@@ -10,6 +10,7 @@ import PDFLink from '../components/UI/PDFLink'
 const HomePage = () => {
   const { user, isAdmin, signOut } = useAuth()
   const [showSubtitle, setShowSubtitle] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
 
   const handleFirstTextComplete = () => {
     setShowSubtitle(true)
@@ -176,8 +177,55 @@ const HomePage = () => {
                 </div>
               )}
             </div>
+            {/* Mobile menu toggle */}
+            <button
+              className="md:hidden inline-flex items-center px-3 py-2 rounded hover:opacity-80"
+              style={{ color: '#252422' }}
+              aria-label="Menü öffnen"
+              onClick={() => setMobileOpen(o => !o)}
+            >
+              <span className="sr-only">Menü</span>
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
           </div>
         </div>
+        {/* Mobile dropdown */}
+        {mobileOpen && (
+          <div className="md:hidden px-6 pb-4 space-y-2" style={{ backgroundColor: '#F4F1E8' }}>
+            <Link to="/" className="block text-sm font-medium" style={{ color: '#252422' }} onClick={() => setMobileOpen(false)}>Start</Link>
+            <Link to="/about" className="block text-sm font-medium" style={{ color: '#252422' }} onClick={() => setMobileOpen(false)}>Über uns</Link>
+            <Link to="/faq" className="block text-sm font-medium" style={{ color: '#252422' }} onClick={() => setMobileOpen(false)}>FAQ</Link>
+            <Link to="/contact" className="block text-sm font-medium" style={{ color: '#252422' }} onClick={() => setMobileOpen(false)}>Kontakt</Link>
+            {!user ? (
+              <div className="pt-2 space-y-2">
+                <Link to="/login" className="block text-sm font-medium" style={{ color: '#252422' }} onClick={() => setMobileOpen(false)}>Anmelden</Link>
+                <Link to="/register" className="inline-flex items-center px-4 py-2 text-sm font-medium text-white rounded-md" style={{ backgroundColor: '#252422' }} onClick={() => setMobileOpen(false)}>Registrieren</Link>
+              </div>
+            ) : (
+              <div className="pt-2 space-y-2">
+                <button
+                  onClick={() => { window.location.href = '/profile' }}
+                  className="inline-flex items-center px-4 py-2 text-sm font-medium text-white rounded-md"
+                  style={{ backgroundColor: '#252422' }}
+                >
+                  {user.email}
+                </button>
+                {isAdmin() && (
+                  <Link to="/admin" className="inline-flex items-center px-4 py-2 text-sm font-medium text-white rounded-md" style={{ backgroundColor: '#dc2626' }} onClick={() => setMobileOpen(false)}>Admin Panel</Link>
+                )}
+                <button
+                  onClick={async () => { await signOut(); window.location.href = '/login' }}
+                  className="inline-flex items-center px-4 py-2 text-sm font-medium text-white rounded-md"
+                  style={{ backgroundColor: '#A58C81' }}
+                >
+                  Abmelden
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </nav>
 
       {/* Hero Section - Smaller 30% */}
@@ -269,8 +317,10 @@ const HomePage = () => {
         <div className="max-w-7xl mx-auto space-y-8">
           {/* Calendar Section */}
           <div className="bg-white rounded-2xl shadow-xl p-6 relative" style={{ border: '2px solid #A58C81' }}>
-            <div className="w-full">
-              <NewEventCalendar />
+            <div className="w-full overflow-x-auto">
+              <div className="min-w-[640px]">
+                <NewEventCalendar />
+              </div>
             </div>
           </div>
           
