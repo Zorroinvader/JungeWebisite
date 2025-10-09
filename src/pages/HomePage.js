@@ -19,7 +19,7 @@ const HomePage = () => {
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#F4F1E8' }}>
       {/* Navigation Header - Anthropic Style with Dropdowns */}
-      <nav className="w-full border-b" style={{ backgroundColor: '#F4F1E8', borderColor: '#A58C81' }}>
+      <nav className="w-full border-b sticky top-0 z-40" style={{ backgroundColor: '#F4F1E8', borderColor: '#A58C81' }}>
         <div className="w-full px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo on the left */}
@@ -233,8 +233,8 @@ const HomePage = () => {
         <div className="w-full px-6 lg:px-8 py-12">
           <div className="max-w-7xl mx-auto">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-              {/* Left side - Main content */}
-              <div>
+              {/* Left side - Main content (on mobile above, logo moves below/right) */}
+              <div className="order-1 lg:order-1">
                 <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight" style={{ color: '#252422' }}>
                   <TypewriterText 
                     text="Junge Gesellschaft" 
@@ -291,13 +291,13 @@ const HomePage = () => {
                 </div>
               </div>
               
-              {/* Right side - Logo/Visual */}
-              <div className="flex justify-center lg:justify-end">
+              {/* Right side - Logo/Visual (mobile right alignment) */}
+              <div className="order-2 lg:order-2 flex justify-end">
                 <div className="relative">
                   <img 
                     src="/assets/Wappen-Junge-Gesellschaft-Pferdestall-Wedes-Wedel.png" 
                     alt="Junge Gesellschaft Logo" 
-                    className="h-32 w-32 object-contain drop-shadow-xl"
+                    className="h-24 w-24 md:h-32 md:w-32 object-contain drop-shadow-xl"
                   />
                   <div className="absolute -inset-2 bg-white rounded-full opacity-20 blur-lg"></div>
                 </div>
@@ -329,7 +329,8 @@ const HomePage = () => {
                 </div>
               </div>
             )}
-            <div className="w-full overflow-x-auto">
+            {/* Make calendar header usable on small screens */}
+            <div className="w-full overflow-x-auto touch-pan-x">
               {/* Mobile overlay to redirect directly on tap */}
               {!user && (
                 <button
@@ -340,8 +341,10 @@ const HomePage = () => {
                   style={{ background: 'transparent' }}
                 />
               )}
-              <div className="min-w-[640px]">
-                <NewEventCalendar />
+              <div className="min-w-[600px] md:min-w-[720px]">
+                <div className="scale-[0.92] origin-top-left md:scale-100">
+                  <NewEventCalendar />
+                </div>
               </div>
             </div>
           </div>

@@ -52,7 +52,7 @@ const FAQPage = () => {
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#F4F1E8' }}>
       {/* Navigation Header - match HomePage */}
-      <nav className="w-full border-b" style={{ backgroundColor: '#F4F1E8', borderColor: '#A58C81' }}>
+      <nav className="w-full border-b sticky top-0 z-40" style={{ backgroundColor: '#F4F1E8', borderColor: '#A58C81' }}>
         <div className="w-full px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
