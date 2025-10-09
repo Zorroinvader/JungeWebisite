@@ -1,7 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Users, MapPin, Mail, Phone, Clock, FileText } from 'lucide-react'
+import { Users, MapPin, Mail, Clock, FileText } from 'lucide-react'
 
 const ContactPage = () => {
   const { user } = useAuth()

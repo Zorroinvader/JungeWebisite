@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Users, MapPin, Mail, Calendar, FileText, ChevronDown, ChevronUp, HelpCircle } from 'lucide-react'
+import { Users, MapPin, Mail, ChevronDown, ChevronUp } from 'lucide-react'
 
 const FAQPage = () => {
   const { user } = useAuth()

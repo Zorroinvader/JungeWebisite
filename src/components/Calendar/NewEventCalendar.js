@@ -4,7 +4,7 @@ import moment from 'moment'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 import { useAuth } from '../../contexts/AuthContext'
 import { eventsAPI, eventRequestsAPI } from '../../services/httpApi'
-import { Plus, MapPin, Clock, X } from 'lucide-react'
+import { MapPin, Clock, X } from 'lucide-react'
 import EventRequestModalHTTP from './EventRequestModalHTTP'
 import EventDetailsModal from './EventDetailsModal'
 import eventBus from '../../utils/eventBus'
@@ -200,7 +200,6 @@ const NewEventCalendar = () => {
   const eventStyleGetter = useCallback((event) => {
     const isRequest = event.resource?.isRequest || false
     const isBlocked = event.resource?.isBlocked || false
-    const isPrivate = event.resource?.isPrivate || false
 
     // Blocked events (private events for normal users) - gray
     if (isBlocked) {

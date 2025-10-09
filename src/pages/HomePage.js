@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Plus, Calendar, Users, FileText, Phone, MapPin, Mail, ChevronDown } from 'lucide-react'
+import { Calendar, Users, FileText, ChevronDown } from 'lucide-react'
 import NewEventCalendar from '../components/Calendar/NewEventCalendar'
 import SideMenu from '../components/Layout/SideMenu'
 import TypewriterText from '../components/UI/TypewriterText'

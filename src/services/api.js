@@ -1,4 +1,4 @@
-import { supabase, TABLES, EVENT_STATUS } from '../lib/supabase'
+// import { supabase, TABLES, EVENT_STATUS } from '../lib/supabase'
 import { profilesAPI, eventsAPI, eventRequestsAPI } from './httpApi'
 
 // Event API functions using HTTP requests
