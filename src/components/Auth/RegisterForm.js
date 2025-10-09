@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { supabase } from '../../lib/supabase'
 import { Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle } from 'lucide-react'
 
 const RegisterForm = () => {
-  const { signUp, signIn, user, loading } = useAuth()
+  const { signUp } = useAuth()
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
     fullName: '',

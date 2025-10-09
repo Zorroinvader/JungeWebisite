@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { Eye, EyeOff, Mail, Lock, AlertCircle } from 'lucide-react'
 
 const LoginForm = () => {
-  const { signIn, user, loading: authLoading } = useAuth()
+  const { signIn, user } = useAuth()
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
     email: '',
@@ -16,7 +16,7 @@ const LoginForm = () => {
 
   // Reset loading when user logs in successfully
   useEffect(() => {
-    console.log('LoginForm useEffect - user:', user, 'loading:', loading)
+    console.log('LoginForm useEffect - user:', user)
     if (user) {
       console.log('User logged in, navigating to home page')
       setLoading(false)

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { eventRequestAPI } from '../services/api'
 import { Calendar, Clock, CheckCircle, XCircle, AlertCircle, User, Mail } from 'lucide-react'
@@ -12,26 +12,18 @@ const ProfilePageSimple = () => {
 
   console.log('ProfilePageSimple render - user:', user, 'profile:', profile)
 
-  useEffect(() => {
-    console.log('ProfilePageSimple useEffect - loading event requests')
-    loadEventRequests()
-  }, [])
-
-  const loadEventRequests = async () => {
+  const loadEventRequests = useCallback(async () => {
     try {
       console.log('Loading event requests for user ID:', user?.id)
       setLoading(true)
-      
       if (!user?.id) {
         console.log('No user ID available')
         setError('Benutzer nicht gefunden')
         setEventRequests([])
         return
       }
-      
       const { data, error } = await eventRequestAPI.getUserEventRequests(user.id)
       console.log('Event requests API response:', { data, error })
-      
       if (error) {
         console.error('Error loading event requests:', error)
         setEventRequests([])
@@ -48,7 +40,12 @@ const ProfilePageSimple = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user?.id])
+
+  useEffect(() => {
+    console.log('ProfilePageSimple useEffect - loading event requests')
+    loadEventRequests()
+  }, [loadEventRequests])
 
   const getStatusIcon = (status) => {
     switch (status) {

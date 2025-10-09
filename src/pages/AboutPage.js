@@ -283,6 +283,7 @@ const AboutPage = () => {
           </div>
         </div>
       </div>
+      </div>
 
       {/* Footer - match HomePage */}
       <footer style={{ backgroundColor: '#252422' }}>

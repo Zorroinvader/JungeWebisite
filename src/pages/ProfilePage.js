@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { eventRequestsAPI } from '../services/httpApi'
 import { Calendar, Clock, CheckCircle, XCircle, AlertCircle, User, Mail } from 'lucide-react'
@@ -12,14 +12,34 @@ const ProfilePage = () => {
   const [error, setError] = useState('')
   const [isLoadingRequests, setIsLoadingRequests] = useState(false)
 
+  const loadEventRequests = useCallback(async () => {
+    if (isLoadingRequests) {
+      return
+    }
+    setIsLoadingRequests(true)
+    try {
+      const data = await eventRequestsAPI.getByUser(user?.id)
+      if (data) {
+        setEventRequests(data || [])
+        setError('')
+      } else {
+        setEventRequests([])
+        setError('Keine Event-Anfragen gefunden')
+      }
+    } catch (err) {
+      setEventRequests([])
+      setError(`Ein unerwarteter Fehler ist aufgetreten: ${err.message}`)
+    } finally {
+      setLoading(false)
+      setIsLoadingRequests(false)
+    }
+  }, [isLoadingRequests, user?.id])
+
   useEffect(() => {
-    // Load event requests immediately
     loadEventRequests()
     
     // Set up periodic refresh every 60 seconds
-    const refreshInterval = setInterval(() => {
-      loadEventRequests()
-    }, 60000)
+    const refreshInterval = setInterval(() => { loadEventRequests() }, 60000)
     
     // Listen for new event request creation
     const handleEventRequestCreated = (data) => {
@@ -39,33 +59,9 @@ const ProfilePage = () => {
       clearTimeout(safetyTimeout)
       eventBus.off('eventRequestCreated', handleEventRequestCreated)
     }
-  }, [user?.id])
+  }, [user?.id, loadEventRequests])
 
-  const loadEventRequests = async () => {
-    if (isLoadingRequests) {
-      return // Prevent multiple simultaneous calls
-    }
-    
-    setIsLoadingRequests(true)
-    
-    try {
-      const data = await eventRequestsAPI.getByUser(user?.id)
-      
-      if (data) {
-        setEventRequests(data || [])
-        setError('')
-      } else {
-        setEventRequests([])
-        setError('Keine Event-Anfragen gefunden')
-      }
-    } catch (err) {
-      setEventRequests([])
-      setError(`Ein unerwarteter Fehler ist aufgetreten: ${err.message}`)
-    } finally {
-      setLoading(false)
-      setIsLoadingRequests(false)
-    }
-  }
+  // loadEventRequests is memoized above
 
   const getStatusIcon = (status) => {
     switch (status) {
