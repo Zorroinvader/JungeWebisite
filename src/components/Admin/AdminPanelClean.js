@@ -97,7 +97,7 @@ const AdminPanelClean = () => {
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#F4F1E8' }}>
       {/* Navigation Header */}
-      <nav className="w-full border-b" style={{ backgroundColor: '#F4F1E8', borderColor: '#A58C81' }}>
+      <nav className="w-full border-b sticky top-0 z-40" style={{ backgroundColor: '#F4F1E8', borderColor: '#A58C81' }}>
         <div className="w-full px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo on the left */}
@@ -138,7 +138,7 @@ const AdminPanelClean = () => {
         <div className="bg-white rounded-2xl shadow-xl" style={{ border: '2px solid #A58C81' }}>
           {/* Tab Navigation */}
           <div style={{ borderBottom: '1px solid #A58C81' }}>
-            <nav className="-mb-px flex space-x-8 px-6" aria-label="Tabs">
+            <nav className="-mb-px flex flex-wrap gap-x-4 gap-y-2 px-4 sm:px-6" aria-label="Tabs">
               {tabs.map((tab) => {
                 const Icon = tab.icon
                 return (
@@ -149,7 +149,7 @@ const AdminPanelClean = () => {
                       activeTab === tab.id
                         ? 'border-b-2 font-semibold'
                         : 'border-transparent hover:opacity-70'
-                    } whitespace-nowrap py-4 px-1 font-medium text-sm flex items-center space-x-2 transition-opacity duration-200`}
+                    } whitespace-nowrap py-3 px-2 font-medium text-sm flex items-center space-x-2 transition-opacity duration-200`}
                     style={{
                       borderColor: activeTab === tab.id ? '#A58C81' : 'transparent',
                       color: activeTab === tab.id ? '#A58C81' : '#666'
@@ -164,7 +164,7 @@ const AdminPanelClean = () => {
           </div>
 
           {/* Tab Content */}
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {renderTabContent()}
           </div>
         </div>
