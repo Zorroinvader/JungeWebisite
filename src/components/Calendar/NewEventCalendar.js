@@ -326,7 +326,7 @@ const NewEventCalendar = () => {
       {/* Header with Refresh Button */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold mb-2" style={{ color: '#252422' }}>Event-Kalender</h2>
+          <h2 className="text-4xl md:text-5xl font-extrabold mb-2 tracking-tight" style={{ color: '#252422' }}>Event-Kalender</h2>
           <p className="text-base" style={{ color: '#A58C81' }}>
             {user && 'Klicken Sie auf ein Datum, um ein Event anzufragen.'}
           </p>

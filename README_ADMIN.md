@@ -17,7 +17,7 @@ Willkommen! Diese Anleitung erklärt Ihnen in einfachen Worten, wie Sie die Webs
 Hinweis: Oben rechts finden Sie die Navigation. Wenn Sie angemeldet sind, sehen Sie zusätzlich den Button „Profil“ und (falls Admin) „Admin Panel“.
 
 ---
-cal
+
 ## Anmelden und Abmelden
 1. Klicken Sie oben rechts auf „Anmelden“.
 2. Geben Sie Ihre E‑Mail und Ihr Passwort ein und klicken Sie auf „Anmelden“.

@@ -11,6 +11,7 @@ const HomePage = () => {
   const { user, isAdmin, signOut } = useAuth()
   const [showSubtitle, setShowSubtitle] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [showDescription, setShowDescription] = useState(false)
 
   const handleFirstTextComplete = () => {
     setShowSubtitle(true)
@@ -228,42 +229,49 @@ const HomePage = () => {
         )}
       </nav>
 
-      {/* Hero Section - Smaller 30% */}
+      {/* Hero Section */}
       <div className="w-full" style={{ backgroundColor: '#F4F1E8' }}>
-        <div className="w-full px-6 lg:px-8 py-12">
-          <div className="max-w-7xl mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-              {/* Left side - Main content (on mobile above, logo moves below/right) */}
-              <div className="order-1 lg:order-1 lg:-ml-4 xl:-ml-6 2xl:-ml-8 lg:max-w-2xl xl:max-w-3xl">
-                {/* Title row with inline logo on mobile */}
-                <div className="flex items-center justify-between md:block">
-                  <h1 className="text-4xl md:text-6xl font-bold mb-3 md:mb-6 leading-tight" style={{ color: '#252422' }}>
+        <div className="w-full px-6 py-12">
+          <div className="max-w-5xl ml-0 lg:ml-[12vw] xl:ml-[12vw] 2xl:ml-[12vw]">
+            {/* Logo + Title row on the left */}
+            <div className="flex items-center gap-4 mb-3 lg:mb-6">
+              <img 
+                src="/assets/Wappen-Junge-Gesellschaft-Pferdestall-Wedes-Wedel.png" 
+                alt="Junge Gesellschaft Logo" 
+                className="h-16 w-16 md:h-24 md:w-24 object-contain"
+              />
+              <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold leading-tight tracking-tight min-h-[56px] md:min-h-[72px] lg:min-h-[88px]" style={{ color: '#252422' }}>
+                <TypewriterText 
+                  text="Junge Gesellschaft" 
+                  speed={75}
+                  className="block"
+                  onComplete={handleFirstTextComplete}
+                />
+              </h1>
+            </div>
+                <div className="min-h-[32px] md:min-h-[40px] mt-3">
+                  {showSubtitle && (
                     <TypewriterText 
-                      text="Junge Gesellschaft" 
-                      speed={150}
-                      className="block"
-                      onComplete={handleFirstTextComplete}
+                      text="Pferdestall Wedes-Wedel e.V." 
+                      speed={20}
+                      className="block text-xl md:text-2xl font-semibold"
+                      style={{ color: '#A58C81' }}
+                      showCursor={false}
+                      onComplete={() => setShowDescription(true)}
                     />
-                  </h1>
-                  {/* Mobile inline logo next to the title */}
-                  <img
-                    src="/assets/Wappen-Junge-Gesellschaft-Pferdestall-Wedes-Wedel.png"
-                    alt="Junge Gesellschaft Logo"
-                    className="md:hidden h-14 w-14 object-contain ml-4"
-                  />
+                  )}
                 </div>
-                {showSubtitle && (
-                  <TypewriterText 
-                    text="Pferdestall Wedes-Wedel e.V." 
-                    speed={100}
-                    className="block text-lg md:text-xl mt-3 font-medium"
-                    style={{ color: '#A58C81' }}
-                    showCursor={false}
-                  />
-                )}
-                <p className="text-xl md:text-2xl mb-8 leading-relaxed font-normal" style={{ color: '#252422' }}>
-                  Die Begegnungsstätte für Junge (und jung gebliebene) Leute in unserer Gemeinde
-                </p>
+                <div className="min-h-[56px] md:min-h-[64px]">
+                  {showDescription && (
+                    <TypewriterText 
+                      text="Die Begegnungsstätte für Junge (und jung gebliebene) Leute in unserer Gemeinde" 
+                      speed={20}
+                      className="text-xl md:text-2xl mb-8 leading-relaxed font-normal"
+                      style={{ color: '#252422' }}
+                      showCursor={false}
+                    />
+                  )}
+                </div>
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Link
                     to="/about"
@@ -298,21 +306,6 @@ const HomePage = () => {
                     Event anfragen
                   </button>
                 </div>
-              </div>
-              
-              {/* Right side - Logo/Visual (mobile right alignment) */}
-              {/* Desktop logo on the right, hidden on mobile */}
-              <div className="hidden lg:flex justify-end">
-                <div className="relative mb-4 md:mb-0">
-                  <img 
-                    src="/assets/Wappen-Junge-Gesellschaft-Pferdestall-Wedes-Wedel.png" 
-                    alt="Junge Gesellschaft Logo" 
-                    className="h-24 w-24 md:h-32 md:w-32 object-contain drop-shadow-xl"
-                  />
-                  <div className="absolute -inset-2 bg-white rounded-full opacity-20 blur-lg"></div>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -324,7 +317,7 @@ const HomePage = () => {
 
       {/* Main Content */}
       <div className="w-full px-6 lg:px-8 py-12" style={{ backgroundColor: '#F4F1E8' }}>
-        <div className="max-w-7xl mx-auto space-y-8">
+        <div className="mx-auto space-y-8 max-w-7xl xl:max-w-[96rem] 2xl:max-w-[108rem]">
           {/* Calendar Section */}
           <div className="bg-white rounded-2xl shadow-xl p-6 relative" style={{ border: '2px solid #A58C81' }}>
             {/* If user not logged in, show quick hint and mobile tap overlay */}
