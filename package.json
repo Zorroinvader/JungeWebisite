@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Jungengesellschaft website with Supabase backend and interactive calendar",
   "private": true,
-  "homepage": "https://[your-username].github.io/[repository-name]",
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
     "react": "^18.2.0",
