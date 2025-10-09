@@ -1,0 +1,15 @@
+{
+  "short_name": "Junge Gesellschaft",
+  "name": "Junge Gesellschaft Pferdestall Wedes-Wedel e.V.",
+  "icons": [
+    {
+      "src": "assets/Wappen-Junge-Gesellschaft-Pferdestall-Wedes-Wedel.png",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/png"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#A58C81",
+  "background_color": "#F4F1E8"
+}
