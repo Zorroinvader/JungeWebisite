@@ -235,23 +235,32 @@ const HomePage = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
               {/* Left side - Main content (on mobile above, logo moves below/right) */}
               <div className="order-1 lg:order-1">
-                <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight" style={{ color: '#252422' }}>
-                  <TypewriterText 
-                    text="Junge Gesellschaft" 
-                    speed={150}
-                    className="block"
-                    onComplete={handleFirstTextComplete}
-                  />
-                  {showSubtitle && (
+                {/* Title row with inline logo on mobile */}
+                <div className="flex items-center justify-between md:block">
+                  <h1 className="text-4xl md:text-6xl font-bold mb-3 md:mb-6 leading-tight" style={{ color: '#252422' }}>
                     <TypewriterText 
-                      text="Pferdestall Wedes-Wedel e.V." 
-                      speed={100}
-                      className="block text-lg md:text-xl mt-3 font-medium"
-                      style={{ color: '#A58C81' }}
-                      showCursor={false}
+                      text="Junge Gesellschaft" 
+                      speed={150}
+                      className="block"
+                      onComplete={handleFirstTextComplete}
                     />
-                  )}
-                </h1>
+                  </h1>
+                  {/* Mobile inline logo next to the title */}
+                  <img
+                    src="/assets/Wappen-Junge-Gesellschaft-Pferdestall-Wedes-Wedel.png"
+                    alt="Junge Gesellschaft Logo"
+                    className="md:hidden h-14 w-14 object-contain ml-4"
+                  />
+                </div>
+                {showSubtitle && (
+                  <TypewriterText 
+                    text="Pferdestall Wedes-Wedel e.V." 
+                    speed={100}
+                    className="block text-lg md:text-xl mt-3 font-medium"
+                    style={{ color: '#A58C81' }}
+                    showCursor={false}
+                  />
+                )}
                 <p className="text-xl md:text-2xl mb-8 leading-relaxed font-normal" style={{ color: '#252422' }}>
                   Die Begegnungsstätte für Junge (und jung gebliebene) Leute in unserer Gemeinde
                 </p>
@@ -292,7 +301,8 @@ const HomePage = () => {
               </div>
               
               {/* Right side - Logo/Visual (mobile right alignment) */}
-              <div className="order-2 lg:order-2 flex justify-end">
+              {/* Desktop logo on the right, hidden on mobile */}
+              <div className="hidden lg:flex justify-end">
                 <div className="relative mb-4 md:mb-0">
                   <img 
                     src="/assets/Wappen-Junge-Gesellschaft-Pferdestall-Wedes-Wedel.png" 

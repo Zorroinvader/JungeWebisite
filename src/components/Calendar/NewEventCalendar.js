@@ -270,9 +270,19 @@ const NewEventCalendar = () => {
           padding: 6px 8px;
           gap: 6px;
           flex-wrap: wrap;
+          width: 100%;
+          display: flex;
+          justify-content: center;
+        }
+        .compact-calendar .rbc-toolbar .rbc-btn-group {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
         }
         .compact-calendar .rbc-toolbar-label {
           font-size: 13px;
+          text-align: center;
+          width: 100%;
         }
         .compact-calendar .rbc-btn-group > button {
           padding: 4px 8px;
@@ -302,6 +312,15 @@ const NewEventCalendar = () => {
         @media (max-width: 360px) {
           .compact-calendar .rbc-calendar { height: 360px !important; }
           .compact-calendar .rbc-month-row { min-height: 64px; }
+        }
+        @media (max-width: 640px) {
+          .compact-calendar .rbc-toolbar {
+            flex-direction: column;
+            align-items: center;
+          }
+          .compact-calendar .rbc-toolbar .rbc-btn-group {
+            width: 100%;
+          }
         }
       `}</style>
       {/* Header with Refresh Button */}
