@@ -234,7 +234,7 @@ const HomePage = () => {
           <div className="max-w-7xl mx-auto">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
               {/* Left side - Main content (on mobile above, logo moves below/right) */}
-              <div className="order-1 lg:order-1 lg:-ml-6 xl:-ml-10">
+              <div className="order-1 lg:order-1 lg:-ml-4 xl:-ml-6 2xl:-ml-8 lg:max-w-2xl xl:max-w-3xl">
                 {/* Title row with inline logo on mobile */}
                 <div className="flex items-center justify-between md:block">
                   <h1 className="text-4xl md:text-6xl font-bold mb-3 md:mb-6 leading-tight" style={{ color: '#252422' }}>
