@@ -317,7 +317,29 @@ const HomePage = () => {
         <div className="max-w-7xl mx-auto space-y-8">
           {/* Calendar Section */}
           <div className="bg-white rounded-2xl shadow-xl p-6 relative" style={{ border: '2px solid #A58C81' }}>
+            {/* If user not logged in, show quick hint and mobile tap overlay */}
+            {!user && (
+              <div className="mb-4 flex items-center justify-between">
+                <p className="text-sm" style={{ color: '#666' }}>
+                  Bitte anmelden, um eine Event‑Anfrage zu stellen.
+                </p>
+                <div className="hidden sm:flex items-center gap-2">
+                  <Link to="/login" className="px-3 py-1.5 text-sm font-medium text-white rounded-md" style={{ backgroundColor: '#252422' }}>Anmelden</Link>
+                  <Link to="/register" className="px-3 py-1.5 text-sm font-medium text-white rounded-md" style={{ backgroundColor: '#A58C81' }}>Registrieren</Link>
+                </div>
+              </div>
+            )}
             <div className="w-full overflow-x-auto">
+              {/* Mobile overlay to redirect directly on tap */}
+              {!user && (
+                <button
+                  type="button"
+                  className="absolute inset-0 z-10 md:hidden"
+                  aria-label="Zum Anmelden tippen"
+                  onClick={() => { window.location.href = '/login' }}
+                  style={{ background: 'transparent' }}
+                />
+              )}
               <div className="min-w-[640px]">
                 <NewEventCalendar />
               </div>
