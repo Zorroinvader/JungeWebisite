@@ -330,7 +330,7 @@ const HomePage = () => {
               </div>
             )}
             {/* Make calendar header usable on small screens */}
-            <div className="w-full overflow-x-auto touch-pan-x">
+            <div className="w-full touch-pan-x">
               {/* Mobile overlay to redirect directly on tap */}
               {!user && (
                 <button
@@ -341,10 +341,8 @@ const HomePage = () => {
                   style={{ background: 'transparent' }}
                 />
               )}
-              <div className="min-w-[600px] md:min-w-[720px]">
-                <div className="scale-[0.92] origin-top-left md:scale-100">
-                  <NewEventCalendar />
-                </div>
+              <div className="w-full">
+                <NewEventCalendar />
               </div>
             </div>
           </div>

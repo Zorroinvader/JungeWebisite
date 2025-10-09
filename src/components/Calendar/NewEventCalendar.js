@@ -291,16 +291,16 @@ const NewEventCalendar = () => {
         .compact-calendar .rbc-event {
           padding: 1px 3px;
         }
-        .compact-calendar .rbc-calendar {
-          height: 440px !important;
-        }
+        .compact-calendar .rbc-calendar { height: 400px !important; width: 100% !important; }
+        .compact-calendar .rbc-month-view { width: 100% !important; }
+        .compact-calendar .rbc-time-view, .compact-calendar .rbc-agenda-view { width: 100% !important; }
         @media (min-width: 640px) {
-          .compact-calendar .rbc-calendar { height: 620px !important; }
+          .compact-calendar .rbc-calendar { height: 560px !important; }
           .compact-calendar .rbc-toolbar-label { font-size: 14px; }
           .compact-calendar .rbc-month-view { font-size: 13px; }
         }
         @media (max-width: 360px) {
-          .compact-calendar .rbc-calendar { height: 400px !important; }
+          .compact-calendar .rbc-calendar { height: 360px !important; }
           .compact-calendar .rbc-month-row { min-height: 64px; }
         }
       `}</style>
@@ -359,7 +359,7 @@ const NewEventCalendar = () => {
             events={events}
             startAccessor="start"
             endAccessor="end"
-            style={{ height: '620px' }}
+            style={{ height: '560px', width: '100%' }}
             view="month"
             views={['month']}
             date={currentDate}
