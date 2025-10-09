@@ -264,6 +264,46 @@ const NewEventCalendar = () => {
 
   return (
     <div className="w-full">
+      {/* Compact mobile styles for react-big-calendar */}
+      <style>{`
+        .compact-calendar .rbc-toolbar {
+          padding: 6px 8px;
+          gap: 6px;
+          flex-wrap: wrap;
+        }
+        .compact-calendar .rbc-toolbar-label {
+          font-size: 13px;
+        }
+        .compact-calendar .rbc-btn-group > button {
+          padding: 4px 8px;
+          font-size: 12px;
+          line-height: 1.2;
+        }
+        .compact-calendar .rbc-month-view {
+          font-size: 12px;
+        }
+        .compact-calendar .rbc-month-row {
+          min-height: 72px;
+        }
+        .compact-calendar .rbc-date-cell {
+          padding: 2px 4px;
+        }
+        .compact-calendar .rbc-event {
+          padding: 1px 3px;
+        }
+        .compact-calendar .rbc-calendar {
+          height: 440px !important;
+        }
+        @media (min-width: 640px) {
+          .compact-calendar .rbc-calendar { height: 620px !important; }
+          .compact-calendar .rbc-toolbar-label { font-size: 14px; }
+          .compact-calendar .rbc-month-view { font-size: 13px; }
+        }
+        @media (max-width: 360px) {
+          .compact-calendar .rbc-calendar { height: 400px !important; }
+          .compact-calendar .rbc-month-row { min-height: 64px; }
+        }
+      `}</style>
       {/* Header with Refresh Button */}
       <div className="mb-6 flex items-center justify-between">
         <div>
@@ -319,7 +359,7 @@ const NewEventCalendar = () => {
             events={events}
             startAccessor="start"
             endAccessor="end"
-            style={{ height: '700px' }}
+            style={{ height: '620px' }}
             view="month"
             views={['month']}
             date={currentDate}

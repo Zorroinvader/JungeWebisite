@@ -29,7 +29,7 @@ const HomePage = () => {
                 alt="Junge Gesellschaft Logo" 
                 className="h-8 w-8 object-contain"
               />
-              <span className="text-lg font-semibold" style={{ color: '#252422' }}>Junge Gesellschaft</span>
+              <Link to="/" className="text-lg font-semibold hover:opacity-80" style={{ color: '#252422' }}>Junge Gesellschaft</Link>
             </div>
             
             {/* Navigation on the right */}
@@ -293,7 +293,7 @@ const HomePage = () => {
               
               {/* Right side - Logo/Visual (mobile right alignment) */}
               <div className="order-2 lg:order-2 flex justify-end">
-                <div className="relative">
+                <div className="relative mb-4 md:mb-0">
                   <img 
                     src="/assets/Wappen-Junge-Gesellschaft-Pferdestall-Wedes-Wedel.png" 
                     alt="Junge Gesellschaft Logo" 
