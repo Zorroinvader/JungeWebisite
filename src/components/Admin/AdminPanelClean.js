@@ -149,14 +149,14 @@ const AdminPanelClean = () => {
                       activeTab === tab.id
                         ? 'border-b-2 font-semibold'
                         : 'border-transparent hover:opacity-70'
-                    } whitespace-nowrap py-3 px-2 font-medium text-sm flex items-center space-x-2 transition-opacity duration-200`}
+                    } min-w-0 whitespace-normal text-center py-3 px-2 font-medium text-sm flex items-center justify-center space-x-2 transition-opacity duration-200`}
                     style={{
                       borderColor: activeTab === tab.id ? '#A58C81' : 'transparent',
                       color: activeTab === tab.id ? '#A58C81' : '#666'
                     }}
                   >
-                    <Icon className="h-5 w-5" />
-                    <span>{tab.name}</span>
+                    <Icon className="h-5 w-5 flex-shrink-0" />
+                    <span className="break-words">{tab.name}</span>
                   </button>
                 )
               })}
