@@ -7,15 +7,58 @@
     <meta name="theme-color" content="#000000" />
     <meta
       name="description"
-      content="Jungengesellschaft Website - Events und Kalender"
+      content="Jungengesellschaft Pferdestall Wedes-Wedel"
     />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Clash+Grotesk:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
-    <title>Jungengesellschaft</title>
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/assets/Wappen-Junge-Gesellschaft-Pferdestall-Wedes-Wedel.png" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <title>Jungengesellschaft Pferdestall Wedes-Wedel</title>
+    
+    <!-- Security: Disable right-click and dev tools shortcuts -->
+    <script>
+      // Disable right-click context menu
+      document.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+      });
+      
+      // Disable F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U
+      document.addEventListener('keydown', function(e) {
+        // F12
+        if (e.keyCode === 123) {
+          e.preventDefault();
+          return false;
+        }
+        // Ctrl+Shift+I (Dev Tools)
+        if (e.ctrlKey && e.shiftKey && e.keyCode === 73) {
+          e.preventDefault();
+          return false;
+        }
+        // Ctrl+Shift+J (Console)
+        if (e.ctrlKey && e.shiftKey && e.keyCode === 74) {
+          e.preventDefault();
+          return false;
+        }
+        // Ctrl+U (View Source)
+        if (e.ctrlKey && e.keyCode === 85) {
+          e.preventDefault();
+          return false;
+        }
+        // Ctrl+Shift+C (Inspect Element)
+        if (e.ctrlKey && e.shiftKey && e.keyCode === 67) {
+          e.preventDefault();
+          return false;
+        }
+      });
+      
+      // Disable React DevTools in production
+      if (typeof window.__REACT_DEVTOOLS_GLOBAL_HOOK__ === 'object') {
+        for (let [key, value] of Object.entries(window.__REACT_DEVTOOLS_GLOBAL_HOOK__)) {
+          window.__REACT_DEVTOOLS_GLOBAL_HOOK__[key] = typeof value === 'function' ? () => {} : null;
+        }
+      }
+    </script>
   </head>
   <body>
-    <noscript>Sie müssen JavaScript aktivieren, um diese App zu verwenden.</noscript>
+    <noscript>Sie müssen JavaScript aktivieren, um diese Website zu nutzen.</noscript>
     <div id="root"></div>
   </body>
 </html>
