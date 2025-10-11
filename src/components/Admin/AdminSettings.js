@@ -88,7 +88,7 @@ const AdminSettings = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label htmlFor="siteName" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="siteName" className="block text-sm font-medium text-gray-700 dark:text-[#F4F1E8] mb-2">
                 Website-Name
               </label>
               <input
@@ -97,12 +97,12 @@ const AdminSettings = () => {
                 name="siteName"
                 value={settings.siteName}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-[#6a6a6a] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-[#8a8a8a] focus:border-primary-500 dark:focus:border-[#8a8a8a] bg-white dark:bg-[#1a1a1a] text-[#252422] dark:text-[#e0e0e0] placeholder-gray-500 dark:placeholder-gray-400"
               />
             </div>
 
             <div>
-              <label htmlFor="contactEmail" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="contactEmail" className="block text-sm font-medium text-gray-700 dark:text-[#F4F1E8] mb-2">
                 Kontakt-E-Mail
               </label>
               <input
@@ -111,7 +111,7 @@ const AdminSettings = () => {
                 name="contactEmail"
                 value={settings.contactEmail}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-[#6a6a6a] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-[#8a8a8a] focus:border-primary-500 dark:focus:border-[#8a8a8a] bg-white dark:bg-[#1a1a1a] text-[#252422] dark:text-[#e0e0e0] placeholder-gray-500 dark:placeholder-gray-400"
               />
             </div>
           </div>
@@ -137,7 +137,7 @@ const AdminSettings = () => {
           
           <div className="space-y-6">
             <div>
-              <label htmlFor="maxEventParticipants" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="maxEventParticipants" className="block text-sm font-medium text-gray-700 dark:text-[#F4F1E8] mb-2">
                 Maximale Teilnehmerzahl pro Event
               </label>
               <input
@@ -148,7 +148,7 @@ const AdminSettings = () => {
                 onChange={handleChange}
                 min="1"
                 max="1000"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-[#6a6a6a] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-[#8a8a8a] focus:border-primary-500 dark:focus:border-[#8a8a8a] bg-white dark:bg-[#1a1a1a] text-[#252422] dark:text-[#e0e0e0] placeholder-gray-500 dark:placeholder-gray-400"
               />
             </div>
 
@@ -187,7 +187,7 @@ const AdminSettings = () => {
           <h3 className="text-lg font-medium text-gray-900 mb-4">Benachrichtigungen</h3>
           
           <div>
-            <label htmlFor="notificationEmail" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="notificationEmail" className="block text-sm font-medium text-gray-700 dark:text-[#F4F1E8] mb-2">
               Benachrichtigungs-E-Mail
             </label>
             <input
@@ -196,7 +196,7 @@ const AdminSettings = () => {
               name="notificationEmail"
               value={settings.notificationEmail}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-[#6a6a6a] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-[#8a8a8a] focus:border-primary-500 dark:focus:border-[#8a8a8a] bg-white dark:bg-[#1a1a1a] text-[#252422] dark:text-[#e0e0e0] placeholder-gray-500 dark:placeholder-gray-400"
             />
             <p className="mt-1 text-sm text-gray-500">
               E-Mail-Adresse für Benachrichtigungen über neue Event-Anfragen

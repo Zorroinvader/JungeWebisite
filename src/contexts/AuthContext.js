@@ -205,43 +205,55 @@ export const AuthProvider = ({ children }) => {
 
   // Initialize auth state
   useEffect(() => {
-    // Get initial session
-    const getInitialSession = async () => {
+    // Always start with no user - force explicit login
+    const initializeAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        // Clear any Supabase auth data from localStorage
+        const supabaseKeys = Object.keys(localStorage).filter(key => key.startsWith('sb-'))
+        supabaseKeys.forEach(key => {
+          localStorage.removeItem(key)
+          console.log('Cleared localStorage key:', key)
+        })
         
-        if (session?.user) {
-          setUser(session.user)
-          const userProfile = await getProfile(session.user.id)
-          setProfile(userProfile)
-        }
+        // Always clear any existing session immediately
+        console.log('Forcing logout on page load - clearing any existing session')
+        await supabase.auth.signOut()
+        
+        // Ensure local state is cleared
+        setUser(null)
+        setProfile(null)
+        
+        console.log('Page load: User is logged out')
       } catch (error) {
-        console.error('Error getting initial session:', error)
+        console.error('Error during auth initialization:', error)
+        // Even if there's an error, ensure we start logged out
+        setUser(null)
+        setProfile(null)
       } finally {
         setLoading(false)
       }
     }
 
-    getInitialSession()
+    // Initialize auth state
+    initializeAuth()
 
-    // No safety timeout - let it load naturally
-
-    // Listen for auth changes
+    // Listen for auth changes only for explicit login/logout actions
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log(`[${new Date().toLocaleTimeString()}] Auth state change:`, event, session?.user?.email)
-        if (session?.user) {
+        
+        // Only process SIGNED_IN events for explicit logins
+        if (event === 'SIGNED_IN' && session?.user) {
           setUser(session.user)
           const userProfile = await getProfile(session.user.id)
           setProfile(userProfile)
-          console.log(`[${new Date().toLocaleTimeString()}] Profile loaded:`, userProfile)
-        } else {
+          console.log(`[${new Date().toLocaleTimeString()}] User signed in - Profile loaded:`, userProfile)
+        } else if (event === 'SIGNED_OUT') {
           setUser(null)
           setProfile(null)
-          console.log(`[${new Date().toLocaleTimeString()}] User logged out`)
+          console.log(`[${new Date().toLocaleTimeString()}] User signed out`)
         }
-        setLoading(false)
-        console.log(`[${new Date().toLocaleTimeString()}] Auth loading set to false - user: ${!!session?.user}, profile: ${!!profile}`)
+        // Ignore TOKEN_REFRESHED and other events
       }
     )
 

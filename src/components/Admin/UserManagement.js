@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { profileAPI } from '../../services/api'
-import { User, Shield, Mail, Calendar, AlertCircle, CheckCircle, X } from 'lucide-react'
+import { profilesAPI } from '../../services/httpApi'
+import { User, Shield, Mail, Calendar, AlertCircle, X, Plus } from 'lucide-react'
 import moment from 'moment'
+import RegisterForm from '../Auth/RegisterForm'
 
 const UserManagement = () => {
   const [users, setUsers] = useState([])
@@ -9,18 +10,15 @@ const UserManagement = () => {
   const [error, setError] = useState('')
   const [selectedUser, setSelectedUser] = useState(null)
   const [showRoleModal, setShowRoleModal] = useState(false)
+  const [showRegisterForm, setShowRegisterForm] = useState(false)
 
   // Load users
   const loadUsers = async () => {
     try {
       setLoading(true)
-      const { data, error } = await profileAPI.getProfiles()
-      
-      if (error) {
-        setError(error.message)
-      } else {
-        setUsers(data || [])
-      }
+      const data = await profilesAPI.getAll()
+      setUsers(data || [])
+      setError('')
     } catch (err) {
       setError('Fehler beim Laden der Benutzer')
     } finally {
@@ -28,20 +26,22 @@ const UserManagement = () => {
     }
   }
 
+  // Handle successful registration
+  const handleRegistrationSuccess = () => {
+    setShowRegisterForm(false)
+    loadUsers() // Reload users list
+  }
+
   // Update user role
   const handleUpdateRole = async (userId, newRole) => {
     try {
-      const { error } = await profileAPI.updateUserRole(userId, newRole)
-      
-      if (error) {
-        setError(error.message)
-      } else {
-        setUsers(users.map(user => 
-          user.id === userId ? { ...user, role: newRole } : user
-        ))
-        setShowRoleModal(false)
-        setSelectedUser(null)
-      }
+      await profilesAPI.updateUserRole(userId, newRole)
+      setUsers(users.map(user => 
+        user.id === userId ? { ...user, role: newRole } : user
+      ))
+      setShowRoleModal(false)
+      setSelectedUser(null)
+      setError('')
     } catch (err) {
       setError('Fehler beim Aktualisieren der Benutzerrolle')
     }
@@ -100,6 +100,13 @@ const UserManagement = () => {
             {users.length} Benutzer{users.length !== 1 ? '' : ''} gefunden
           </p>
         </div>
+        <button
+          onClick={() => setShowRegisterForm(true)}
+          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Neuer Benutzer
+        </button>
       </div>
 
       {/* Error Message */}
@@ -187,6 +194,36 @@ const UserManagement = () => {
           }}
           onUpdateRole={handleUpdateRole}
         />
+      )}
+
+      {/* Register Form Modal */}
+      {showRegisterForm && (
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+          <div className="relative w-full max-w-lg bg-white dark:bg-[#252422] rounded-2xl shadow-2xl border border-gray-200 dark:border-[#EBE9E9]/20">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-[#EBE9E9]/20">
+              <div>
+                <h3 className="text-xl font-bold text-[#252422] dark:text-[#F4F1E8]">
+                  Neuen Benutzer registrieren
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-[#EBE9E9] mt-1">
+                  Erstellen Sie einen neuen Benutzer mit der Standard-Registrierung
+                </p>
+              </div>
+              <button
+                onClick={() => setShowRegisterForm(false)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-[#EBE9E9]/10 rounded-lg transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-[#F4F1E8]"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            {/* Form Content */}
+            <div className="p-6">
+              <RegisterForm onSuccess={handleRegistrationSuccess} isModal={true} />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -290,5 +327,6 @@ const RoleChangeModal = ({ user, onClose, onUpdateRole }) => {
     </div>
   )
 }
+
 
 export default UserManagement

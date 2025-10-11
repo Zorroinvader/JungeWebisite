@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { Calendar, Users, FileText, Settings, AlertCircle, Check, X, Clock, Eye, Download, ArrowLeft } from 'lucide-react'
 import { eventRequestsAPI, eventsAPI } from '../../services/httpApi'
 import eventBus from '../../utils/eventBus'
+import UserManagement from './UserManagement'
 
 const AdminPanelClean = () => {
   const { isAdmin, user, profile } = useAuth()
@@ -95,49 +96,21 @@ const AdminPanelClean = () => {
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#F4F1E8' }}>
-      {/* Navigation Header */}
-      <nav className="w-full border-b sticky top-0 z-40" style={{ backgroundColor: '#F4F1E8', borderColor: '#A58C81' }}>
-        <div className="w-full px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            {/* Logo on the left */}
-            <div className="flex items-center space-x-3">
-              <img 
-                src="/assets/Wappen-Junge-Gesellschaft-Pferdestall-Wedes-Wedel.png" 
-                alt="Junge Gesellschaft Logo" 
-                className="h-8 w-8 object-contain"
-              />
-              <span className="text-lg font-semibold" style={{ color: '#252422' }}>Junge Gesellschaft</span>
-            </div>
-            
-            {/* Navigation on the right */}
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => navigate('/')}
-                className="text-sm font-medium hover:opacity-70 transition-opacity"
-                style={{ color: '#252422' }}
-              >
-                Zurück zur Startseite
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
+    <div className="min-h-screen bg-[#F4F1E8] dark:bg-[#252422]">
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold mb-4" style={{ color: '#252422' }}>Admin Panel</h1>
-            <p className="text-lg" style={{ color: '#A58C81' }}>
+            <h1 className="text-4xl font-bold mb-4 text-[#252422] dark:text-[#F4F1E8]">Admin Panel</h1>
+            <p className="text-lg text-[#A58C81] dark:text-[#EBE9E9]">
               Verwalten Sie Events, Benutzer und Einstellungen
             </p>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl" style={{ border: '2px solid #A58C81' }}>
+        <div className="bg-white dark:bg-[#252422] rounded-2xl shadow-xl border-2 border-[#A58C81] dark:border-[#EBE9E9]">
           {/* Tab Navigation */}
-          <div style={{ borderBottom: '1px solid #A58C81' }}>
+          <div className="border-b border-[#A58C81] dark:border-[#EBE9E9]">
             <nav className="-mb-px flex flex-wrap gap-x-4 gap-y-2 px-4 sm:px-6" aria-label="Tabs">
               {tabs.map((tab) => {
                 const Icon = tab.icon
@@ -147,13 +120,9 @@ const AdminPanelClean = () => {
                     onClick={() => setActiveTab(tab.id)}
                     className={`${
                       activeTab === tab.id
-                        ? 'border-b-2 font-semibold'
-                        : 'border-transparent hover:opacity-70'
+                        ? 'border-b-2 font-semibold border-[#A58C81] dark:border-[#EBE9E9] text-[#A58C81] dark:text-[#EBE9E9]'
+                        : 'border-transparent hover:opacity-70 text-gray-600 dark:text-[#EBE9E9]'
                     } min-w-0 whitespace-normal text-center py-3 px-2 font-medium text-sm flex items-center justify-center space-x-2 transition-opacity duration-200`}
-                    style={{
-                      borderColor: activeTab === tab.id ? '#A58C81' : 'transparent',
-                      color: activeTab === tab.id ? '#A58C81' : '#666'
-                    }}
                   >
                     <Icon className="h-5 w-5 flex-shrink-0" />
                     <span className="break-words">{tab.name}</span>
@@ -266,8 +235,14 @@ const EventsTab = () => {
                   )}
                   
                   <div className="text-sm text-gray-500 space-y-1">
-                    <p><strong>Datum:</strong> {new Date(event.start_date).toLocaleDateString('de-DE')}</p>
-                    <p><strong>Zeit:</strong> {new Date(event.start_date).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} - {new Date(event.end_date).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</p>
+                    <p><strong>Zeitraum:</strong> {new Date(event.start_date).toLocaleDateString('de-DE')} {event.start_date !== event.end_date ? `bis ${new Date(event.end_date).toLocaleDateString('de-DE')}` : ''}</p>
+                    {event.schluesselannahme_time && (
+                      <p><strong>Schlüsselannahme:</strong> {event.schluesselannahme_time} am {new Date(event.start_date).toLocaleDateString('de-DE')}</p>
+                    )}
+                    {event.schluesselabgabe_time && (
+                      <p><strong>Schlüsselabgabe:</strong> {event.schluesselabgabe_time} am {new Date(event.end_date).toLocaleDateString('de-DE')}</p>
+                    )}
+                    <p><strong>Event-Typ:</strong> {event.event_type || 'Privates Event'}</p>
                     <p><strong>Genehmigt am:</strong> {new Date(event.updated_at).toLocaleDateString('de-DE')} um {new Date(event.updated_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</p>
                   </div>
                 </div>
@@ -326,8 +301,10 @@ const RequestsTab = () => {
         description: request.description || '',
         start_date: request.start_date,
         end_date: request.end_date || request.start_date,
+        schluesselannahme_time: request.schluesselannahme_time || '',
+        schluesselabgabe_time: request.schluesselabgabe_time || '',
         location: request.location || '',
-        event_type: request.event_type || 'Allgemein',
+        event_type: request.event_type || 'Privates Event',
         max_participants: request.max_participants || null,
         is_private: request.is_private || false,
         created_by: request.requested_by,
@@ -341,7 +318,8 @@ const RequestsTab = () => {
         hausordnung_accepted: request.hausordnung_accepted,
         mietvertrag_accepted: request.mietvertrag_accepted,
         terms_accepted: request.terms_accepted,
-        youth_protection_accepted: request.youth_protection_accepted
+        youth_protection_accepted: request.youth_protection_accepted,
+        additional_notes: request.additional_notes || ''
       }
 
       // Create the event in the events table
@@ -603,13 +581,39 @@ const RequestsTab = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <h4 className="font-medium text-gray-900">Startdatum</h4>
-                  <p className="text-gray-600">{new Date(selectedRequest.start_date).toLocaleString('de-DE')}</p>
+                  <p className="text-gray-600">{new Date(selectedRequest.start_date).toLocaleDateString('de-DE')}</p>
                 </div>
                 <div>
                   <h4 className="font-medium text-gray-900">Enddatum</h4>
-                  <p className="text-gray-600">{new Date(selectedRequest.end_date).toLocaleString('de-DE')}</p>
+                  <p className="text-gray-600">{new Date(selectedRequest.end_date).toLocaleDateString('de-DE')}</p>
                 </div>
               </div>
+              
+              {selectedRequest.schluesselannahme_time && (
+                <div>
+                  <h4 className="font-medium text-gray-900">Schlüsselannahme</h4>
+                  <p className="text-gray-600">{selectedRequest.schluesselannahme_time} am {new Date(selectedRequest.start_date).toLocaleDateString('de-DE')}</p>
+                </div>
+              )}
+              
+              {selectedRequest.schluesselabgabe_time && (
+                <div>
+                  <h4 className="font-medium text-gray-900">Schlüsselabgabe</h4>
+                  <p className="text-gray-600">{selectedRequest.schluesselabgabe_time} am {new Date(selectedRequest.end_date).toLocaleDateString('de-DE')}</p>
+                </div>
+              )}
+              
+              <div>
+                <h4 className="font-medium text-gray-900">Event-Typ</h4>
+                <p className="text-gray-600">{selectedRequest.event_type || 'Privates Event'}</p>
+              </div>
+              
+              {selectedRequest.additional_notes && (
+                <div>
+                  <h4 className="font-medium text-gray-900">Weitere Dinge</h4>
+                  <p className="text-gray-600">{selectedRequest.additional_notes}</p>
+                </div>
+              )}
               
               <div>
                 <h4 className="font-medium text-gray-900">Status</h4>
@@ -713,20 +717,7 @@ const RequestsTab = () => {
 }
 
 const UsersTab = () => {
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">Benutzer verwalten</h2>
-      </div>
-      <div className="text-center py-12 bg-gray-50 rounded-lg">
-        <Users className="mx-auto h-12 w-12 text-gray-400" />
-        <h3 className="mt-2 text-sm font-medium text-gray-900">Benutzerverwaltung</h3>
-        <p className="mt-1 text-sm text-gray-500">
-          Hier können Sie Benutzer verwalten.
-        </p>
-      </div>
-    </div>
-  )
+  return <UserManagement />
 }
 
 const SettingsTab = () => {

@@ -1,6 +1,7 @@
 import React from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { DarkModeProvider } from './contexts/DarkModeContext'
 import Layout from './components/Layout/Layout'
 import HomePage from './pages/HomePage'
 import AboutPage from './pages/AboutPage'
@@ -100,12 +101,14 @@ const AppContent = () => {
   )
 }
 
-// App Component with AuthProvider
+// App Component with AuthProvider and DarkModeProvider
 const App = () => {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <DarkModeProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </DarkModeProvider>
   )
 }
 

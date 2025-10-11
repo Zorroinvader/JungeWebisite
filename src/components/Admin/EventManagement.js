@@ -341,7 +341,7 @@ const EventFormModal = ({ event, onClose, onSuccess }) => {
                 value={formData.title}
                 onChange={handleChange}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-[#6a6a6a] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-[#8a8a8a] focus:border-primary-500 dark:focus:border-[#8a8a8a] bg-white dark:bg-[#1a1a1a] text-[#252422] dark:text-[#e0e0e0] placeholder-gray-500 dark:placeholder-gray-400"
               />
             </div>
 
@@ -371,7 +371,7 @@ const EventFormModal = ({ event, onClose, onSuccess }) => {
                   value={formData.start_date}
                   onChange={handleChange}
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-[#6a6a6a] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-[#8a8a8a] focus:border-primary-500 dark:focus:border-[#8a8a8a] bg-white dark:bg-[#1a1a1a] text-[#252422] dark:text-[#e0e0e0] placeholder-gray-500 dark:placeholder-gray-400"
                 />
               </div>
 
@@ -385,7 +385,7 @@ const EventFormModal = ({ event, onClose, onSuccess }) => {
                   name="end_date"
                   value={formData.end_date}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-[#6a6a6a] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-[#8a8a8a] focus:border-primary-500 dark:focus:border-[#8a8a8a] bg-white dark:bg-[#1a1a1a] text-[#252422] dark:text-[#e0e0e0] placeholder-gray-500 dark:placeholder-gray-400"
                 />
               </div>
             </div>
@@ -401,7 +401,7 @@ const EventFormModal = ({ event, onClose, onSuccess }) => {
                   name="location"
                   value={formData.location}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-[#6a6a6a] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-[#8a8a8a] focus:border-primary-500 dark:focus:border-[#8a8a8a] bg-white dark:bg-[#1a1a1a] text-[#252422] dark:text-[#e0e0e0] placeholder-gray-500 dark:placeholder-gray-400"
                 />
               </div>
 
@@ -436,7 +436,7 @@ const EventFormModal = ({ event, onClose, onSuccess }) => {
                 value={formData.max_participants}
                 onChange={handleChange}
                 min="1"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-[#6a6a6a] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-[#8a8a8a] focus:border-primary-500 dark:focus:border-[#8a8a8a] bg-white dark:bg-[#1a1a1a] text-[#252422] dark:text-[#e0e0e0] placeholder-gray-500 dark:placeholder-gray-400"
               />
             </div>
 

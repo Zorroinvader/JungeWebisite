@@ -1,207 +1,151 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
-import { Users, MapPin, Mail, Calendar, FileText, Heart } from 'lucide-react'
+import { MapPin, Mail, Heart, Crown, UserCheck, Shield, Users, Target } from 'lucide-react'
 
 const AboutPage = () => {
-  const { user } = useAuth()
-
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#F4F1E8' }}>
-      {/* Navigation Header - match HomePage */}
-      <nav className="w-full border-b sticky top-0 z-40" style={{ backgroundColor: '#F4F1E8', borderColor: '#A58C81' }}>
-        <div className="w-full px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <img 
-                src="/assets/Wappen-Junge-Gesellschaft-Pferdestall-Wedes-Wedel.png" 
-                alt="Junge Gesellschaft Logo" 
-                className="h-8 w-8 object-contain"
-              />
-              <span className="text-lg font-semibold" style={{ color: '#252422' }}>Junge Gesellschaft</span>
-            </div>
-            
-            <div className="hidden md:flex items-center space-x-6">
-              <Link to="/" className="text-sm font-medium hover:opacity-70 transition-opacity" style={{ color: '#252422' }}>Start</Link>
-              <Link to="/about" className="text-sm font-medium hover:opacity-70 transition-opacity" style={{ color: '#252422' }}>Über uns</Link>
-              <Link to="/faq" className="text-sm font-medium hover:opacity-70 transition-opacity" style={{ color: '#252422' }}>FAQ</Link>
-              <Link to="/contact" className="text-sm font-medium hover:opacity-70 transition-opacity" style={{ color: '#252422' }}>Kontakt</Link>
-              {user ? (
-                <div className="flex items-center space-x-4">
-                  <Link
-                    to="/profile"
-                    className="inline-flex items-center px-4 py-2 text-sm font-medium text-white rounded-md hover:opacity-90 transition-opacity"
-                    style={{ backgroundColor: '#252422' }}
-                  >
-                    <Users className="h-4 w-4 mr-2" />
-                    Profil
-                  </Link>
-                </div>
-              ) : (
-                <div className="flex items-center space-x-4">
-                  <Link
-                    to="/login"
-                    className="text-sm font-medium hover:opacity-70 transition-opacity"
-                    style={{ color: '#252422' }}
-                  >
-                    Anmelden
-                  </Link>
-                  <Link
-                    to="/register"
-                    className="inline-flex items-center px-4 py-2 text-sm font-medium text-white rounded-md hover:opacity-90 transition-opacity"
-                    style={{ backgroundColor: '#252422' }}
-                  >
-                    Registrieren
-                  </Link>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* Hero Section - left aligned like HomePage */}
-      <div className="w-full" style={{ backgroundColor: '#F4F1E8' }}>
+    <div className="min-h-screen">
+      {/* Hero Section */}
+      <div className="w-full bg-[#F4F1E8] dark:bg-[#252422]">
         <div className="w-full px-6 lg:px-8 py-12">
           <div className="max-w-7xl mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-              <div className="lg:pr-16">
-                <h1 className="text-4xl md:text-5xl font-bold mb-4 leading-tight" style={{ color: '#252422' }}>
-                  Über die Junge Gesellschaft
-                </h1>
-                <p className="text-lg md:text-xl mb-2 leading-relaxed" style={{ color: '#A58C81' }}>
-                  Der Club der Jungen Gesellschaft in Wedelheine - Eine moderne Begegnungsstätte für junge Leute
-                </p>
-              </div>
+            <div className="max-w-5xl ml-0 lg:ml-[12vw] xl:ml-[12vw] 2xl:ml-[12vw]">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-[#252422] dark:text-[#F4F1E8] mb-6">
+                Über uns
+            </h1>
+              <p className="text-xl md:text-2xl text-[#A58C81] dark:text-[#EBE9E9] mb-8">
+                Die Begegnungsstätte für Junge (und jung gebliebene) Leute in unserer Gemeinde
+            </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Main Content - match card styles */}
-      <div className="w-full px-6 lg:px-8 py-12" style={{ backgroundColor: '#F4F1E8' }}>
-        <div className="max-w-7xl mx-auto">
-          <div className="space-y-16">
+      {/* Main Content */}
+      <div className="w-full bg-[#F4F1E8] dark:bg-[#252422]">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 py-12">
           
-          {/* History Section */}
-          <div className="bg-white rounded-2xl p-8" style={{ border: '2px solid #A58C81' }}>
-            <h2 className="text-2xl font-semibold mb-6 flex items-center" style={{ color: '#252422' }}>
-              <Calendar className="h-6 w-6 mr-3" />
-              Unsere Geschichte
+          {/* 1. Vision Section - Most Important, Moved to Top */}
+          <div className="mb-24">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-[#252422]/5 to-[#1a1a1a]/5 rounded-3xl"></div>
+              <div className="absolute top-0 right-0 w-72 h-72 bg-[#A58C81]/10 rounded-full -translate-y-36 translate-x-36"></div>
+              <div className="absolute bottom-0 left-0 w-56 h-56 bg-[#8B6F5F]/10 rounded-full translate-y-28 -translate-x-28"></div>
+              
+              <div className="relative z-10 p-12">
+                <div className="flex items-center mb-8">
+                  <Heart className="h-10 w-10 mr-4 text-[#A58C81]" />
+                  <h2 className="text-4xl font-bold text-[#252422] dark:text-[#F4F1E8]">
+                    Unsere Vision
             </h2>
-            <div className="prose prose-lg max-w-none" style={{ color: '#252422' }}>
-              <p className="text-lg leading-relaxed mb-6">
-                Aufgrund einiger Vorfälle, bei denen vereinzelt Jugendliche das Eigentum der Gemeinde Meine nicht pfleglich behandelten und teilweise zweckentfremdeten, sah sich die Gemeinde Meine während der schwierigen Corona-Zeit mehrfach gezwungen, den Jugendclub in Wedelheine über längere Zeiträume zu schließen.
-              </p>
-              <p className="text-lg leading-relaxed mb-6">
-                Als Ende 2021 eine dauerhafte Schließung im Raum stand, setzten sich einige Jugendliche gemeinsam mit ihren Eltern vor Ort dafür ein, dass der Jugendclub erhalten bleibt. Nach dem mehrheitlichen Willen der Bürger und Bürgerinnen sollte der Jugendclub weiterhin vorwiegend für Jugendliche ab 16 und junge Erwachsene zur Verfügung stehen, da ein vergleichbares Angebot für Junge Leute in der Gemeinde ansonsten fehlt.
-              </p>
-              <p className="text-lg leading-relaxed">
-                Das Ergebnis ist aus Sicht der Jugendlichen und deren Eltern sogar noch besser, als sie es sich erhofft hatten: Nach ausführlichen Verhandlungen mit der Gemeinde über die Ausrichtung des Jugendclubs wurde ein neues Betreiberkonzept entwickelt, für das eigens der Verein "Junge Gesellschaft Pferdestall Wedes-Wedel e.V." gegründet wurde.
-              </p>
             </div>
-          </div>
-
-          {/* Mission Section */}
-          <div className="bg-white rounded-2xl p-8" style={{ border: '2px solid #A58C81' }}>
-            <h2 className="text-2xl font-semibold mb-6 flex items-center" style={{ color: '#252422' }}>
-              <Heart className="h-6 w-6 mr-3" />
-              Unser Ziel
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div>
-                <h3 className="text-xl font-semibold mb-4" style={{ color: '#252422' }}>Für Jugendliche ab 16</h3>
-                <p className="leading-relaxed" style={{ color: '#666' }}>
-                  Das neue Betreiberkonzept sieht vor, dass gemäß Vereinssatzung nur Jugendliche ab 16 und Erwachsene offizielle Mitglieder der "Jungen Gesellschaft Pferdestall Wedes-Wedel e.V." werden können. Ziel ist es, den Jugendclub vorrangig als Begegnungsstätte für junge Menschen ab 16 zu etablieren.
+                <p className="text-xl text-[#252422] dark:text-[#F4F1E8] mb-8 leading-relaxed max-w-4xl">
+                  Wir sind überzeugt davon, dass das ein tolles Projekt ist, welches bei verantwortungsvollem Handeln 
+                  aller Beteiligten auch in Zukunft dafür sorgt, dass wir hier bei uns in Wedelheine einen wirklich 
+                  coolen „Lieblingsort für Junge Leute der Gemeinde Meine" und deren Freunde haben.
                 </p>
+                <div className="flex items-center bg-gradient-to-r from-[#A58C81]/10 to-[#8B6F5F]/10 rounded-2xl p-6">
+                  <Target className="h-8 w-8 mr-4 text-[#A58C81]" />
+                  <span className="text-xl font-semibold text-[#252422] dark:text-[#F4F1E8]">
+                    Jede(r) ab 16 kann offiziell Mitglied werden
+                  </span>
               </div>
-              <div>
-                <h3 className="text-xl font-semibold mb-4" style={{ color: '#252422' }}>Altersgerechte Veranstaltungen</h3>
-                <p className="leading-relaxed" style={{ color: '#666' }}>
-                  In unserem Club finden altersgerechte Veranstaltungen wie Halloween- oder Silvesterpartys für Jugendliche ab 16 und Volljährige statt. Jugendliche unter 16 sind jedoch stets gern gesehene Gäste im Jugendclub.
-                </p>
               </div>
             </div>
           </div>
 
-          {/* Board Members Section */}
-          <div className="bg-white rounded-2xl p-8" style={{ border: '2px solid #A58C81' }}>
-            <h2 className="text-2xl font-semibold mb-8 flex items-center" style={{ color: '#252422' }}>
-              <Users className="h-6 w-6 mr-3" />
-              Unser Vorstand
+          {/* 2. Vorstand Section - Clean List Design */}
+          <div className="mb-24">
+            <div className="relative">
+              {/* Background Elements */}
+              <div className="absolute inset-0 bg-gradient-to-br from-[#A58C81]/5 to-[#8B6F5F]/5 rounded-3xl"></div>
+              <div className="absolute top-0 right-0 w-64 h-64 bg-[#A58C81]/10 rounded-full -translate-y-32 translate-x-32"></div>
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-[#8B6F5F]/10 rounded-full translate-y-24 -translate-x-24"></div>
+              
+              <div className="relative z-10 p-12">
+                <div className="flex items-center mb-12">
+                  <Crown className="h-10 w-10 mr-4 text-[#A58C81]" />
+                  <h2 className="text-4xl font-bold text-[#252422] dark:text-[#F4F1E8]">
+                    Aktueller Vorstand
             </h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div>
-                <h3 className="text-2xl font-semibold mb-6" style={{ color: '#252422' }}>Aktueller Vorstand</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center p-3 bg-gray-50 rounded-md">
-                    <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center text-white font-semibold text-sm mr-3">
-                      CR
+                </div>
+                
+                {/* Vorstand Members - Clean List Design */}
+                <div className="space-y-8">
+                  {/* Vorsitzende - Most Important */}
+                  <div className="flex items-center">
+                    <div className="w-16 h-16 bg-gradient-to-r from-[#A58C81] to-[#8B6F5F] rounded-full flex items-center justify-center mr-6">
+                      <Crown className="h-8 w-8 text-white" />
                     </div>
                     <div>
-                      <p className="font-medium" style={{ color: '#252422' }}>Charlotte Rode</p>
-                      <p className="text-sm" style={{ color: '#666' }}>Vorsitzende</p>
+                      <h3 className="text-2xl font-bold text-[#252422] dark:text-[#F4F1E8] mb-1">Charlotte Rode</h3>
+                      <p className="text-lg text-[#A58C81] dark:text-[#A58C81]">Vorsitzende</p>
                     </div>
                   </div>
-                  <div className="flex items-center p-3 bg-gray-50 rounded-md">
-                    <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center text-white font-semibold text-sm mr-3">
-                      MV
+
+                  {/* Other Vorstand Members */}
+                  <div className="space-y-6">
+                    <div className="flex items-center">
+                      <div className="w-12 h-12 bg-[#A58C81]/20 rounded-full flex items-center justify-center mr-6">
+                        <div className="w-6 h-6 bg-[#A58C81] rounded-full"></div>
                     </div>
                     <div>
-                      <p className="font-medium" style={{ color: '#252422' }}>Max Vogeley</p>
-                      <p className="text-sm" style={{ color: '#666' }}>Stellv. Vorsitzender</p>
+                        <h4 className="text-xl font-semibold text-[#252422] dark:text-[#F4F1E8] mb-1">Max Vogeley</h4>
+                        <p className="text-[#A58C81] dark:text-[#A58C81]">Stellv. Vorsitzender</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center p-3 bg-gray-50 rounded-md">
-                    <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center text-white font-semibold text-sm mr-3">
-                      BS
-                    </div>
-                    <div>
-                      <p className="font-medium" style={{ color: '#252422' }}>Ben Strich</p>
-                      <p className="text-sm" style={{ color: '#666' }}>Kassenwart</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center p-3 bg-gray-50 rounded-md">
-                    <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center text-white font-semibold text-sm mr-3">
-                      RS
+                    
+                    <div className="flex items-center">
+                      <div className="w-12 h-12 bg-[#A58C81]/20 rounded-full flex items-center justify-center mr-6">
+                        <div className="w-6 h-6 bg-[#A58C81] rounded-full"></div>
                     </div>
                     <div>
-                      <p className="font-medium" style={{ color: '#252422' }}>Reinhard Strich</p>
-                      <p className="text-sm" style={{ color: '#666' }}>Stellv. Kassenwart</p>
+                        <h4 className="text-xl font-semibold text-[#252422] dark:text-[#F4F1E8] mb-1">Ben Strich</h4>
+                        <p className="text-[#A58C81] dark:text-[#A58C81]">Kassenwart</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center p-3 bg-gray-50 rounded-md">
-                    <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center text-white font-semibold text-sm mr-3">
-                      CR
+                    
+                    <div className="flex items-center">
+                      <div className="w-12 h-12 bg-[#A58C81]/20 rounded-full flex items-center justify-center mr-6">
+                        <div className="w-6 h-6 bg-[#A58C81] rounded-full"></div>
                     </div>
                     <div>
-                      <p className="font-medium" style={{ color: '#252422' }}>Christian Rode</p>
-                      <p className="text-sm" style={{ color: '#666' }}>Schriftwart</p>
+                        <h4 className="text-xl font-semibold text-[#252422] dark:text-[#F4F1E8] mb-1">Reinhard Strich</h4>
+                        <p className="text-[#A58C81] dark:text-[#A58C81]">Stellv. Kassenwart</p>
+                      </div>
                     </div>
+                    
+                    <div className="flex items-center">
+                      <div className="w-12 h-12 bg-[#A58C81]/20 rounded-full flex items-center justify-center mr-6">
+                        <div className="w-6 h-6 bg-[#A58C81] rounded-full"></div>
+                    </div>
+                    <div>
+                        <h4 className="text-xl font-semibold text-[#252422] dark:text-[#F4F1E8] mb-1">Christian Rode</h4>
+                        <p className="text-[#A58C81] dark:text-[#A58C81]">Schriftwart</p>
+                      </div>
                   </div>
                 </div>
               </div>
 
-              <div>
-                <h3 className="text-xl font-semibold mb-6" style={{ color: '#252422' }}>Gründungsmitglieder</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center p-3 bg-gray-50 rounded-md">
-                    <div className="w-10 h-10 bg-gray-500 rounded-full flex items-center justify-center text-white font-semibold text-sm mr-3">
-                      JR
-                    </div>
-                    <div>
-                      <p className="font-medium" style={{ color: '#252422' }}>Joana Rode-Glag</p>
-                      <p className="text-sm" style={{ color: '#666' }}>Gründungsmitglied</p>
-                    </div>
+                {/* Gründungsmitglieder - Subtle */}
+                <div className="border-t border-[#A58C81]/20 pt-8 mt-12">
+                  <div className="flex items-center mb-6">
+                    <UserCheck className="h-6 w-6 mr-3 text-[#A58C81]" />
+                    <h3 className="text-2xl font-semibold text-[#252422] dark:text-[#F4F1E8]">
+                      Weitere Gründungsmitglieder
+                    </h3>
                   </div>
-                  <div className="flex items-center p-3 bg-gray-50 rounded-md">
-                    <div className="w-10 h-10 bg-gray-500 rounded-full flex items-center justify-center text-white font-semibold text-sm mr-3">
-                      YS
+                  <div className="flex flex-wrap gap-4">
+                    <div className="flex items-center">
+                      <div className="w-8 h-8 bg-[#A58C81]/20 rounded-full flex items-center justify-center mr-3">
+                        <div className="w-3 h-3 bg-[#A58C81] rounded-full"></div>
+                      </div>
+                      <span className="font-medium text-[#252422] dark:text-[#F4F1E8]">Joana Rode-Glag</span>
                     </div>
-                    <div>
-                      <p className="font-medium" style={{ color: '#252422' }}>Yvonne Strich</p>
-                      <p className="text-sm" style={{ color: '#666' }}>Gründungsmitglied</p>
+                    <div className="flex items-center">
+                      <div className="w-8 h-8 bg-[#A58C81]/20 rounded-full flex items-center justify-center mr-3">
+                        <div className="w-3 h-3 bg-[#A58C81] rounded-full"></div>
+                      </div>
+                      <span className="font-medium text-[#252422] dark:text-[#F4F1E8]">Yvonne Strich</span>
                     </div>
                   </div>
                 </div>
@@ -209,128 +153,129 @@ const AboutPage = () => {
             </div>
           </div>
 
-          {/* Location Section */}
-          <div className="bg-white rounded-2xl p-8" style={{ border: '2px solid #A58C81' }}>
-            <h2 className="text-2xl font-semibold mb-6 flex items-center" style={{ color: '#252422' }}>
-              <MapPin className="h-6 w-6 mr-3" />
-              Unser Standort
+          {/* 3. Wer wir sind - Modern Layout */}
+          <div className="mb-24">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-[#A58C81]/5 to-[#8B6F5F]/5 rounded-3xl"></div>
+              <div className="absolute top-0 left-0 w-64 h-64 bg-[#A58C81]/10 rounded-full -translate-y-32 -translate-x-32"></div>
+              <div className="absolute bottom-0 right-0 w-48 h-48 bg-[#8B6F5F]/10 rounded-full translate-y-24 translate-x-24"></div>
+              
+              <div className="relative z-10 p-12">
+                <div className="flex items-center mb-8">
+                  <Users className="h-10 w-10 mr-4 text-[#A58C81]" />
+                  <h2 className="text-4xl font-bold text-[#252422] dark:text-[#F4F1E8]">
+                    Wer wir sind
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div>
-                <h3 className="text-xl font-semibold mb-4" style={{ color: '#252422' }}>Junge Gesellschaft Pferdestall Wedes-Wedel e.V.</h3>
-                <div className="space-y-2" style={{ color: '#252422' }}>
-                  <p className="flex items-center">
-                    <MapPin className="h-5 w-5 mr-2" />
-                    Alte Dorfstrasse 46
-                  </p>
-                  <p className="flex items-center">
-                    <MapPin className="h-5 w-5 mr-2" />
-                    38527 Meine
-                  </p>
-                  <p className="flex items-center">
-                    <Mail className="h-5 w-5 mr-2" />
-                    <a href="mailto:jungegesellschaft@wedelheine.de" className="hover:opacity-80" style={{ color: '#A58C81' }}>
-                      jungegesellschaft@wedelheine.de
-                    </a>
-                  </p>
                 </div>
-              </div>
-              <div className="bg-gray-100 rounded-lg p-6 flex items-center justify-center">
-                <p className="text-gray-600 text-center">
-                  Karte wird hier angezeigt<br />
-                  <span className="text-sm">(Google Maps Integration)</span>
-                </p>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+              <div>
+                    <p className="text-lg text-[#252422] dark:text-[#F4F1E8] mb-6 leading-relaxed">
+                      Unser Verein wurde vor kurzem von 7 Personen gegründet und besteht aktuell aus 8 offiziellen Mitgliedern. 
+                      Für die Wiedereröffnung und Neuausrichtung des Jugendclubs in Wedelheine haben wir ein neues Betreiberkonzept 
+                      erarbeitet und einen eingetragenen Verein (e.V.) gegründet.
+                    </p>
+                    <p className="text-lg text-[#252422] dark:text-[#F4F1E8] leading-relaxed">
+                      Wir wollen in Abstimmung mit der Gemeinde Meine den Jugendclub offiziell von der Gemeinde pachten und 
+                      in Eigenverantwortung betreiben können.
+                    </p>
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-[#252422] dark:text-[#F4F1E8] mb-6 flex items-center">
+                      <Shield className="h-8 w-8 mr-3 text-[#A58C81]" />
+                      Aktueller Stand
+                    </h3>
+                    <div className="space-y-4">
+                      <div className="flex items-start">
+                        <div className="w-3 h-3 bg-[#A58C81] rounded-full mt-2 mr-4 flex-shrink-0"></div>
+                        <div>
+                          <p className="text-lg font-semibold text-[#252422] dark:text-[#F4F1E8]">Vereins-Steuernummer erhalten</p>
+                          <p className="text-[#252422] dark:text-[#F4F1E8]">Offizielles Vereinskonto eröffnet</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start">
+                        <div className="w-3 h-3 bg-[#A58C81] rounded-full mt-2 mr-4 flex-shrink-0"></div>
+                        <div>
+                          <p className="text-lg font-semibold text-[#252422] dark:text-[#F4F1E8]">Vollumfängliche Vereinsversicherung</p>
+                          <p className="text-[#252422] dark:text-[#F4F1E8]">Dank der Unterstützung durch Torsten Marienfeld</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start">
+                        <div className="w-3 h-3 bg-[#A58C81] rounded-full mt-2 mr-4 flex-shrink-0"></div>
+                        <div>
+                          <p className="text-lg font-semibold text-[#252422] dark:text-[#F4F1E8]">Erste Mitgliedsanträge eingegangen</p>
+                          <p className="text-[#252422] dark:text-[#F4F1E8]">Vereinssatzung wird überarbeitet</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Documents Section */}
-          <div className="bg-white rounded-2xl p-8" style={{ border: '2px solid #A58C81' }}>
-            <h2 className="text-2xl font-semibold mb-6 flex items-center" style={{ color: '#252422' }}>
-              <FileText className="h-6 w-6 mr-3" />
-              Wichtige Dokumente
+          {/* 4. Kontakt und Standort - Clean Design */}
+          <div className="mb-12">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-[#A58C81]/5 to-[#8B6F5F]/5 rounded-3xl"></div>
+              <div className="absolute top-0 right-0 w-56 h-56 bg-[#A58C81]/10 rounded-full -translate-y-28 translate-x-28"></div>
+              <div className="absolute bottom-0 left-0 w-40 h-40 bg-[#8B6F5F]/10 rounded-full translate-y-20 -translate-x-20"></div>
+              
+              <div className="relative z-10 p-12">
+                <div className="flex items-center mb-8">
+                  <MapPin className="h-10 w-10 mr-4 text-[#A58C81]" />
+                  <h2 className="text-4xl font-bold text-[#252422] dark:text-[#F4F1E8]">
+                    Kontakt & Standort
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <a
-                href="/assets/Eintrits_Antrag.pdf"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center p-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors duration-200"
-              >
-                <div className="w-10 h-10 bg-gray-600 rounded-md flex items-center justify-center mr-3">
-                  <FileText className="h-5 w-5 text-white" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                  <div className="space-y-6">
+                    <div className="flex items-center">
+                      <div className="w-16 h-16 bg-[#A58C81]/10 rounded-full flex items-center justify-center mr-6">
+                        <MapPin className="h-8 w-8 text-[#A58C81]" />
                 </div>
                 <div>
-                  <h3 className="font-medium" style={{ color: '#252422' }}>Mitgliedsantrag</h3>
-                  <p className="text-sm" style={{ color: '#666' }}>PDF herunterladen</p>
+                        <h3 className="text-xl font-semibold text-[#252422] dark:text-[#F4F1E8] mb-1">Standort</h3>
+                        <p className="text-lg text-[#252422] dark:text-[#F4F1E8]">Pferdestall Wedes-Wedel, Wedel</p>
+                      </div>
                 </div>
-              </a>
-              <a
-                href="/assets/satzung.pdf"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center p-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors duration-200"
-              >
-                <div className="w-10 h-10 bg-gray-600 rounded-md flex items-center justify-center mr-3">
-                  <FileText className="h-5 w-5 text-white" />
+                    <div className="flex items-center">
+                      <div className="w-16 h-16 bg-[#A58C81]/10 rounded-full flex items-center justify-center mr-6">
+                        <Mail className="h-8 w-8 text-[#A58C81]" />
                 </div>
                 <div>
-                  <h3 className="font-medium" style={{ color: '#252422' }}>Vereinssatzung</h3>
-                  <p className="text-sm" style={{ color: '#666' }}>PDF herunterladen</p>
-                </div>
+                        <h3 className="text-xl font-semibold text-[#252422] dark:text-[#F4F1E8] mb-1">E-Mail</h3>
+                        <a 
+                          href="mailto:jungegesellschaft@wedelheine.de"
+                          className="text-lg text-[#A58C81] hover:text-[#8B6F5F] transition-colors"
+                        >
+                          jungegesellschaft@wedelheine.de
               </a>
             </div>
           </div>
         </div>
+                  <div className="bg-white/60 dark:bg-[#EBE9E9]/60 backdrop-blur-sm rounded-2xl p-8 border border-[#A58C81]/20">
+                    <h3 className="text-2xl font-bold text-[#252422] dark:text-[#252422] mb-6">Nächste Schritte</h3>
+                    <div className="space-y-4">
+                      <div className="flex items-center">
+                        <div className="w-2 h-2 bg-[#A58C81] rounded-full mr-4"></div>
+                        <span className="text-[#252422] dark:text-[#252422]">Vereinssatzung finalisieren</span>
+                      </div>
+                      <div className="flex items-center">
+                        <div className="w-2 h-2 bg-[#A58C81] rounded-full mr-4"></div>
+                        <span className="text-[#252422] dark:text-[#252422]">Mitgliederanwerbung starten</span>
       </div>
-      </div>
-
-      {/* Footer - match HomePage */}
-      <footer style={{ backgroundColor: '#252422' }}>
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 py-16">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div>
-              <div className="flex items-center space-x-3 mb-4">
-                <img 
-                  src="/assets/Wappen-Junge-Gesellschaft-Pferdestall-Wedes-Wedel.png" 
-                  alt="Junge Gesellschaft Logo" 
-                  className="h-10 w-10 object-contain"
-                />
-                <div>
-                  <h3 className="text-lg font-semibold text-white">Junge Gesellschaft</h3>
-                  <p className="text-sm" style={{ color: '#CCB7AE' }}>Pferdestall Wedes-Wedel e.V.</p>
+                      <div className="flex items-center">
+                        <div className="w-2 h-2 bg-[#A58C81] rounded-full mr-4"></div>
+                        <span className="text-[#252422] dark:text-[#252422]">Regelbetrieb aufnehmen</span>
                 </div>
               </div>
-              <p className="text-white text-sm opacity-80">
-                Die Begegnungsstätte für Junge (und jung gebliebene) Leute in unserer Gemeinde.
-              </p>
-            </div>
-            
-            <div>
-              <h4 className="text-lg font-semibold text-white mb-4">Kontakt</h4>
-              <div className="space-y-1 text-sm text-white opacity-80">
-                <p>Alte Dorfstrasse 46</p>
-                <p>38527 Meine</p>
-                <p>jungegesellschaft@wedelheine.de</p>
               </div>
             </div>
-            
-            <div>
-              <h4 className="text-lg font-semibold text-white mb-4">Links</h4>
-              <div className="space-y-1">
-                <Link to="/" className="block text-sm text-white opacity-80 hover:opacity-100 transition-opacity">Start</Link>
-                <Link to="/about" className="block text-sm text-white opacity-80 hover:opacity-100 transition-opacity">Über uns</Link>
-                <Link to="/faq" className="block text-sm text-white opacity-80 hover:opacity-100 transition-opacity">FAQ</Link>
-                <Link to="/contact" className="block text-sm text-white opacity-80 hover:opacity-100 transition-opacity">Kontakt</Link>
               </div>
             </div>
-          </div>
-          
-          <div className="border-t mt-8 pt-8 text-center text-sm text-white opacity-60" style={{ borderColor: '#CCB7AE' }}>
-            <p>&copy; 2024 Junge Gesellschaft Pferdestall Wedes-Wedel e.V. Alle Rechte vorbehalten.</p>
           </div>
         </div>
-      </footer>
+      </div>
     </div>
   )
 }

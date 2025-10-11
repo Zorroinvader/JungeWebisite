@@ -328,6 +328,150 @@ export const profilesAPI = {
       console.error('HTTP API updateProfile error:', error)
       throw error
     }
+  },
+
+  async getAll() {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=*&order=created_at.desc`, {
+        method: 'GET',
+        headers: getHeaders()
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      const result = await response.json()
+      return result
+    } catch (error) {
+      console.error('HTTP API getProfiles error:', error)
+      throw error
+    }
+  },
+
+  async updateUserRole(id, role) {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: getHeaders(),
+        body: JSON.stringify({ role })
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      return { success: true }
+    } catch (error) {
+      console.error('HTTP API updateUserRole error:', error)
+      throw error
+    }
+  },
+
+  async createUser(userData) {
+    try {
+      // Use Supabase auth signup to create the user
+      const authResponse = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: userData.email,
+          password: userData.password,
+          data: {
+            full_name: userData.full_name,
+            role: userData.role || 'member'
+          }
+        })
+      })
+
+      if (!authResponse.ok) {
+        const errorText = await authResponse.text()
+        throw new Error(`User creation failed: ${errorText}`)
+      }
+
+      const authUser = await authResponse.json()
+
+      // Check if profile already exists (might be created by trigger)
+      const existingProfileResponse = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${authUser.user.id}&select=*`, {
+        method: 'GET',
+        headers: getHeaders()
+      })
+
+      if (existingProfileResponse.ok) {
+        const existingProfile = await existingProfileResponse.json()
+        
+        if (existingProfile && existingProfile.length > 0) {
+          // Profile already exists, update it with the provided data
+          const updateResponse = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${authUser.user.id}`, {
+            method: 'PATCH',
+            headers: getHeaders(),
+            body: JSON.stringify({
+              email: userData.email,
+              full_name: userData.full_name,
+              role: userData.role || 'member'
+            })
+          })
+
+          if (!updateResponse.ok) {
+            const errorText = await updateResponse.text()
+            throw new Error(`Profile update failed: ${errorText}`)
+          }
+        } else {
+          // Profile doesn't exist, create it
+          const profileResponse = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({
+              id: authUser.user.id,
+              email: userData.email,
+              full_name: userData.full_name,
+              role: userData.role || 'member'
+            })
+          })
+
+          if (!profileResponse.ok) {
+            const errorText = await profileResponse.text()
+            throw new Error(`Profile creation failed: ${errorText}`)
+          }
+        }
+      } else {
+        // If we can't check, try to create the profile
+        const profileResponse = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify({
+            id: authUser.user.id,
+            email: userData.email,
+            full_name: userData.full_name,
+            role: userData.role || 'member'
+          })
+        })
+
+        if (!profileResponse.ok) {
+          const errorText = await profileResponse.text()
+          // If it's a duplicate key error, the profile might already exist
+          if (errorText.includes('duplicate key value violates unique constraint')) {
+            console.log('Profile already exists, continuing...')
+          } else {
+            throw new Error(`Profile creation failed: ${errorText}`)
+          }
+        }
+      }
+
+      return { 
+        success: true, 
+        user: authUser.user
+      }
+    } catch (error) {
+      console.error('HTTP API createUser error:', error)
+      throw error
+    }
   }
 }
 
