@@ -1,19 +1,24 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { Calendar, Users, FileText, Settings, AlertCircle, Check, X, Clock, Eye, Download, ArrowLeft } from 'lucide-react'
+import { useDarkMode } from '../../contexts/DarkModeContext'
+import { Calendar, Users, FileText, Settings, AlertCircle, Check, X, Clock, Eye, Download, ArrowLeft, Workflow, Plus, Edit } from 'lucide-react'
 import { eventRequestsAPI, eventsAPI } from '../../services/httpApi'
 import eventBus from '../../utils/eventBus'
 import UserManagement from './UserManagement'
+import ThreeStepRequestManagement from './ThreeStepRequestManagement'
+import AdminEventCreationForm from './AdminEventCreationForm'
+import AdminEventEditForm from './AdminEventEditForm'
+import { fetchAndParseICS, convertToDBEvent } from '../../utils/icsParser'
 
 const AdminPanelClean = () => {
   const { isAdmin, user, profile } = useAuth()
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('events')
+  const [activeTab, setActiveTab] = useState('three-step-requests')
 
   const tabs = [
+    { id: 'three-step-requests', name: '3-Schritt Anfragen', icon: Workflow },
     { id: 'events', name: 'Events verwalten', icon: Calendar },
-    { id: 'requests', name: 'Event-Anfragen', icon: FileText },
     { id: 'users', name: 'Benutzer verwalten', icon: Users },
     { id: 'settings', name: 'Einstellungen', icon: Settings }
   ]
@@ -82,16 +87,16 @@ const AdminPanelClean = () => {
 
   const renderTabContent = () => {
     switch (activeTab) {
+      case 'three-step-requests':
+        return <ThreeStepRequestManagement />
       case 'events':
         return <EventsTab />
-      case 'requests':
-        return <RequestsTab />
       case 'users':
         return <UsersTab />
       case 'settings':
         return <SettingsTab />
       default:
-        return <EventsTab />
+        return <ThreeStepRequestManagement />
     }
   }
 
@@ -147,6 +152,9 @@ const EventsTab = () => {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [showEditForm, setShowEditForm] = useState(false)
+  const [selectedEvent, setSelectedEvent] = useState(null)
 
   useEffect(() => {
     loadEvents()
@@ -155,20 +163,30 @@ const EventsTab = () => {
   const loadEvents = async () => {
     try {
       setLoading(true)
-      const data = await eventRequestsAPI.getAll()
-      
-      if (data) {
-        // Filter for approved events
-        const approvedEvents = data.filter(req => req.status === 'approved')
-        setEvents(approvedEvents || [])
-      } else {
-        setEvents([])
-      }
+      // Get all events directly from events table
+      const data = await eventsAPI.getAll()
+      setEvents(data || [])
     } catch (err) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleEventCreated = () => {
+    setShowCreateForm(false)
+    loadEvents() // Refresh the list
+  }
+
+  const handleEventUpdated = () => {
+    setShowEditForm(false)
+    setSelectedEvent(null)
+    loadEvents() // Refresh the list
+  }
+
+  const handleEditClick = (event) => {
+    setSelectedEvent(event)
+    setShowEditForm(true)
   }
 
   if (loading) {
@@ -199,518 +217,122 @@ const EventsTab = () => {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">Events verwalten ({events.length})</h2>
-        <button
-          onClick={loadEvents}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
-        >
-          Aktualisieren
-        </button>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-[#F4F1E8]">Events verwalten ({events.length})</h2>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowCreateForm(true)}
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg transition-colors shadow-md"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Event erstellen
+          </button>
+          <button
+            onClick={loadEvents}
+            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-[#EBE9E9] bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700"
+          >
+            Aktualisieren
+          </button>
+        </div>
       </div>
 
       {events.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg">
-          <Calendar className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">Keine Events geplant</h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Es sind noch keine Events geplant. Events werden automatisch erstellt, wenn Event-Anfragen genehmigt werden.
+        <div className="text-center py-12 bg-gray-50 dark:bg-gray-900/20 rounded-lg border-2 border-[#A58C81] dark:border-[#4a4a4a]">
+          <Calendar className="mx-auto h-12 w-12 text-[#A58C81] dark:text-[#EBE9E9]" />
+          <h3 className="mt-2 text-sm font-medium text-[#252422] dark:text-[#F4F1E8]">Keine Events vorhanden</h3>
+          <p className="mt-1 text-sm text-[#A58C81] dark:text-[#EBE9E9]">
+            Erstellen Sie ein neues Event oder warten Sie auf genehmigte Anfragen.
           </p>
+          <button
+            onClick={() => setShowCreateForm(true)}
+            className="mt-4 inline-flex items-center px-6 py-3 text-sm font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg transition-colors shadow-md"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Erstes Event erstellen
+          </button>
         </div>
       ) : (
         <div className="space-y-4">
           {events.map((event) => (
-            <div key={event.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+            <div key={event.id} className="bg-white dark:bg-[#2a2a2a] border-2 border-[#A58C81] dark:border-[#4a4a4a] rounded-lg p-4 shadow-sm">
               <div className="flex justify-between items-start">
                 <div className="flex-1">
                   <div className="flex items-center space-x-3 mb-2">
-                    <h3 className="text-lg font-medium text-gray-900">{event.title}</h3>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      <Check className="h-4 w-4 mr-1" />
-                      Genehmigt
-                    </span>
+                    <h3 className="text-lg font-medium text-[#252422] dark:text-[#F4F1E8]">{event.title}</h3>
+                    
+                    {/* Privacy Badge */}
+                    {event.is_private ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border border-purple-300 dark:border-purple-700">
+                        🔒 Privat
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border border-blue-300 dark:border-blue-700">
+                        🌍 Öffentlich
+                      </span>
+                    )}
+                    
+                    {/* Event Type Badge */}
+                    {event.event_type && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+                        {event.event_type}
+                      </span>
+                    )}
+                    
+                    {/* Imported Badge */}
+                    {event.imported_from && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">
+                        📥 Importiert
+                      </span>
+                    )}
                   </div>
                   
                   {event.description && (
-                    <p className="text-gray-600 mb-2">{event.description}</p>
+                    <p className="text-gray-600 dark:text-gray-300 mb-2 text-sm">{event.description}</p>
                   )}
                   
-                  <div className="text-sm text-gray-500 space-y-1">
-                    <p><strong>Zeitraum:</strong> {new Date(event.start_date).toLocaleDateString('de-DE')} {event.start_date !== event.end_date ? `bis ${new Date(event.end_date).toLocaleDateString('de-DE')}` : ''}</p>
-                    {event.schluesselannahme_time && (
-                      <p><strong>Schlüsselannahme:</strong> {event.schluesselannahme_time} am {new Date(event.start_date).toLocaleDateString('de-DE')}</p>
+                  <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1">
+                    <p><strong>Zeitraum:</strong> {new Date(event.start_date).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })} {new Date(event.start_date).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} → {new Date(event.end_date).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</p>
+                    {event.location && (
+                      <p><strong>Ort:</strong> {event.location}</p>
                     )}
-                    {event.schluesselabgabe_time && (
-                      <p><strong>Schlüsselabgabe:</strong> {event.schluesselabgabe_time} am {new Date(event.end_date).toLocaleDateString('de-DE')}</p>
+                    {event.category && (
+                      <p><strong>Kategorie:</strong> {event.category}</p>
                     )}
-                    <p><strong>Event-Typ:</strong> {event.event_type || 'Privates Event'}</p>
-                    <p><strong>Genehmigt am:</strong> {new Date(event.updated_at).toLocaleDateString('de-DE')} um {new Date(event.updated_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</p>
                   </div>
                 </div>
+
+                <button
+                  onClick={() => handleEditClick(event)}
+                  className="ml-4 px-4 py-2 text-sm font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg transition-colors flex items-center shadow-md"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Bearbeiten
+                </button>
               </div>
             </div>
           ))}
         </div>
       )}
-    </div>
-  )
-}
 
-const RequestsTab = () => {
-  const { user } = useAuth()
-  const [requests, setRequests] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [selectedRequest, setSelectedRequest] = useState(null)
-  const [showDetails, setShowDetails] = useState(false)
+      {/* Edit Event Form Modal */}
+      {showEditForm && selectedEvent && (
+        <AdminEventEditForm
+          isOpen={showEditForm}
+          event={selectedEvent}
+          onClose={() => {
+            setShowEditForm(false)
+            setSelectedEvent(null)
+          }}
+          onSuccess={handleEventUpdated}
+        />
+      )}
 
-  useEffect(() => {
-    loadRequests()
-  }, [])
-
-  const loadRequests = async () => {
-    try {
-      setLoading(true)
-      const data = await eventRequestsAPI.getAll()
-      
-      if (data) {
-        setRequests(data || [])
-      } else {
-        setRequests([])
-      }
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleApprove = async (requestId) => {
-    try {
-      // First, get the request details
-      const requests = await eventRequestsAPI.getAll()
-      const request = requests.find(req => req.id === requestId)
-      
-      if (!request) {
-        alert('Event-Anfrage nicht gefunden!')
-        return
-      }
-
-      // Create an event from the request data
-      const eventData = {
-        title: request.title,
-        description: request.description || '',
-        start_date: request.start_date,
-        end_date: request.end_date || request.start_date,
-        schluesselannahme_time: request.schluesselannahme_time || '',
-        schluesselabgabe_time: request.schluesselabgabe_time || '',
-        location: request.location || '',
-        event_type: request.event_type || 'Privates Event',
-        max_participants: request.max_participants || null,
-        is_private: request.is_private || false,
-        created_by: request.requested_by,
-        requester_name: request.requester_name,
-        requester_email: request.requester_email,
-        uploaded_file_name: request.uploaded_file_name,
-        uploaded_file_size: request.uploaded_file_size,
-        uploaded_file_type: request.uploaded_file_type,
-        uploaded_file_data: request.uploaded_file_data,
-        uploaded_mietvertrag_url: request.uploaded_mietvertrag_url,
-        hausordnung_accepted: request.hausordnung_accepted,
-        mietvertrag_accepted: request.mietvertrag_accepted,
-        terms_accepted: request.terms_accepted,
-        youth_protection_accepted: request.youth_protection_accepted,
-        additional_notes: request.additional_notes || ''
-      }
-
-      // Create the event in the events table
-      await eventsAPI.create(eventData)
-
-      // Update the request status to approved
-      await eventRequestsAPI.update(requestId, { 
-        status: 'approved',
-        reviewed_by: user?.id,
-        reviewed_at: new Date().toISOString()
-      })
-      
-      alert('Event-Anfrage wurde genehmigt und Event wurde erstellt!')
-      loadRequests() // Reload the list
-      
-      // Emit event to refresh calendar
-      eventBus.emit('eventRequestApproved', { requestId })
-    } catch (err) {
-      console.error('Approval error:', err)
-      alert(`Fehler: ${err.message}`)
-    }
-  }
-
-  const handleReject = async (requestId) => {
-    const reason = prompt('Grund für die Ablehnung:')
-    if (!reason) return
-
-    try {
-      // Update the request status to rejected
-      await eventRequestsAPI.update(requestId, { 
-        status: 'rejected',
-        review_notes: reason,
-        reviewed_by: user?.id,
-        reviewed_at: new Date().toISOString()
-      })
-      alert('Event-Anfrage wurde abgelehnt!')
-      loadRequests() // Reload the list
-      
-      // Emit event to refresh calendar
-      eventBus.emit('eventRequestRejected', { requestId })
-    } catch (err) {
-      alert(`Fehler: ${err.message}`)
-    }
-  }
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800'
-      case 'approved': return 'bg-green-100 text-green-800'
-      case 'rejected': return 'bg-red-100 text-red-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'pending': return <Clock className="h-4 w-4" />
-      case 'approved': return <Check className="h-4 w-4" />
-      case 'rejected': return <X className="h-4 w-4" />
-      default: return <Clock className="h-4 w-4" />
-    }
-  }
-
-  const getStatusText = (status) => {
-    switch (status) {
-      case 'pending': return 'Ausstehend'
-      case 'approved': return 'Genehmigt'
-      case 'rejected': return 'Abgelehnt'
-      default: return status
-    }
-  }
-
-  // Download uploaded PDF file
-  const downloadUploadedFile = (request) => {
-    try {
-      
-      // Check if we have base64 data (new format)
-      if (request.uploaded_file_data) {
-        // Convert base64 to blob
-        const byteCharacters = atob(request.uploaded_file_data)
-        const byteNumbers = new Array(byteCharacters.length)
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i)
-        }
-        const byteArray = new Uint8Array(byteNumbers)
-        const blob = new Blob([byteArray], { type: request.uploaded_file_type || 'application/pdf' })
-        
-        // Create download link
-        const url = window.URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = request.uploaded_file_name || 'mietvertrag.pdf'
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        window.URL.revokeObjectURL(url)
-        
-      } 
-      // Fallback to URL (old format)
-      else if (request.uploaded_mietvertrag_url) {
-        const link = document.createElement('a')
-        link.href = request.uploaded_mietvertrag_url
-        link.download = 'mietvertrag.pdf'
-        link.target = '_blank'
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-      } else {
-        alert('Keine Datei zum Herunterladen verfügbar')
-      }
-    } catch (error) {
-      console.error('Error downloading file:', error)
-      alert('Fehler beim Herunterladen der Datei')
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-        <span className="ml-2 text-gray-600">Lade Event-Anfragen...</span>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-12 bg-red-50 rounded-lg">
-        <AlertCircle className="mx-auto h-12 w-12 text-red-400" />
-        <h3 className="mt-2 text-sm font-medium text-red-900">Fehler beim Laden</h3>
-        <p className="mt-1 text-sm text-red-600">{error}</p>
-        <button
-          onClick={loadRequests}
-          className="mt-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-        >
-          Erneut versuchen
-        </button>
-      </div>
-    )
-  }
-
-  if (requests.length === 0) {
-    return (
-      <div className="text-center py-12 bg-gray-50 rounded-lg">
-        <FileText className="mx-auto h-12 w-12 text-gray-400" />
-        <h3 className="mt-2 text-sm font-medium text-gray-900">Keine Event-Anfragen</h3>
-        <p className="mt-1 text-sm text-gray-500">
-          Es sind noch keine Event-Anfragen eingegangen.
-        </p>
-      </div>
-    )
-  }
-
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">Event-Anfragen ({requests.length})</h2>
-        <button
-          onClick={loadRequests}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
-        >
-          Aktualisieren
-        </button>
-      </div>
-
-      <div className="space-y-4">
-        {requests.map((request) => (
-          <div key={request.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <div className="flex items-center space-x-3 mb-2">
-                  <h3 className="text-lg font-medium text-gray-900">{request.title}</h3>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
-                    {getStatusIcon(request.status)}
-                    <span className="ml-1">{getStatusText(request.status)}</span>
-                  </span>
-                </div>
-                
-                {request.description && (
-                  <p className="text-gray-600 mb-2">{request.description}</p>
-                )}
-                
-                <div className="text-sm text-gray-500 space-y-1">
-                  <p><strong>Datum:</strong> {new Date(request.start_date).toLocaleDateString('de-DE')}</p>
-                  <p><strong>Zeit:</strong> {new Date(request.start_date).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} - {new Date(request.end_date).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</p>
-                  <p><strong>Eingereicht:</strong> {new Date(request.created_at).toLocaleDateString('de-DE')} um {new Date(request.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</p>
-                </div>
-
-                {request.review_notes && (
-                  <div className="mt-2 p-2 bg-gray-50 rounded text-sm">
-                    <strong>Bemerkungen:</strong> {request.review_notes}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex space-x-2 ml-4">
-                <button
-                  onClick={() => {
-                    setSelectedRequest(request)
-                    setShowDetails(true)
-                  }}
-                  className="p-2 text-gray-400 hover:text-gray-600"
-                  title="Details anzeigen"
-                >
-                  <Eye className="h-4 w-4" />
-                </button>
-                
-                {request.status === 'pending' && (
-                  <>
-                    <button
-                      onClick={() => handleApprove(request.id)}
-                      className="p-2 text-green-600 hover:text-green-700 bg-green-50 rounded hover:bg-green-100"
-                      title="Genehmigen"
-                    >
-                      <Check className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleReject(request.id)}
-                      className="p-2 text-red-600 hover:text-red-700 bg-red-50 rounded hover:bg-red-100"
-                      title="Ablehnen"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Details Modal */}
-      {showDetails && selectedRequest && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-start mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Event-Anfrage Details</h3>
-              <button
-                onClick={() => setShowDetails(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <h4 className="font-medium text-gray-900">Titel</h4>
-                <p className="text-gray-600">{selectedRequest.title}</p>
-              </div>
-              
-              {selectedRequest.description && (
-                <div>
-                  <h4 className="font-medium text-gray-900">Beschreibung</h4>
-                  <p className="text-gray-600">{selectedRequest.description}</p>
-                </div>
-              )}
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h4 className="font-medium text-gray-900">Startdatum</h4>
-                  <p className="text-gray-600">{new Date(selectedRequest.start_date).toLocaleDateString('de-DE')}</p>
-                </div>
-                <div>
-                  <h4 className="font-medium text-gray-900">Enddatum</h4>
-                  <p className="text-gray-600">{new Date(selectedRequest.end_date).toLocaleDateString('de-DE')}</p>
-                </div>
-              </div>
-              
-              {selectedRequest.schluesselannahme_time && (
-                <div>
-                  <h4 className="font-medium text-gray-900">Schlüsselannahme</h4>
-                  <p className="text-gray-600">{selectedRequest.schluesselannahme_time} am {new Date(selectedRequest.start_date).toLocaleDateString('de-DE')}</p>
-                </div>
-              )}
-              
-              {selectedRequest.schluesselabgabe_time && (
-                <div>
-                  <h4 className="font-medium text-gray-900">Schlüsselabgabe</h4>
-                  <p className="text-gray-600">{selectedRequest.schluesselabgabe_time} am {new Date(selectedRequest.end_date).toLocaleDateString('de-DE')}</p>
-                </div>
-              )}
-              
-              <div>
-                <h4 className="font-medium text-gray-900">Event-Typ</h4>
-                <p className="text-gray-600">{selectedRequest.event_type || 'Privates Event'}</p>
-              </div>
-              
-              {selectedRequest.additional_notes && (
-                <div>
-                  <h4 className="font-medium text-gray-900">Weitere Dinge</h4>
-                  <p className="text-gray-600">{selectedRequest.additional_notes}</p>
-                </div>
-              )}
-              
-              <div>
-                <h4 className="font-medium text-gray-900">Status</h4>
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(selectedRequest.status)}`}>
-                  {getStatusIcon(selectedRequest.status)}
-                  <span className="ml-1">{getStatusText(selectedRequest.status)}</span>
-                </span>
-              </div>
-              
-              <div>
-                <h4 className="font-medium text-gray-900">Eingereicht am</h4>
-                <p className="text-gray-600">{new Date(selectedRequest.created_at).toLocaleString('de-DE')}</p>
-              </div>
-
-              {/* PDF Upload Information */}
-              {(selectedRequest.uploaded_file_data || selectedRequest.uploaded_mietvertrag_url) && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="flex items-center space-x-2 mb-3">
-                    <FileText className="h-5 w-5 text-green-600" />
-                    <span className="text-sm font-medium text-green-900">Ausgefüllter Mietvertrag hochgeladen</span>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 mb-3">
-                    {selectedRequest.uploaded_file_name && (
-                      <div>
-                        <strong>Dateiname:</strong> {selectedRequest.uploaded_file_name}
-                      </div>
-                    )}
-                    {selectedRequest.uploaded_file_size && (
-                      <div>
-                        <strong>Größe:</strong> {(selectedRequest.uploaded_file_size / 1024).toFixed(1)} KB
-                      </div>
-                    )}
-                    {selectedRequest.uploaded_file_type && (
-                      <div>
-                        <strong>Typ:</strong> {selectedRequest.uploaded_file_type}
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => downloadUploadedFile(selectedRequest)}
-                    className="inline-flex items-center px-4 py-2 text-sm font-medium text-green-700 bg-green-100 border border-green-300 rounded-md hover:bg-green-200 transition-colors duration-200"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Mietvertrag herunterladen
-                  </button>
-                </div>
-              )}
-
-              {!selectedRequest.uploaded_file_data && !selectedRequest.uploaded_mietvertrag_url && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <div className="flex items-center space-x-2">
-                    <AlertCircle className="h-5 w-5 text-yellow-600" />
-                    <span className="text-sm text-yellow-800">Kein ausgefüllter Mietvertrag hochgeladen</span>
-                  </div>
-                </div>
-              )}
-              
-              {selectedRequest.review_notes && (
-                <div>
-                  <h4 className="font-medium text-gray-900">Bemerkungen</h4>
-                  <p className="text-gray-600">{selectedRequest.review_notes}</p>
-                </div>
-              )}
-            </div>
-            
-            <div className="mt-6 flex justify-end space-x-3">
-              <button
-                onClick={() => setShowDetails(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
-              >
-                Schließen
-              </button>
-              {selectedRequest.status === 'pending' && (
-                <>
-                  <button
-                    onClick={() => {
-                      handleApprove(selectedRequest.id)
-                      setShowDetails(false)
-                    }}
-                    className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700"
-                  >
-                    Genehmigen
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleReject(selectedRequest.id)
-                      setShowDetails(false)
-                    }}
-                    className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700"
-                  >
-                    Ablehnen
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+      {/* Admin Event Creation Form Modal */}
+      {showCreateForm && (
+        <AdminEventCreationForm
+          isOpen={showCreateForm}
+          onClose={() => setShowCreateForm(false)}
+          onSuccess={handleEventCreated}
+        />
       )}
     </div>
   )
@@ -721,17 +343,675 @@ const UsersTab = () => {
 }
 
 const SettingsTab = () => {
+  const { isDarkMode } = useDarkMode()
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true)
+  const [autoApprovePublic, setAutoApprovePublic] = useState(false)
+  const [showPrivateEvents, setShowPrivateEvents] = useState(true)
+  const [showBlockedDates, setShowBlockedDates] = useState(true)
+  const [defaultToWeekView, setDefaultToWeekView] = useState(false)
+  const [adminEmails, setAdminEmails] = useState([])
+  const [newEmail, setNewEmail] = useState('')
+  const [emailError, setEmailError] = useState('')
+
+  // Load settings from localStorage on mount
+  useEffect(() => {
+    const savedSettings = localStorage.getItem('adminSettings')
+    if (savedSettings) {
+      try {
+        const settings = JSON.parse(savedSettings)
+        setNotificationsEnabled(settings.notificationsEnabled ?? true)
+        setAutoApprovePublic(settings.autoApprovePublic ?? false)
+        setShowPrivateEvents(settings.showPrivateEvents ?? true)
+        setShowBlockedDates(settings.showBlockedDates ?? true)
+        setDefaultToWeekView(settings.defaultToWeekView ?? false)
+        setAdminEmails(settings.adminEmails ?? [])
+      } catch (error) {
+        console.error('Error loading settings:', error)
+      }
+    }
+  }, [])
+
+  const validateEmail = (email) => {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return re.test(email)
+  }
+
+  const handleAddEmail = () => {
+    setEmailError('')
+    
+    if (!newEmail.trim()) {
+      setEmailError('Bitte geben Sie eine E-Mail-Adresse ein')
+      return
+    }
+
+    if (!validateEmail(newEmail)) {
+      setEmailError('Bitte geben Sie eine gültige E-Mail-Adresse ein')
+      return
+    }
+
+    if (adminEmails.includes(newEmail.toLowerCase())) {
+      setEmailError('Diese E-Mail-Adresse wurde bereits hinzugefügt')
+      return
+    }
+
+    setAdminEmails([...adminEmails, newEmail.toLowerCase()])
+    setNewEmail('')
+  }
+
+  const handleRemoveEmail = (emailToRemove) => {
+    setAdminEmails(adminEmails.filter(email => email !== emailToRemove))
+  }
+
+  const handleImportOldCalendar = async () => {
+    // Use Supabase Edge Function as proxy to bypass CORS
+    const ICS_FEED_URL = `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/fetch-ics`
+    
+    console.log('═══════════════════════════════════════════════════════════')
+    console.log('🚀 CALENDAR IMPORT STARTED')
+    console.log('═══════════════════════════════════════════════════════════')
+    console.log('⏰ Start Time:', new Date().toLocaleString())
+    console.log('🔗 ICS Feed URL:', ICS_FEED_URL)
+    console.log('')
+    
+    if (!window.confirm('Möchten Sie Events aus dem alten Kalender importieren?\n\nDies kann einige Minuten dauern.')) {
+      console.log('❌ Import cancelled by user')
+      return
+    }
+    
+    try {
+      // Show loading indicator
+      console.log('───────────────────────────────────────────────────────────')
+      console.log('📡 PHASE 1: FETCHING ICS FEED')
+      console.log('───────────────────────────────────────────────────────────')
+      
+      alert('Import wird gestartet...\n\nBitte warten Sie, während die Events importiert werden.\n\nÖffnen Sie die Browser-Konsole (F12) für Live-Logs!')
+      
+      // Fetch and parse ICS feed
+      console.log('📥 Fetching ICS feed...')
+      const startFetch = Date.now()
+      const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY
+      const parsedEvents = await fetchAndParseICS(ICS_FEED_URL, supabaseKey)
+      const fetchTime = Date.now() - startFetch
+      
+      console.log(`✅ Fetch completed in ${fetchTime}ms`)
+      console.log(`📊 Total events parsed: ${parsedEvents.length}`)
+      console.log('')
+      
+      // Show sample of first few events
+      console.log('───────────────────────────────────────────────────────────')
+      console.log('📋 SAMPLE OF PARSED EVENTS (First 3):')
+      console.log('───────────────────────────────────────────────────────────')
+      parsedEvents.slice(0, 3).forEach((evt, idx) => {
+        console.log(`${idx + 1}. ${evt.SUMMARY}`)
+        console.log(`   📅 Date: ${evt.startDate?.toLocaleDateString()}`)
+        console.log(`   🏷️ Category: ${evt.CATEGORIES}`)
+        console.log(`   🔒 Private: ${evt.isPrivate}`)
+        console.log(`   📍 Location: ${evt.LOCATION || 'N/A'}`)
+        console.log('')
+      })
+      
+      // Get existing events once
+      console.log('───────────────────────────────────────────────────────────')
+      console.log('📡 PHASE 2: CHECKING FOR DUPLICATES')
+      console.log('───────────────────────────────────────────────────────────')
+      console.log('🔍 Fetching existing events from database...')
+      const existingEvents = await eventsAPI.getAll()
+      console.log(`📊 Found ${existingEvents.length} existing events in database`)
+      console.log('')
+      
+      // Convert and import events
+      console.log('───────────────────────────────────────────────────────────')
+      console.log('📡 PHASE 3: IMPORTING EVENTS')
+      console.log('───────────────────────────────────────────────────────────')
+      
+      let successCount = 0
+      let errorCount = 0
+      let skipCount = 0
+      const errors = []
+      const startImport = Date.now()
+      
+      for (let i = 0; i < parsedEvents.length; i++) {
+        const icsEvent = parsedEvents[i]
+        const progress = `[${i + 1}/${parsedEvents.length}]`
+        
+        try {
+          const dbEvent = convertToDBEvent(icsEvent)
+          
+          // Check if event already exists (by UID)
+          const exists = existingEvents.some(e => e.imported_uid === dbEvent.imported_uid)
+          
+          if (exists) {
+            skipCount++
+            console.log(`${progress} ⏭️  SKIP (duplicate): "${dbEvent.title}"`)
+            continue
+          }
+          
+          // Create event in database
+          console.log(`${progress} 📝 Creating: "${dbEvent.title}"`)
+          console.log(`         📅 ${dbEvent.start_date} - ${dbEvent.end_date}`)
+          console.log(`         🎨 Type: ${dbEvent.event_type}, Private: ${dbEvent.is_private}`)
+          
+          await eventsAPI.create(dbEvent)
+          successCount++
+          console.log(`${progress} ✅ SUCCESS: "${dbEvent.title}"`)
+          console.log('')
+          
+        } catch (error) {
+          errorCount++
+          errors.push({ event: icsEvent.SUMMARY, error: error.message })
+          console.error(`${progress} ❌ ERROR: "${icsEvent.SUMMARY}"`)
+          console.error(`         ⚠️  ${error.message}`)
+          console.error(error)
+          console.log('')
+        }
+      }
+      
+      const importTime = Date.now() - startImport
+      
+      // Show results
+      console.log('')
+      console.log('═══════════════════════════════════════════════════════════')
+      console.log('🎉 IMPORT COMPLETED')
+      console.log('═══════════════════════════════════════════════════════════')
+      console.log('📊 STATISTICS:')
+      console.log(`   ✅ Successfully imported: ${successCount}`)
+      console.log(`   ❌ Errors: ${errorCount}`)
+      console.log(`   ⏭️  Skipped (duplicates): ${skipCount}`)
+      console.log(`   📊 Total processed: ${parsedEvents.length}`)
+      console.log('')
+      console.log('⏱️  TIMING:')
+      console.log(`   📥 Fetch time: ${fetchTime}ms`)
+      console.log(`   💾 Import time: ${importTime}ms`)
+      console.log(`   🕐 Total time: ${fetchTime + importTime}ms`)
+      console.log('')
+      console.log('⏰ End Time:', new Date().toLocaleString())
+      
+      if (errors.length > 0) {
+        console.log('')
+        console.log('───────────────────────────────────────────────────────────')
+        console.log('⚠️  ERRORS DETAILS:')
+        console.log('───────────────────────────────────────────────────────────')
+        errors.forEach((err, idx) => {
+          console.error(`${idx + 1}. Event: "${err.event}"`)
+          console.error(`   Error: ${err.error}`)
+        })
+      }
+      
+      console.log('═══════════════════════════════════════════════════════════')
+      
+      const message = `Import abgeschlossen!\n\n✅ Erfolgreich importiert: ${successCount}\n❌ Fehler: ${errorCount}\n⏭️ Übersprungen (Duplikate): ${skipCount}\n\nDetails in der Browser-Konsole (F12)\n\nSeite wird neu geladen...`
+      alert(message)
+      
+      // Reload events
+      console.log('🔄 Reloading page...')
+      window.location.reload()
+      
+    } catch (error) {
+      console.error('')
+      console.error('═══════════════════════════════════════════════════════════')
+      console.error('💥 IMPORT FAILED')
+      console.error('═══════════════════════════════════════════════════════════')
+      console.error('❌ Error:', error.message)
+      console.error('📍 Stack:', error.stack)
+      console.error('═══════════════════════════════════════════════════════════')
+      
+      alert(`Import fehlgeschlagen!\n\nFehler: ${error.message}\n\nBitte überprüfen Sie die Browser-Konsole (F12) für Details.`)
+    }
+  }
+
+  const handleExportData = () => {
+    alert('Export-Funktion:\n\nAlle Events und Anfragen werden als CSV/JSON exportiert.\n(In Entwicklung)')
+  }
+
+  const handleClearCache = () => {
+    if (window.confirm('Möchten Sie den System-Cache wirklich löschen?\n\nACHTUNG: Alle gespeicherten Einstellungen werden gelöscht!')) {
+      localStorage.clear()
+      // Reset to defaults
+      setNotificationsEnabled(true)
+      setAutoApprovePublic(false)
+      setShowPrivateEvents(true)
+      setShowBlockedDates(true)
+      setDefaultToWeekView(false)
+      setAdminEmails([])
+      alert('Cache wurde erfolgreich geleert!')
+    }
+  }
+
+  const handleDeleteAllEvents = async () => {
+    // Triple confirmation for safety
+    const confirmStep1 = window.confirm(
+      '⚠️ WARNUNG: Alle Events löschen\n\n' +
+      'Dies wird ALLE Events aus der Datenbank löschen!\n\n' +
+      'Diese Aktion kann NICHT rückgängig gemacht werden!\n\n' +
+      'Möchten Sie fortfahren?'
+    )
+    
+    if (!confirmStep1) {
+      console.log('❌ Delete cancelled at step 1')
+      return
+    }
+
+    const confirmStep2 = window.prompt(
+      '⚠️ ZWEITE BESTÄTIGUNG\n\n' +
+      'Um fortzufahren, geben Sie "ALLE EVENTS LÖSCHEN" ein:\n\n' +
+      '(Groß-/Kleinschreibung wird beachtet)'
+    )
+    
+    if (confirmStep2 !== 'ALLE EVENTS LÖSCHEN') {
+      alert('❌ Abgebrochen: Falsche Eingabe')
+      console.log('❌ Delete cancelled at step 2')
+      return
+    }
+
+    const confirmStep3 = window.confirm(
+      '🔴 LETZTE WARNUNG\n\n' +
+      'Dies ist Ihre letzte Chance!\n\n' +
+      'Alle Events werden unwiderruflich gelöscht.\n\n' +
+      'Sind Sie ABSOLUT SICHER?'
+    )
+    
+    if (!confirmStep3) {
+      console.log('❌ Delete cancelled at step 3')
+      return
+    }
+
+    try {
+      console.log('═══════════════════════════════════════════════════════════')
+      console.log('🗑️ DELETE ALL EVENTS STARTED')
+      console.log('═══════════════════════════════════════════════════════════')
+      console.log('⏰ Start Time:', new Date().toLocaleString())
+      console.log('')
+
+      // Fetch all events
+      console.log('📥 Fetching all events...')
+      const allEvents = await eventsAPI.getAll()
+      console.log(`📊 Found ${allEvents.length} events to delete`)
+      
+      if (allEvents.length === 0) {
+        alert('ℹ️ Keine Events zum Löschen gefunden.')
+        return
+      }
+
+      console.log('')
+      console.log('───────────────────────────────────────────────────────────')
+      console.log('🗑️ DELETING EVENTS')
+      console.log('───────────────────────────────────────────────────────────')
+
+      let successCount = 0
+      let errorCount = 0
+      const errors = []
+
+      for (let i = 0; i < allEvents.length; i++) {
+        const event = allEvents[i]
+        const progress = `[${i + 1}/${allEvents.length}]`
+
+        try {
+          console.log(`${progress} 🗑️ Deleting: "${event.title}"`)
+          await eventsAPI.delete(event.id)
+          successCount++
+          console.log(`${progress} ✅ Deleted: "${event.title}"`)
+        } catch (error) {
+          errorCount++
+          errors.push({ event: event.title, error: error.message })
+          console.error(`${progress} ❌ Error deleting: "${event.title}"`)
+          console.error(`         ⚠️  ${error.message}`)
+        }
+      }
+
+      console.log('')
+      console.log('═══════════════════════════════════════════════════════════')
+      console.log('🎯 DELETE COMPLETED')
+      console.log('═══════════════════════════════════════════════════════════')
+      console.log('📊 STATISTICS:')
+      console.log(`   ✅ Successfully deleted: ${successCount}`)
+      console.log(`   ❌ Errors: ${errorCount}`)
+      console.log(`   📊 Total processed: ${allEvents.length}`)
+      console.log('')
+      console.log('⏰ End Time:', new Date().toLocaleString())
+
+      if (errors.length > 0) {
+        console.log('')
+        console.log('───────────────────────────────────────────────────────────')
+        console.log('⚠️ ERRORS DETAILS:')
+        console.log('───────────────────────────────────────────────────────────')
+        errors.forEach((err, idx) => {
+          console.error(`${idx + 1}. Event: "${err.event}"`)
+          console.error(`   Error: ${err.error}`)
+        })
+      }
+
+      console.log('═══════════════════════════════════════════════════════════')
+
+      alert(
+        `✅ Löschvorgang abgeschlossen!\n\n` +
+        `Gelöscht: ${successCount}\n` +
+        `Fehler: ${errorCount}\n\n` +
+        `Seite wird neu geladen...`
+      )
+
+      // Reload page
+      window.location.reload()
+
+    } catch (error) {
+      console.error('')
+      console.error('═══════════════════════════════════════════════════════════')
+      console.error('💥 DELETE FAILED')
+      console.error('═══════════════════════════════════════════════════════════')
+      console.error('❌ Error:', error.message)
+      console.error('📍 Stack:', error.stack)
+      console.error('═══════════════════════════════════════════════════════════')
+
+      alert(`❌ Fehler beim Löschen!\n\n${error.message}\n\nDetails in der Konsole (F12).`)
+    }
+  }
+
+  const handleSaveSettings = () => {
+    const settings = {
+      notificationsEnabled,
+      autoApprovePublic,
+      showPrivateEvents,
+      showBlockedDates,
+      defaultToWeekView,
+      adminEmails,
+      lastUpdated: new Date().toISOString()
+    }
+
+    localStorage.setItem('adminSettings', JSON.stringify(settings))
+    
+    alert('✓ Einstellungen wurden erfolgreich gespeichert!\n\n' +
+          `Benachrichtigungen: ${notificationsEnabled ? 'Aktiviert' : 'Deaktiviert'}\n` +
+          `Admin E-Mails: ${adminEmails.length} konfiguriert\n` +
+          `Auto-Genehmigung: ${autoApprovePublic ? 'Aktiviert' : 'Deaktiviert'}`)
+  }
+
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">Einstellungen</h2>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-semibold text-[#252422] dark:text-[#F4F1E8]">Einstellungen</h2>
+        <button
+          onClick={handleSaveSettings}
+          className="inline-flex items-center px-6 py-3 text-sm font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg transition-colors shadow-md"
+        >
+          <Check className="h-4 w-4 mr-2" />
+          Einstellungen speichern
+        </button>
       </div>
-      <div className="text-center py-12 bg-gray-50 rounded-lg">
-        <Settings className="mx-auto h-12 w-12 text-gray-400" />
-        <h3 className="mt-2 text-sm font-medium text-gray-900">Systemeinstellungen</h3>
-        <p className="mt-1 text-sm text-gray-500">
-          Hier können Sie Systemeinstellungen vornehmen.
-        </p>
+
+      {/* Notification Settings */}
+      <div className={`bg-white dark:bg-[#2a2a2a] rounded-lg p-6 border-2 border-[#A58C81] dark:border-[#4a4a4a]`}>
+        <div className={`border-l-4 border-[#6054d9] pl-4 py-2`}>
+          <h3 className={`text-lg font-bold text-[#252422] dark:text-[#F4F1E8] mb-1`}>
+            Benachrichtigungen
+          </h3>
+          <p className={`text-xs text-[#A58C81] dark:text-[#EBE9E9] mb-4`}>
+            E-Mail-Benachrichtigungen für neue Event-Anfragen und Statusänderungen
+          </p>
+
+          <div className="space-y-3 mt-4">
+            <label className="flex items-center space-x-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={notificationsEnabled}
+                onChange={(e) => setNotificationsEnabled(e.target.checked)}
+                className="w-4 h-4 text-[#6054d9] border-[#A58C81] rounded focus:ring-[#6054d9]"
+              />
+              <span className={`text-sm text-[#252422] dark:text-[#F4F1E8]`}>
+                E-Mail-Benachrichtigungen bei neuen Anfragen aktivieren
+              </span>
+            </label>
+            <label className="flex items-center space-x-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoApprovePublic}
+                onChange={(e) => setAutoApprovePublic(e.target.checked)}
+                className="w-4 h-4 text-[#6054d9] border-[#A58C81] rounded focus:ring-[#6054d9]"
+              />
+              <span className={`text-sm text-[#252422] dark:text-[#F4F1E8]`}>
+                Öffentliche Events automatisch genehmigen
+              </span>
+            </label>
+          </div>
+
+          {/* Admin Email List */}
+          <div className="mt-6 pt-6 border-t border-[#A58C81] dark:border-[#6a6a6a]">
+            <h4 className={`text-sm font-bold text-[#252422] dark:text-[#F4F1E8] mb-2`}>
+              Admin E-Mail-Adressen für Benachrichtigungen
+            </h4>
+            <p className={`text-xs text-[#A58C81] dark:text-[#EBE9E9] mb-3`}>
+              Diese E-Mail-Adressen erhalten Benachrichtigungen bei neuen Event-Anfragen
+            </p>
+
+            {/* Add Email Form */}
+            <div className="flex gap-2 mb-3">
+              <div className="flex-1">
+                <input
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => {
+                    setNewEmail(e.target.value)
+                    setEmailError('')
+                  }}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleAddEmail()
+                    }
+                  }}
+                  placeholder="admin@beispiel.de"
+                  className="w-full px-3 py-2 border-2 border-[#A58C81] dark:border-[#6a6a6a] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6054d9] bg-white dark:bg-[#1a1a1a] text-[#252422] dark:text-[#F4F1E8]"
+                />
+                {emailError && (
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-1">{emailError}</p>
+                )}
+              </div>
+              <button
+                onClick={handleAddEmail}
+                className="px-4 py-2 text-sm font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Email List */}
+            {adminEmails.length > 0 ? (
+              <div className="space-y-2">
+                {adminEmails.map((email, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-2 bg-gray-50 dark:bg-[#1a1a1a] rounded-lg border border-[#A58C81] dark:border-[#6a6a6a]"
+                  >
+                    <span className={`text-sm text-[#252422] dark:text-[#F4F1E8]`}>
+                      {email}
+                    </span>
+                    <button
+                      onClick={() => handleRemoveEmail(email)}
+                      className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                      title="Entfernen"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className={`text-xs text-[#A58C81] dark:text-[#EBE9E9] italic text-center py-3`}>
+                Noch keine E-Mail-Adressen konfiguriert
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Calendar Display Settings */}
+      <div className={`bg-white dark:bg-[#2a2a2a] rounded-lg p-6 border-2 border-[#A58C81] dark:border-[#4a4a4a]`}>
+        <div className={`border-l-4 border-[#A58C81] pl-4 py-2`}>
+          <h3 className={`text-lg font-bold text-[#252422] dark:text-[#F4F1E8] mb-1`}>
+            Kalender-Anzeigeeinstellungen
+          </h3>
+          <p className={`text-xs text-[#A58C81] dark:text-[#EBE9E9] mb-4`}>
+            Anpassung der Kalender-Darstellung
+          </p>
+
+          <div className="space-y-3 mt-4">
+            <label className="flex items-center space-x-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showPrivateEvents}
+                onChange={(e) => setShowPrivateEvents(e.target.checked)}
+                className="w-4 h-4 text-[#6054d9] border-[#A58C81] rounded focus:ring-[#6054d9]"
+              />
+              <span className={`text-sm text-[#252422] dark:text-[#F4F1E8]`}>
+                Private Events im öffentlichen Kalender anzeigen
+              </span>
+            </label>
+            <label className="flex items-center space-x-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showBlockedDates}
+                onChange={(e) => setShowBlockedDates(e.target.checked)}
+                className="w-4 h-4 text-[#6054d9] border-[#A58C81] rounded focus:ring-[#6054d9]"
+              />
+              <span className={`text-sm text-[#252422] dark:text-[#F4F1E8]`}>
+                Blockierte Zeiträume anzeigen
+              </span>
+            </label>
+            <label className="flex items-center space-x-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={defaultToWeekView}
+                onChange={(e) => setDefaultToWeekView(e.target.checked)}
+                className="w-4 h-4 text-[#6054d9] border-[#A58C81] rounded focus:ring-[#6054d9]"
+              />
+              <span className={`text-sm text-[#252422] dark:text-[#F4F1E8]`}>
+                Wochenansicht als Standard
+              </span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {/* Data Export/Backup */}
+      <div className={`bg-white dark:bg-[#2a2a2a] rounded-lg p-6 border-2 border-[#A58C81] dark:border-[#4a4a4a]`}>
+        <div className={`border-l-4 border-[#6054d9] pl-4 py-2`}>
+          <h3 className={`text-lg font-bold text-[#252422] dark:text-[#F4F1E8] mb-1`}>
+            Daten-Export & Backup
+          </h3>
+          <p className={`text-xs text-[#A58C81] dark:text-[#EBE9E9] mb-4`}>
+            Exportieren und sichern Sie Ihre Daten
+          </p>
+
+          <div className="flex flex-wrap gap-3 mt-4">
+            <button
+              onClick={handleExportData}
+              className="inline-flex items-center px-4 py-2 text-sm font-medium text-[#252422] dark:text-[#F4F1E8] bg-white dark:bg-[#1a1a1a] border-2 border-[#A58C81] dark:border-[#6a6a6a] rounded-lg hover:bg-gray-50 dark:hover:bg-[#252422] transition-colors"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Alle Events exportieren (CSV)
+            </button>
+            <button
+              onClick={handleExportData}
+              className="inline-flex items-center px-4 py-2 text-sm font-medium text-[#252422] dark:text-[#F4F1E8] bg-white dark:bg-[#1a1a1a] border-2 border-[#A58C81] dark:border-[#6a6a6a] rounded-lg hover:bg-gray-50 dark:hover:bg-[#252422] transition-colors"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Anfragen exportieren (CSV)
+            </button>
+            <button
+              onClick={handleExportData}
+              className="inline-flex items-center px-4 py-2 text-sm font-medium text-[#252422] dark:text-[#F4F1E8] bg-white dark:bg-[#1a1a1a] border-2 border-[#A58C81] dark:border-[#6a6a6a] rounded-lg hover:bg-gray-50 dark:hover:bg-[#252422] transition-colors"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Backup erstellen (JSON)
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Import Section */}
+      <div className={`bg-white dark:bg-[#2a2a2a] rounded-lg p-6 border-2 border-[#A58C81] dark:border-[#4a4a4a]`}>
+        <div className={`border-l-4 border-[#6054d9] pl-4 py-2`}>
+          <h3 className={`text-lg font-bold text-[#252422] dark:text-[#F4F1E8] mb-1`}>
+            Daten Import
+          </h3>
+          <p className={`text-xs text-[#A58C81] dark:text-[#EBE9E9] mb-4`}>
+            Importieren Sie Events aus dem alten Kalender-System
+          </p>
+
+          <div className="mt-4">
+            <button
+              onClick={handleImportOldCalendar}
+              className="inline-flex items-center px-6 py-3 text-sm font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg transition-colors shadow-md"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Aus altem Kalender importieren
+            </button>
+            <p className={`text-xs mt-2 text-[#A58C81] dark:text-[#EBE9E9]`}>
+              Importiert Events aus: kalender.digital (ICS Feed)
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* System Maintenance */}
+      <div className={`bg-white dark:bg-[#2a2a2a] rounded-lg p-6 border-2 border-[#A58C81] dark:border-[#4a4a4a]`}>
+        <div className={`border-l-4 border-red-500 pl-4 py-2`}>
+          <h3 className={`text-lg font-bold text-[#252422] dark:text-[#F4F1E8] mb-1`}>
+            System-Wartung
+          </h3>
+          <p className={`text-xs text-[#A58C81] dark:text-[#EBE9E9] mb-4`}>
+            Wartungsfunktionen und Cache-Verwaltung
+          </p>
+
+          <div className="flex flex-wrap gap-3 mt-4">
+            <button
+              onClick={handleClearCache}
+              className="inline-flex items-center px-4 py-2 text-sm font-medium text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+            >
+              <AlertCircle className="h-4 w-4 mr-2" />
+              Cache leeren
+            </button>
+            
+            <button
+              onClick={handleDeleteAllEvents}
+              className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-red-600 dark:bg-red-700 border-2 border-red-700 dark:border-red-900 rounded-lg hover:bg-red-700 dark:hover:bg-red-800 transition-colors shadow-md"
+            >
+              <X className="h-4 w-4 mr-2" />
+              Alle Events löschen
+            </button>
+          </div>
+          
+          <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/10 border-l-4 border-red-500 rounded">
+            <p className="text-xs text-red-700 dark:text-red-400">
+              <strong>⚠️ Warnung:</strong> Der Button "Alle Events löschen" erfordert eine 3-fache Bestätigung und löscht unwiderruflich alle Events aus der Datenbank. Verwenden Sie diese Funktion nur zum Testen oder bei einem kompletten Neustart!
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* System Info */}
+      <div className={`bg-white dark:bg-[#2a2a2a] rounded-lg p-6 border-2 border-[#A58C81] dark:border-[#4a4a4a]`}>
+        <div className={`border-l-4 border-[#A58C81] pl-4 py-2`}>
+          <h3 className={`text-lg font-bold text-[#252422] dark:text-[#F4F1E8] mb-1`}>
+            System-Informationen
+          </h3>
+          <p className={`text-xs text-[#A58C81] dark:text-[#EBE9E9] mb-4`}>
+            Allgemeine System- und Anwendungsinformationen
+          </p>
+
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className={`text-[#A58C81] dark:text-[#EBE9E9]`}>Version:</span>
+              <span className={`font-medium text-[#252422] dark:text-[#F4F1E8]`}>1.0.0</span>
+            </div>
+            <div className="flex justify-between">
+              <span className={`text-[#A58C81] dark:text-[#EBE9E9]`}>Datenbank:</span>
+              <span className={`font-medium text-[#252422] dark:text-[#F4F1E8]`}>Supabase</span>
+            </div>
+            <div className="flex justify-between">
+              <span className={`text-[#A58C81] dark:text-[#EBE9E9]`}>Event-System:</span>
+              <span className={`font-medium text-[#252422] dark:text-[#F4F1E8]`}>3-Schritt Workflow</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )

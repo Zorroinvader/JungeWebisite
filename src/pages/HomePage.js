@@ -1,18 +1,70 @@
-import React, { useState } from 'react'
-import { Link } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Calendar, Users, FileText } from 'lucide-react'
-import NewEventCalendar from '../components/Calendar/NewEventCalendar'
+import { useDarkMode } from '../contexts/DarkModeContext'
+import { Calendar, Users, FileText, Search } from 'lucide-react'
+import SimpleMonthCalendar from '../components/Calendar/SimpleMonthCalendar'
 import TypewriterText from '../components/UI/TypewriterText'
 import NextEventInfo from '../components/UI/NextEventInfo'
+import PublicEventRequestForm from '../components/Calendar/PublicEventRequestForm'
+import GuestOrRegisterModal from '../components/Calendar/GuestOrRegisterModal'
 
 const HomePage = () => {
   const { user } = useAuth()
+  const { isDarkMode } = useDarkMode()
+  const navigate = useNavigate()
   const [showSubtitle, setShowSubtitle] = useState(false)
+  const [showPublicRequestForm, setShowPublicRequestForm] = useState(false)
+  const [showGuestOrRegister, setShowGuestOrRegister] = useState(false)
+  const [selectedDate, setSelectedDate] = useState(null)
 
   const handleFirstTextComplete = () => {
     setShowSubtitle(true)
   }
+
+  const handlePublicRequestSuccess = () => {
+    setShowPublicRequestForm(false)
+    // Registered users go to profile, guests go to tracking
+    if (user) {
+      setTimeout(() => {
+        navigate('/profile')
+      }, 2000)
+    } else {
+      setTimeout(() => {
+        navigate('/event-tracking')
+      }, 2000)
+    }
+  }
+
+  const handleEventRequest = (date = null) => {
+    setSelectedDate(date)
+    // If user is logged in, go straight to form with pre-filled data
+    if (user) {
+      setShowPublicRequestForm(true)
+    } else {
+      // Show guest or register choice
+      setShowGuestOrRegister(true)
+    }
+  }
+
+  const handleContinueAsGuest = () => {
+    setShowGuestOrRegister(false)
+    setShowPublicRequestForm(true)
+  }
+
+  // Check if returning from login/register with pending request
+  useEffect(() => {
+    const pendingRequest = sessionStorage.getItem('pendingEventRequest')
+    const pendingDate = sessionStorage.getItem('pendingEventDate')
+    
+    if (pendingRequest === 'true' && user) {
+      sessionStorage.removeItem('pendingEventRequest')
+      const date = pendingDate ? pendingDate : null
+      sessionStorage.removeItem('pendingEventDate')
+      setSelectedDate(date)
+      setShowPublicRequestForm(true)
+    }
+  }, [user])
 
   return (
     <div className="min-h-screen">
@@ -65,39 +117,47 @@ const HomePage = () => {
         </div>
       </div>
 
-      {/* Button Section - Middle between hero and calendar */}
-      <div className="w-full bg-[#F4F1E8] dark:bg-[#252422] py-[1vh] sm:py-[1.2vh] md:py-[1.4vh] lg:py-[1.6vh] xl:py-[1.8vh] 2xl:py-[2vh]">
+      {/* Action Section - Redesigned */}
+      <div className="w-full bg-[#F4F1E8] dark:bg-[#252422] py-[2vh] sm:py-[3vh] md:py-[4vh]">
         <div className="max-w-6xl mx-auto px-[4vw] sm:px-[5vw] md:px-[6vw] lg:px-[8vw] xl:px-[10vw]">
-          <div className="flex flex-wrap justify-center gap-[3vw] sm:gap-[2.5vw] md:gap-[2vw] lg:gap-[1.8vw] xl:gap-[1.5vw]">
+          {/* Info/Navigation Links - Minimal Top */}
+          <div className="flex flex-wrap justify-center gap-[4vw] sm:gap-[3vw] md:gap-[2.5vw] mb-[3vh] sm:mb-[4vh]">
             <Link
               to="/about"
-              className="group inline-flex items-center px-[3.5vw] sm:px-[3vw] md:px-[2.5vw] lg:px-[2vw] xl:px-[1.8vw] py-[1.8vh] sm:py-[1.5vh] md:py-[1.2vh] lg:py-[1vh] xl:py-[0.8vh] text-[2.8vw] sm:text-[2.4vw] md:text-[2vw] lg:text-[1.6vw] xl:text-[1.3vw] font-semibold text-white dark:text-[#252422] bg-[#A58C81] dark:bg-[#F4F1E8] rounded-full border-2 border-[#A58C81] dark:border-[#F4F1E8] hover:bg-[#8B6F5F] dark:hover:bg-[#EBE9E9] hover:text-white dark:hover:text-[#252422] transition-all duration-200 hover:scale-110 shadow-lg hover:shadow-xl"
+              className={`inline-flex items-center text-[2.5vw] sm:text-[2vw] md:text-[1.6vw] lg:text-[1.3vw] xl:text-[1.1vw] font-medium text-[#252422] dark:text-[#F4F1E8] hover:text-[#A58C81] dark:hover:text-[#EBE9E9] transition-colors underline decoration-2 underline-offset-4 decoration-[#A58C81] dark:decoration-[#EBE9E9]`}
             >
-              <Users className="h-[3vw] sm:h-[2.5vw] md:h-[2vw] lg:h-[1.6vw] xl:h-[1.3vw] w-[3vw] sm:w-[2.5vw] md:w-[2vw] lg:w-[1.6vw] xl:w-[1.3vw] mr-[1.2vw] sm:mr-[1vw] md:mr-[0.8vw] lg:mr-[0.6vw] xl:mr-[0.5vw]" />
+              <Users className="h-[2.5vw] sm:h-[2vw] md:h-[1.6vw] lg:h-[1.3vw] xl:h-[1.1vw] w-[2.5vw] sm:w-[2vw] md:w-[1.6vw] lg:w-[1.3vw] xl:w-[1.1vw] mr-[1vw] sm:mr-[0.8vw]" />
               Über uns
             </Link>
             <Link
               to="/faq"
-              className="group inline-flex items-center px-[3.5vw] sm:px-[3vw] md:px-[2.5vw] lg:px-[2vw] xl:px-[1.8vw] py-[1.8vh] sm:py-[1.5vh] md:py-[1.2vh] lg:py-[1vh] xl:py-[0.8vh] text-[2.8vw] sm:text-[2.4vw] md:text-[2vw] lg:text-[1.6vw] xl:text-[1.3vw] font-semibold text-white dark:text-[#252422] bg-[#A58C81] dark:bg-[#F4F1E8] rounded-full border-2 border-[#A58C81] dark:border-[#F4F1E8] hover:bg-[#8B6F5F] dark:hover:bg-[#EBE9E9] hover:text-white dark:hover:text-[#252422] transition-all duration-200 hover:scale-110 shadow-lg hover:shadow-xl"
+              className={`inline-flex items-center text-[2.5vw] sm:text-[2vw] md:text-[1.6vw] lg:text-[1.3vw] xl:text-[1.1vw] font-medium text-[#252422] dark:text-[#F4F1E8] hover:text-[#A58C81] dark:hover:text-[#EBE9E9] transition-colors underline decoration-2 underline-offset-4 decoration-[#A58C81] dark:decoration-[#EBE9E9]`}
             >
-              <FileText className="h-[3vw] sm:h-[2.5vw] md:h-[2vw] lg:h-[1.6vw] xl:h-[1.3vw] w-[3vw] sm:w-[2.5vw] md:w-[2vw] lg:w-[1.6vw] xl:w-[1.3vw] mr-[1.2vw] sm:mr-[1vw] md:mr-[0.8vw] lg:mr-[0.6vw] xl:mr-[0.5vw]" />
+              <FileText className="h-[2.5vw] sm:h-[2vw] md:h-[1.6vw] lg:h-[1.3vw] xl:h-[1.1vw] w-[2.5vw] sm:w-[2vw] md:w-[1.6vw] lg:w-[1.3vw] xl:w-[1.1vw] mr-[1vw] sm:mr-[0.8vw]" />
               FAQ
             </Link>
+          </div>
+
+          {/* Main CTA - Event anfragen (Purple like Register button) */}
+          <div className="text-center">
             <button
-              onClick={() => {
-                const calendar = document.querySelector('.rbc-calendar')
-                if (calendar) {
-                  const event = new CustomEvent('openEventRequestModal', {
-                    detail: { selectedDate: new Date() }
-                  })
-                  window.dispatchEvent(event)
-                }
-              }}
-              className="group inline-flex items-center px-[3.5vw] sm:px-[3vw] md:px-[2.5vw] lg:px-[2vw] xl:px-[1.8vw] py-[1.8vh] sm:py-[1.5vh] md:py-[1.2vh] lg:py-[1vh] xl:py-[0.8vh] text-[2.8vw] sm:text-[2.4vw] md:text-[2vw] lg:text-[1.6vw] xl:text-[1.3vw] font-semibold text-white dark:text-[#252422] bg-[#A58C81] dark:bg-[#F4F1E8] rounded-full border-2 border-[#A58C81] dark:border-[#F4F1E8] hover:bg-[#8B6F5F] dark:hover:bg-[#EBE9E9] hover:text-white dark:hover:text-[#252422] transition-all duration-200 hover:scale-110 shadow-lg hover:shadow-xl"
+              onClick={() => handleEventRequest()}
+              className="group inline-flex items-center justify-center px-[8vw] sm:px-[6vw] md:px-[5vw] lg:px-[4vw] py-[2.5vh] sm:py-[2.2vh] md:py-[2vh] text-[3.5vw] sm:text-[3vw] md:text-[2.4vw] lg:text-[2vw] xl:text-[1.6vw] font-bold text-white bg-[#6054d9] hover:bg-[#4f44c7] dark:bg-[#6054d9] dark:hover:bg-[#4f44c7] rounded-2xl hover:scale-105 transition-all duration-200 shadow-2xl hover:shadow-3xl"
             >
-              <Calendar className="h-[3vw] sm:h-[2.5vw] md:h-[2vw] lg:h-[1.6vw] xl:h-[1.3vw] w-[3vw] sm:w-[2.5vw] md:w-[2vw] lg:w-[1.6vw] xl:w-[1.3vw] mr-[1.2vw] sm:mr-[1vw] md:mr-[0.8vw] lg:mr-[0.6vw] xl:mr-[0.5vw]" />
+              <Calendar className="h-[4.5vw] sm:h-[4vw] md:h-[3.5vw] lg:h-[2.8vw] xl:h-[2.2vw] w-[4.5vw] sm:w-[4vw] md:w-[3.5vw] lg:w-[2.8vw] xl:w-[2.2vw] mr-[2vw] sm:mr-[1.8vw] md:mr-[1.5vw] lg:mr-[1.2vw]" />
               Event anfragen
             </button>
+            <div className="mt-3 flex items-center justify-center gap-[1vw]">
+              <span className={`text-[2.2vw] sm:text-[1.8vw] md:text-[1.4vw] lg:text-[1.1vw] xl:text-[0.9vw] text-[#252422] dark:text-[#F4F1E8]`}>
+                oder
+              </span>
+              <Link 
+                to="/event-tracking"
+                className={`text-[2.5vw] sm:text-[2vw] md:text-[1.6vw] lg:text-[1.3vw] xl:text-[1.1vw] font-medium text-[#252422] dark:text-[#F4F1E8] hover:text-[#A58C81] dark:hover:text-[#EBE9E9] transition-colors underline decoration-2 underline-offset-4 decoration-[#A58C81] dark:decoration-[#EBE9E9]`}
+              >
+                Status verfolgen
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -110,34 +170,40 @@ const HomePage = () => {
         <div className="mx-auto space-y-[0.5vh] sm:space-y-[0.8vh] md:space-y-[1vh] lg:space-y-[1.2vh] xl:space-y-[1.5vh] 2xl:space-y-[1.8vh] max-w-[98vw] sm:max-w-[95vw] md:max-w-[90vw] lg:max-w-[85vw] xl:max-w-[80vw] 2xl:max-w-[75vw]">
           {/* Calendar Section */}
           <div className="bg-white dark:bg-[#252422] rounded-2xl shadow-xl p-[2vw] sm:p-[1.5vw] md:p-[1vw] lg:p-[0.8vw] xl:p-[0.6vw] 2xl:p-[0.5vw] relative border-2 border-[#A58C81] dark:border-[#EBE9E9]">
-            {/* If user not logged in, show quick hint and mobile tap overlay */}
-            {!user && (
-              <div className="mb-[0.5vh] sm:mb-[0.8vh] md:mb-[1vh]">
-                <p className="text-[2.5vw] sm:text-[2vw] md:text-[1.5vw] lg:text-[1.2vw] xl:text-[1vw] 2xl:text-[0.8vw] text-gray-600 dark:text-[#EBE9E9]">
-                  Bitte anmelden, um eine Event‑Anfrage zu stellen.
-                </p>
-              </div>
-            )}
             {/* Make calendar header usable on small screens */}
             <div className="w-full touch-pan-x">
-              {/* Mobile overlay to redirect directly on tap */}
-              {!user && (
-                <button
-                  type="button"
-                  className="absolute inset-0 z-10 md:hidden"
-                  onClick={() => {
-                    window.location.href = '/login'
-                  }}
-                  aria-label="Zum Anmelden weiterleiten"
-                >
-                  <span className="sr-only">Tippen Sie hier, um sich anzumelden</span>
-                </button>
-              )}
-              <NewEventCalendar />
+              <SimpleMonthCalendar onDateClick={handleEventRequest} />
             </div>
           </div>
         </div>
       </div>
+
+      {/* Guest or Register Modal */}
+      {showGuestOrRegister && (
+        <GuestOrRegisterModal
+          isOpen={showGuestOrRegister}
+          onClose={() => {
+            setShowGuestOrRegister(false)
+            setSelectedDate(null)
+          }}
+          onContinueAsGuest={handleContinueAsGuest}
+          selectedDate={selectedDate}
+        />
+      )}
+
+      {/* Public Event Request Form Modal */}
+      {showPublicRequestForm && (
+        <PublicEventRequestForm
+          isOpen={showPublicRequestForm}
+          onClose={() => {
+            setShowPublicRequestForm(false)
+            setSelectedDate(null)
+          }}
+          onSuccess={handlePublicRequestSuccess}
+          selectedDate={selectedDate}
+          userData={user}
+        />
+      )}
     </div>
   )
 }

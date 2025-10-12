@@ -4,6 +4,7 @@ import { eventRequestsAPI } from '../services/httpApi'
 import { Calendar, Clock, CheckCircle, XCircle, AlertCircle, User, Mail } from 'lucide-react'
 import moment from 'moment'
 import eventBus from '../utils/eventBus'
+import MyEventRequests from '../components/Profile/MyEventRequests'
 
 const ProfilePage = () => {
   const { user, profile } = useAuth()
@@ -154,101 +155,7 @@ const ProfilePage = () => {
           </div>
 
           <div className="p-8">
-            {error && (
-              <div className="mb-6 rounded-lg p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
-                <div className="flex">
-                  <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-                  <div className="ml-3 flex-1">
-                    <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                      {error === 'Profile timeout' ? 'Laden dauert länger als erwartet.' : error}
-                    </p>
-                    <button
-                      onClick={loadEventRequests}
-                      className="mt-2 text-sm underline hover:opacity-80 transition-opacity text-yellow-800 dark:text-yellow-200"
-                    >
-                      Erneut versuchen
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {loading ? (
-              <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 mx-auto border-[#A58C81]"></div>
-                <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">Lade Event-Anfragen...</p>
-              </div>
-            ) : eventRequests.length === 0 ? (
-              <div className="text-center py-12">
-                <Calendar className="mx-auto h-12 w-12 mb-4 text-[#A58C81]" />
-                <h3 className="text-lg font-semibold mb-2 text-[#252422] dark:text-[#252422]">Noch keine Event-Anfragen</h3>
-                <p className="text-base mb-6 text-[#A58C81] dark:text-[#A58C81]">
-                  Sie haben noch keine Event-Anfragen gestellt. Klicken Sie auf einen Tag im Kalender, um eine Anfrage zu stellen.
-                </p>
-                <div>
-                  <a 
-                    href="/" 
-                    className="inline-flex items-center px-6 py-3 text-base font-medium text-white rounded-lg hover:opacity-90 transition-opacity bg-[#A58C81]"
-                  >
-                    <Calendar className="h-5 w-5 mr-2" />
-                    Zum Kalender
-                  </a>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {eventRequests.map((request) => (
-                  <div key={request.id} className="rounded-lg p-6 hover:opacity-90 transition-opacity border border-[#A58C81] bg-gray-50 dark:bg-gray-800">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <h3 className="text-lg font-semibold text-[#252422] dark:text-[#F4F1E8]">
-                            {request.title}
-                          </h3>
-                          <span 
-                            className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
-                            style={getStatusColor(request.status)}
-                          >
-                            {getStatusIcon(request.status)}
-                            <span className="ml-1">{getStatusText(request.status)}</span>
-                          </span>
-                        </div>
-                        
-                        {request.description && (
-                          <p className="text-base mb-4 text-gray-600 dark:text-gray-300">
-                            {request.description}
-                          </p>
-                        )}
-
-                        <div className="flex items-center space-x-6 text-sm text-[#A58C81] dark:text-[#A58C81]">
-                          <div className="flex items-center">
-                            <Calendar className="h-4 w-4 mr-2" />
-                            <span>
-                              {moment(request.start_date).format('DD.MM.YYYY')}
-                            </span>
-                          </div>
-                          
-                          <div className="flex items-center">
-                            <Clock className="h-4 w-4 mr-2" />
-                            <span>
-                              {moment(request.start_date).format('HH:mm')} - {moment(request.end_date).format('HH:mm')}
-                            </span>
-                          </div>
-                        </div>
-
-                        {request.review_notes && (
-                          <div className="mt-3 p-3 bg-gray-100 dark:bg-gray-700 rounded-md">
-                            <p className="text-sm text-gray-700 dark:text-gray-300">
-                              <strong>Bemerkungen:</strong> {request.review_notes}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <MyEventRequests />
           </div>
         </div>
       </div>

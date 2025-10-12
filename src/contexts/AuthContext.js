@@ -205,28 +205,43 @@ export const AuthProvider = ({ children }) => {
 
   // Initialize auth state
   useEffect(() => {
-    // Always start with no user - force explicit login
     const initializeAuth = async () => {
       try {
-        // Clear any Supabase auth data from localStorage
-        const supabaseKeys = Object.keys(localStorage).filter(key => key.startsWith('sb-'))
-        supabaseKeys.forEach(key => {
-          localStorage.removeItem(key)
-          console.log('Cleared localStorage key:', key)
-        })
+        // Check if URL has email confirmation tokens
+        const urlParams = new URLSearchParams(window.location.search)
+        const hasConfirmation = urlParams.has('token') || 
+                               urlParams.has('type') || 
+                               window.location.hash.includes('access_token')
         
-        // Always clear any existing session immediately
-        console.log('Forcing logout on page load - clearing any existing session')
-        await supabase.auth.signOut()
-        
-        // Ensure local state is cleared
-        setUser(null)
-        setProfile(null)
-        
-        console.log('Page load: User is logged out')
+        if (hasConfirmation) {
+          // User is coming back from email confirmation - let Supabase handle it
+          console.log('Email confirmation detected - preserving session')
+          
+          // Get the current session (Supabase will auto-exchange the token)
+          const { data: { session }, error } = await supabase.auth.getSession()
+          
+          if (session?.user) {
+            console.log('User confirmed email and logged in:', session.user.email)
+            setUser(session.user)
+            const userProfile = await getProfile(session.user.id)
+            setProfile(userProfile)
+            
+            // Clean up URL parameters
+            window.history.replaceState({}, document.title, window.location.pathname)
+          }
+        } else {
+          // Normal page load - clear any old sessions
+          const supabaseKeys = Object.keys(localStorage).filter(key => key.startsWith('sb-'))
+          supabaseKeys.forEach(key => {
+            localStorage.removeItem(key)
+          })
+          
+          await supabase.auth.signOut()
+          setUser(null)
+          setProfile(null)
+        }
       } catch (error) {
         console.error('Error during auth initialization:', error)
-        // Even if there's an error, ensure we start logged out
         setUser(null)
         setProfile(null)
       } finally {
@@ -237,23 +252,22 @@ export const AuthProvider = ({ children }) => {
     // Initialize auth state
     initializeAuth()
 
-    // Listen for auth changes only for explicit login/logout actions
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log(`[${new Date().toLocaleTimeString()}] Auth state change:`, event, session?.user?.email)
+        console.log(`Auth state change:`, event, session?.user?.email)
         
-        // Only process SIGNED_IN events for explicit logins
-        if (event === 'SIGNED_IN' && session?.user) {
+        // Handle sign in events (including email confirmation)
+        if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session?.user) {
           setUser(session.user)
           const userProfile = await getProfile(session.user.id)
           setProfile(userProfile)
-          console.log(`[${new Date().toLocaleTimeString()}] User signed in - Profile loaded:`, userProfile)
+          console.log('User authenticated:', session.user.email)
         } else if (event === 'SIGNED_OUT') {
           setUser(null)
           setProfile(null)
-          console.log(`[${new Date().toLocaleTimeString()}] User signed out`)
+          console.log('User signed out')
         }
-        // Ignore TOKEN_REFRESHED and other events
       }
     )
 

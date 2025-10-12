@@ -38,7 +38,16 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
       setError('Bitte geben Sie Ihren vollständigen Namen ein')
       return false
     }
-    // Email is now optional - no validation needed
+    if (!formData.email || !formData.email.trim()) {
+      setError('Bitte geben Sie Ihre E-Mail-Adresse ein')
+      return false
+    }
+    // Simple email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.email)) {
+      setError('Bitte geben Sie eine gültige E-Mail-Adresse ein')
+      return false
+    }
     if (formData.password.length < 6) {
       setError('Das Passwort muss mindestens 6 Zeichen lang sein')
       return false
@@ -86,13 +95,8 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
         // Public registration mode - sign up and sign in
         console.log('Calling signUp with:', { email: formData.email, password: formData.password, fullName: formData.fullName })
         
-        // Add timeout to prevent hanging
-        const signUpPromise = signUp(formData.email, formData.password, formData.fullName)
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('SignUp timeout after 1 seconds')), 1000)
-        )
-        
-        const { data, error } = await Promise.race([signUpPromise, timeoutPromise])
+        // Call signup without timeout - let it complete naturally
+        const { data, error } = await signUp(formData.email, formData.password, formData.fullName)
         console.log('SignUp response:', { data, error })
         
         if (error) {
@@ -102,11 +106,8 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
           console.log('SignUp successful')
           setSuccess(true)
           
-          // Redirect to homepage
-          setTimeout(() => {
-            console.log('Redirecting to homepage...')
-            navigate('/')
-          }, 500)
+          // Don't auto-redirect - let user see the email verification message
+          // They will be redirected after clicking the email link
         }
       }
     } catch (err) {
@@ -117,19 +118,7 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
         setError(`Fehler beim Erstellen des Benutzers: ${err.message}`)
       } else {
         // Public registration error handling
-        // Check if it's a timeout error but user might be signed in
-        if (err.message.includes('SignUp timeout')) {
-          console.log('SignUp timed out, but user might be signed in')
-          setSuccess(true)
-          
-          // Redirect to homepage after timeout
-          setTimeout(() => {
-            console.log('Redirecting to homepage after timeout...')
-            navigate('/')
-          }, 500)
-        } else {
-          setError('Ein unerwarteter Fehler ist aufgetreten')
-        }
+        setError('Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.')
       }
     } finally {
       setIsSubmitting(false)
@@ -149,9 +138,14 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
           <h3 className="text-lg font-medium text-[#252422] dark:text-[#F4F1E8] mb-2">
             Benutzer erfolgreich erstellt!
           </h3>
-          <p className="text-sm text-gray-600 dark:text-[#EBE9E9] mb-4">
-            Der neue Benutzer kann sich jetzt mit den angegebenen Daten anmelden.
+          <p className="text-sm text-gray-600 dark:text-[#EBE9E9] mb-2">
+            Der neue Benutzer kann sich sofort anmelden.
           </p>
+          <div className="mt-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
+            <p className="text-xs text-green-800 dark:text-green-300 font-medium">
+              ✓ E-Mail automatisch bestätigt - Keine Verifikation erforderlich!
+            </p>
+          </div>
         </div>
       )
     }
@@ -180,26 +174,31 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
         <div className="flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
           <div className="max-w-md w-full space-y-8">
             <div className="bg-white dark:bg-[#252422] rounded-2xl shadow-xl p-8 text-center border-2 border-[#A58C81] dark:border-[#EBE9E9]">
-              <CheckCircle className="mx-auto h-12 w-12 mb-4 text-green-600 dark:text-green-400" />
+              <Mail className="mx-auto h-16 w-16 mb-4 text-[#A58C81] dark:text-[#EBE9E9]" />
               <h2 className="text-3xl font-bold mb-4 text-[#252422] dark:text-[#F4F1E8]">
-                Registrierung erfolgreich!
+                Fast geschafft!
               </h2>
+              <p className="text-lg mb-4 text-[#252422] dark:text-[#F4F1E8] font-semibold">
+                Bitte bestätigen Sie Ihre E-Mail-Adresse
+              </p>
               <p className="text-base mb-6 text-[#A58C81] dark:text-[#EBE9E9]">
-                {error ? (
-                  <>
-                    Registrierung erfolgreich!<br/>
-                    <span className="text-red-600 dark:text-red-400">{error}</span>
-                  </>
-                ) : (
-                  'Registrierung erfolgreich! Sie werden zur Startseite weitergeleitet.'
-                )}
+                Wir haben eine Bestätigungs-E-Mail an <strong>{formData.email}</strong> gesendet.
+                <br/><br/>
+                Klicken Sie auf den Link in der E-Mail, um Ihr Konto zu aktivieren.
               </p>
-              <div className="mt-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 mx-auto border-[#A58C81] dark:border-[#EBE9E9]"></div>
+              
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+                <p className="text-sm text-blue-800 dark:text-blue-300">
+                  <strong>Wichtig:</strong> Überprüfen Sie auch Ihren Spam-Ordner, falls Sie keine E-Mail erhalten haben.
+                </p>
               </div>
-              <p className="mt-2 text-sm text-gray-600 dark:text-[#EBE9E9]">
-                Weiterleitung zur Startseite...
-              </p>
+
+              <Link
+                to="/"
+                className="inline-block px-6 py-3 bg-[#A58C81] dark:bg-[#6a6a6a] text-white rounded-lg hover:opacity-90 transition-opacity font-semibold"
+              >
+                Zur Startseite
+              </Link>
             </div>
           </div>
         </div>
@@ -248,7 +247,7 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
 
             <div>
               <label htmlFor="email" className="block text-sm font-medium mb-2 text-[#252422] dark:text-[#F4F1E8]">
-                E-Mail-Adresse <span className="text-gray-600 dark:text-[#EBE9E9]">(optional)</span>
+                E-Mail-Adresse <span className="text-red-600 dark:text-red-400">*</span>
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -261,10 +260,14 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
                   autoComplete="email"
                   value={formData.email}
                   onChange={handleChange}
+                  required
                   className="w-full px-3 py-3 pl-10 border border-[#A58C81] dark:border-[#EBE9E9] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] dark:focus:ring-[#EBE9E9] focus:ring-opacity-50 transition-colors bg-white dark:bg-[#252422] text-[#252422] dark:text-[#F4F1E8]"
-                  placeholder="ihre@email.de (optional)"
+                  placeholder="ihre@email.de"
                 />
               </div>
+              <p className={`text-xs mt-1 text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>
+                Erforderlich für E-Mail-Bestätigung und Benachrichtigungen
+              </p>
             </div>
 
             <div>
@@ -340,8 +343,25 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
               disabled={isSubmitting}
               className="w-full flex justify-center py-3 px-4 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity bg-[#2E07D4] hover:bg-[#2506B8]"
             >
-              {isSubmitting ? 'Wird registriert...' : 'Konto erstellen'}
+              {isSubmitting ? (
+                <span className="flex items-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Konto wird erstellt & E-Mail wird gesendet...
+                </span>
+              ) : 'Konto erstellen'}
             </button>
+
+            {isSubmitting && (
+              <div className="mt-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <p className="text-sm text-blue-800 dark:text-blue-300 text-center">
+                  <Mail className="inline w-4 h-4 mr-2" />
+                  Bitte warten Sie, während wir Ihr Konto erstellen und eine Bestätigungs-E-Mail senden...
+                </p>
+              </div>
+            )}
           </div>
         </form>
       </div>
@@ -437,7 +457,7 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
 
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium mb-2 text-[#252422] dark:text-[#F4F1E8]">
-                    E-Mail-Adresse <span className="text-gray-600 dark:text-[#EBE9E9]">(optional)</span>
+                    E-Mail-Adresse <span className="text-red-600 dark:text-red-400">*</span>
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -450,10 +470,14 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
                       autoComplete="email"
                       value={formData.email}
                       onChange={handleChange}
+                      required
                       className="w-full px-3 py-3 pl-10 border border-[#A58C81] dark:border-[#EBE9E9] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] dark:focus:ring-[#EBE9E9] focus:ring-opacity-50 transition-colors bg-white dark:bg-[#252422] text-[#252422] dark:text-[#F4F1E8]"
-                      placeholder="ihre@email.de (optional)"
+                      placeholder="ihre@email.de"
                     />
                   </div>
+                  <p className={`text-xs mt-1 text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>
+                    Erforderlich für E-Mail-Bestätigung und Benachrichtigungen
+                  </p>
                 </div>
 
                 <div>
@@ -530,8 +554,25 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
                   onClick={() => console.log('Register button clicked!')}
                   className="w-full flex justify-center py-3 px-4 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity bg-[#2E07D4] hover:bg-[#2506B8]"
                 >
-                  {isSubmitting ? 'Wird registriert...' : 'Konto erstellen'}
+                  {isSubmitting ? (
+                    <span className="flex items-center">
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Konto wird erstellt & E-Mail wird gesendet...
+                    </span>
+                  ) : 'Konto erstellen'}
                 </button>
+
+                {isSubmitting && (
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                    <p className="text-sm text-blue-800 dark:text-blue-300 text-center">
+                      <Mail className="inline w-4 h-4 mr-2" />
+                      Bitte warten Sie, während wir Ihr Konto erstellen und eine Bestätigungs-E-Mail senden...
+                    </p>
+                  </div>
+                )}
                 
                 <div className="text-center">
                   <p className="text-sm text-gray-600 dark:text-[#EBE9E9]">

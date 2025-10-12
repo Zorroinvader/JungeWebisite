@@ -67,9 +67,13 @@ const EventCalendar = () => {
             return eventAPI.getEventsForMonth(year, month)
           })
           
-          const [eventsResults, requestsResult] = await Promise.allSettled([
+          // Import the httpApi for temporarily blocked dates
+          const { blockedDatesAPI } = await import('../../services/httpApi')
+          
+          const [eventsResults, requestsResult, blockedDatesResult] = await Promise.allSettled([
             Promise.all(eventPromises),
-            eventRequestAPI.getEventRequests('pending')
+            eventRequestAPI.getEventRequests('pending'),
+            blockedDatesAPI.getTemporarilyBlocked()
           ])
           
           
@@ -160,6 +164,60 @@ const EventCalendar = () => {
         allEvents.push(...pendingRequests)
       }
       
+      // Process temporarily blocked dates (show to all users)
+      if (blockedDatesResult.status === 'fulfilled' && blockedDatesResult.value) {
+        console.log('🟡 Calendar: Processing temporarily blocked dates:', blockedDatesResult.value)
+        const tempBlockedEvents = blockedDatesResult.value.map(blocked => {
+          const isPrivate = blocked.is_private || false
+          
+          // Parse requested days to get date range
+          let startDate, endDate
+          try {
+            const requestedDays = JSON.parse(blocked.requested_days)
+            if (Array.isArray(requestedDays) && requestedDays.length > 0) {
+              startDate = new Date(requestedDays[0])
+              endDate = new Date(requestedDays[requestedDays.length - 1])
+            } else if (blocked.exact_start_datetime) {
+              startDate = new Date(blocked.exact_start_datetime)
+              endDate = new Date(blocked.exact_end_datetime || blocked.exact_start_datetime)
+            }
+          } catch (e) {
+            console.error('Error parsing requested_days:', e)
+            if (blocked.exact_start_datetime) {
+              startDate = new Date(blocked.exact_start_datetime)
+              endDate = new Date(blocked.exact_end_datetime || blocked.exact_start_datetime)
+            }
+          }
+          
+          if (!startDate) {
+            return null
+          }
+          
+          // Show as "Temporarily blocked" or "Vorübergehend blockiert"
+          const title = isAdminUser ? `${blocked.event_name} (Vorläufig)` : 'Vorübergehend blockiert'
+          
+          return {
+            id: `temp-blocked-${blocked.id}`,
+            title: title,
+            start: startDate,
+            end: endDate,
+            resource: {
+              ...blocked,
+              event_name: blocked.event_name,
+              description: isAdminUser ? `Anfrage von ${blocked.requester_name} - Status: ${blocked.request_stage}` : 'Dieser Zeitraum ist vorübergehend blockiert',
+              status: 'temporary_block',
+              isRequest: true,
+              isPrivate: isPrivate,
+              isBlocked: true,
+              isTemporaryBlock: true,
+              request_stage: blocked.request_stage
+            }
+          }
+        }).filter(Boolean)
+        
+        allEvents.push(...tempBlockedEvents)
+      }
+      
           // Update events and mark all loaded months as cached
           
           setEvents(allEvents)
@@ -229,8 +287,25 @@ const EventCalendar = () => {
     const isRequest = event.resource?.isRequest || false
     const isBlocked = event.resource?.isBlocked || false
     const isPrivate = event.resource?.isPrivate || false
+    const isTemporaryBlock = event.resource?.isTemporaryBlock || false
     
-    // 1. Blocked events (private events for normal users) - gray
+    // 1. Temporarily blocked events (pending approval) - yellow/orange
+    if (isTemporaryBlock) {
+      return {
+        style: {
+          backgroundColor: '#f59e0b',
+          borderColor: '#d97706',
+          color: 'white',
+          opacity: 0.7,
+          borderRadius: '4px',
+          borderWidth: '2px',
+          borderStyle: 'dashed',
+          fontStyle: 'italic'
+        }
+      }
+    }
+    
+    // 2. Blocked events (private events for normal users) - gray
     if (isBlocked) {
       return {
         style: {
