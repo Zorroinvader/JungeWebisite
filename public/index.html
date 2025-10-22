@@ -7,15 +7,137 @@
     <meta name="theme-color" content="#000000" />
     <meta
       name="description"
-      content="Jungengesellschaft Website - Events und Kalender"
+      content="Jungengesellschaft Pferdestall Wedes-Wedel"
     />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Clash+Grotesk:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
-    <title>Jungengesellschaft</title>
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/assets/Wappen-Junge-Gesellschaft-Pferdestall-Wedes-Wedel.png" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <title>Jungengesellschaft Pferdestall Wedes-Wedel</title>
+    
+    <!-- Security: Comprehensive protection against code viewing -->
+    <script>
+      // Block all methods of accessing source
+      (function() {
+        'use strict';
+        
+        // Disable right-click context menu
+        document.addEventListener('contextmenu', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }, true);
+        
+        // Disable all keyboard shortcuts for viewing source
+        document.addEventListener('keydown', function(e) {
+          // F12 (DevTools)
+          if (e.keyCode === 123) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+          // Ctrl+Shift+I (DevTools)
+          if (e.ctrlKey && e.shiftKey && e.keyCode === 73) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+          // Ctrl+Shift+J (Console)
+          if (e.ctrlKey && e.shiftKey && e.keyCode === 74) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+          // Ctrl+U (View Source)
+          if (e.ctrlKey && e.keyCode === 85) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+          // Ctrl+S (Save Page)
+          if (e.ctrlKey && e.keyCode === 83) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+          // Ctrl+P (Print)
+          if (e.ctrlKey && e.keyCode === 80) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+          // Ctrl+Shift+C (Inspect Element)
+          if (e.ctrlKey && e.shiftKey && e.keyCode === 67) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+          // Ctrl+Shift+K (Firefox Console)
+          if (e.ctrlKey && e.shiftKey && e.keyCode === 75) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+        }, true);
+        
+        // Disable text selection
+        document.addEventListener('selectstart', function(e) {
+          e.preventDefault();
+          return false;
+        });
+        
+        // Disable copy
+        document.addEventListener('copy', function(e) {
+          e.preventDefault();
+          return false;
+        });
+        
+        // Disable cut
+        document.addEventListener('cut', function(e) {
+          e.preventDefault();
+          return false;
+        });
+        
+        // Disable React DevTools
+        if (typeof window.__REACT_DEVTOOLS_GLOBAL_HOOK__ === 'object') {
+          for (let [key, value] of Object.entries(window.__REACT_DEVTOOLS_GLOBAL_HOOK__)) {
+            window.__REACT_DEVTOOLS_GLOBAL_HOOK__[key] = typeof value === 'function' ? () => {} : null;
+          }
+        }
+        
+        // Disable console
+        var noop = function() {};
+        ['assert', 'clear', 'count', 'debug', 'dir', 'dirxml', 'error', 
+         'exception', 'group', 'groupCollapsed', 'groupEnd', 'info', 'log', 
+         'markTimeline', 'profile', 'profileEnd', 'table', 'time', 'timeEnd', 
+         'timeline', 'timelineEnd', 'timeStamp', 'trace', 'warn'].forEach(function(method) {
+          if (window.console && window.console[method]) {
+            window.console[method] = noop;
+          }
+        });
+        
+        // Make CSS and JS files harder to access
+        if (navigator.userAgent.indexOf('Chrome') > -1 || navigator.userAgent.indexOf('Firefox') > -1) {
+          // Detect DevTools by size
+          var threshold = 160;
+          var check = setInterval(function() {
+            if (window.outerWidth - window.innerWidth > threshold || 
+                window.outerHeight - window.innerHeight > threshold) {
+              document.body.innerHTML = '<h1 style="text-align:center;margin-top:50px;font-family:Arial;">Zugriff verweigert - Access Denied</h1>';
+              clearInterval(check);
+            }
+          }, 500);
+        }
+      })();
+    </script>
+    
+    <!-- Prevent iframe embedding -->
+    <script>
+      if (window.top !== window.self) {
+        window.top.location = window.self.location;
+      }
+    </script>
   </head>
   <body>
-    <noscript>Sie müssen JavaScript aktivieren, um diese App zu verwenden.</noscript>
+    <noscript>Sie müssen JavaScript aktivieren, um diese Website zu nutzen.</noscript>
     <div id="root"></div>
   </body>
 </html>
