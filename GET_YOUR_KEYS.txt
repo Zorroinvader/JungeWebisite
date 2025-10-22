@@ -1,0 +1,25 @@
+========================================
+TO GET YOUR SUPABASE ANON KEY:
+========================================
+
+1. Go to: https://supabase.com/dashboard/project/wthsritnjosieqxpprsl/settings/api
+
+2. Copy the "anon public" key (it's a long string starting with "eyJ...")
+
+3. Open .env file in a text editor
+
+4. Replace "your-anon-key-here" with your actual key
+
+5. Save the file
+
+6. Then run: npx supabase link --project-ref wthsritnjosieqxpprsl
+
+========================================
+
+Your .env file should look like:
+
+REACT_APP_SUPABASE_URL=https://wthsritnjosieqxpprsl.supabase.co
+REACT_APP_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9... (your actual key)
+
+========================================
+

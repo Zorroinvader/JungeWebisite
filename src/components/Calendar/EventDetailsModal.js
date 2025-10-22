@@ -1,10 +1,12 @@
-import React from 'react'
-import { X, MapPin, Clock, Users, FileText, Calendar, Lock } from 'lucide-react'
+import React, { useState } from 'react'
+import { X, MapPin, Clock, Users, FileText, Calendar, Lock, Edit } from 'lucide-react'
 import moment from 'moment'
 import { useAuth } from '../../contexts/AuthContext'
+import QuickEventEditModal from './QuickEventEditModal'
 
-const EventDetailsModal = ({ event, onClose }) => {
+const EventDetailsModal = ({ event, onClose, onEventUpdated }) => {
   const { isAdmin } = useAuth()
+  const [showQuickEdit, setShowQuickEdit] = useState(false)
   
   if (!event) return null
 
@@ -191,16 +193,39 @@ const EventDetailsModal = ({ event, onClose }) => {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200 mt-6">
+          <div className="flex justify-between pt-6 border-t border-gray-200 mt-6">
+            {isAdmin() && (
+              <button
+                onClick={() => setShowQuickEdit(true)}
+                className="px-4 py-2 text-sm font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg transition-colors flex items-center"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Zeit ändern
+              </button>
+            )}
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200"
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200 ml-auto"
             >
               Schließen
             </button>
           </div>
         </div>
       </div>
+
+      {/* Quick Edit Modal */}
+      {showQuickEdit && (
+        <QuickEventEditModal
+          isOpen={showQuickEdit}
+          event={event}
+          onClose={() => setShowQuickEdit(false)}
+          onSuccess={() => {
+            setShowQuickEdit(false);
+            if (onEventUpdated) onEventUpdated();
+            onClose();
+          }}
+        />
+      )}
     </div>
   )
 }

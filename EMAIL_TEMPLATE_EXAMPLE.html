@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Email Template - Junge Gesellschaft</title>
+  <style>
+    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #F4F1E8; }
+    .email-wrapper { max-width: 600px; margin: 0 auto; background: #F4F1E8; }
+    .header { background: #252422; padding: 30px; text-align: center; border-bottom: 3px solid #A58C81; }
+    .logo { max-width: 60px; margin-bottom: 15px; }
+    .header-title { color: #F4F1E8; margin: 0; font-size: 20px; font-weight: 600; }
+    .container { background: white; margin: 20px; border: 2px solid #A58C81; border-radius: 8px; overflow: hidden; }
+    .content { padding: 40px 30px; color: #252422; line-height: 1.8; }
+    .content p { margin: 0 0 15px 0; }
+    .section-title { font-weight: 600; font-size: 12px; text-transform: uppercase; color: #A58C81; margin: 25px 0 10px 0; letter-spacing: 1px; }
+    .info-box { background: #F4F1E8; border-left: 4px solid #A58C81; padding: 15px 20px; margin: 20px 0; border-radius: 4px; }
+    .info-row { margin: 8px 0; color: #252422; }
+    .info-label { font-weight: 600; color: #A58C81; display: inline-block; min-width: 120px; }
+    .cta-button { display: inline-block; background: #6054d9; color: white !important; padding: 14px 32px; text-decoration: none; border-radius: 8px; margin: 25px 0; font-weight: 500; transition: background 0.3s; }
+    .cta-button:hover { background: #4f44c7; }
+    .footer { background: #252422; padding: 25px 30px; text-align: center; color: #F4F1E8; font-size: 13px; }
+    .footer-links { margin-top: 15px; }
+    .footer-links a { color: #A58C81; text-decoration: none; margin: 0 10px; }
+  </style>
+</head>
+<body>
+  <div class="email-wrapper">
+    <div class="header">
+      <img src="http://localhost:3000/assets/Wappen-Junge-Gesellschaft-Pferdestall-Wedes-Wedel.png" alt="Junge Gesellschaft" class="logo" />
+      <h1 class="header-title">Junge Gesellschaft Pferdestall</h1>
+    </div>
+    
+    <div class="container">
+      <div class="content">
+        <h2 style="color: #252422; margin-top: 0;">Ihre Event-Anfrage wurde empfangen</h2>
+        
+        <p>Guten Tag Max Mustermann,</p>
+        
+        <p>vielen Dank für Ihre Event-Anfrage!</p>
+        
+        <div class="info-box">
+          <div class="section-title">Event-Details</div>
+          <div class="info-row"><span class="info-label">Event:</span> Sommerparty 2025</div>
+          <div class="info-row"><span class="info-label">Zeitraum:</span> 15.07.2025 - 17.07.2025</div>
+          <div class="info-row"><span class="info-label">Kategorie:</span> Privates Event</div>
+        </div>
+        
+        <div class="section-title">Status</div>
+        <div class="info-box" style="background: #e8f5e9; border-left-color: #4CAF50;">
+          <div class="info-row">✓ Anfrage eingegangen</div>
+          <div class="info-row">✓ Zeitraum vorläufig für Sie reserviert</div>
+          <div class="info-row">✓ Ein Administrator prüft Ihre Anfrage</div>
+        </div>
+        
+        <p>Sie erhalten eine weitere E-Mail, sobald Ihre Anfrage bearbeitet wurde.</p>
+        
+        <center>
+          <a href="http://localhost:3000/event-tracking" class="cta-button">Status verfolgen</a>
+        </center>
+        
+        <p style="margin-top: 30px; color: #A58C81; font-size: 14px;">
+          Mit freundlichen Grüßen<br>
+          Ihr Event-Management-Team
+        </p>
+      </div>
+    </div>
+    
+    <div class="footer">
+      <p style="margin: 0 0 10px 0; font-weight: 600;">Junge Gesellschaft Pferdestall Wedes Wedel</p>
+      <p style="margin: 0; color: #A58C81;">Event-Anfragen: kontakt@junge-gesellschaft-wedel.de</p>
+      <div class="footer-links">
+        <a href="http://localhost:3000/">Startseite</a> | 
+        <a href="http://localhost:3000/event-tracking">Status verfolgen</a>
+      </div>
+      <p style="margin: 15px 0 0 0; color: #A58C81; font-size: 11px;">Diese E-Mail wurde automatisch generiert.</p>
+    </div>
+  </div>
+</body>
+</html>

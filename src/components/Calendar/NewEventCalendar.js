@@ -3,55 +3,67 @@ import { Calendar, momentLocalizer } from 'react-big-calendar'
 import moment from 'moment'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 import { useAuth } from '../../contexts/AuthContext'
-import { eventsAPI, eventRequestsAPI } from '../../services/httpApi'
-import { MapPin, Clock, X } from 'lucide-react'
-import EventRequestModalHTTP from './EventRequestModalHTTP'
+import { useDarkMode } from '../../contexts/DarkModeContext'
+import httpAPI from '../../services/httpApi'
 import EventDetailsModal from './EventDetailsModal'
-import eventBus from '../../utils/eventBus'
+import PublicEventRequestForm from './PublicEventRequestForm'
 
-// Set up moment locale
+// Set up moment.js for react-big-calendar
 moment.locale('de')
 const localizer = momentLocalizer(moment)
 
-const NewEventCalendar = () => {
+const NewEventCalendar = ({ 
+  currentDate, 
+  onNavigate, 
+  onDateClick,
+  onEventUpdated 
+}) => {
   const { user, isAdmin } = useAuth()
+  const { isDarkMode } = useDarkMode()
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
-  const [selectedDate, setSelectedDate] = useState(null)
-  const [showEventRequestModal, setShowEventRequestModal] = useState(false)
+  const [showEventDetails, setShowEventDetails] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState(null)
-  const [showEventDetailsModal, setShowEventDetailsModal] = useState(false)
-  const [currentDate, setCurrentDate] = useState(new Date())
+  const [showEventRequestForm, setShowEventRequestForm] = useState(false)
+  const [selectedDate, setSelectedDate] = useState(null)
 
-  // Load all events (simplified approach)
+  // Load all events and requests - Optimized for calendar view
   const loadAllEvents = useCallback(async () => {
-    setLoading(true)
-    
     try {
-      // Get all events from database
-      const allEvents = await eventsAPI.getAll()
+      setLoading(true)
       
+      // Use currentDate or fallback to today's date
+      const dateToUse = currentDate || new Date()
       
-      if (!allEvents) {
-        console.error('Error loading events')
-        setEvents([])
-        return
+      // Calculate date range for current month view (current month ± 1 month)
+      const startOfMonth = new Date(dateToUse.getFullYear(), dateToUse.getMonth() - 1, 1)
+      const endOfMonth = new Date(dateToUse.getFullYear(), dateToUse.getMonth() + 2, 0)
+      
+      // Load approved events for current month range only
+      let allEvents = []
+      try {
+        allEvents = await httpAPI.events.getCalendarEvents(startOfMonth, endOfMonth)
+      } catch (dateError) {
+        console.warn('Date range optimization failed, falling back to all events:', dateError)
+        allEvents = await httpAPI.events.getAll()
       }
-
-      // Get pending event requests (only for admin)
+      
+      // Load pending requests (admin only) for current month range only
       let pendingRequests = []
-      if (isAdmin() && user) {
-        const requests = await eventRequestsAPI.getAll()
-        if (requests) {
-          // Filter for pending requests
-          pendingRequests = requests.filter(req => req.status === 'pending')
+      if (isAdmin()) {
+        try {
+          pendingRequests = await httpAPI.eventRequests.getCalendarRequests(startOfMonth, endOfMonth)
+        } catch (dateError) {
+          console.warn('Date range optimization failed for requests, falling back to all requests:', dateError)
+          pendingRequests = await httpAPI.eventRequests.getAll()
         }
       }
-
-      // Process events for calendar
+      
+      // Load temporarily blocked dates
+      const temporarilyBlocked = await httpAPI.blockedDates.getTemporarilyBlocked()
+      
       const calendarEvents = []
-      const isAdminUser = isAdmin()
-
+      
       // Process approved events
       if (allEvents && allEvents.length > 0) {
         allEvents.forEach(event => {
@@ -61,16 +73,34 @@ const NewEventCalendar = () => {
           let eventDescription = event.description
           let isBlocked = false
 
-          // Handle privacy
-          if (isPrivate && !isAdminUser) {
+          // Handle privacy for non-admin users
+          if (isPrivate && !isAdmin()) {
             eventTitle = 'Blockiert'
             eventDescription = 'Dieses Event ist privat und nur für Administratoren sichtbar.'
             isBlocked = true
           }
 
-          const startDate = new Date(event.start_date)
-          const endDate = event.end_date ? new Date(event.end_date) : new Date(event.start_date)
+          // Parse dates
+          let startDate = new Date(event.start_date)
+          let endDate = event.end_date ? new Date(event.end_date) : new Date(event.start_date)
 
+          // Check if event has time information
+          const hasTimeInfo = event.start_date && event.start_date.includes('T')
+          
+          // Format time display for title
+          const formatTime = (date) => {
+            if (!hasTimeInfo) return ''
+            return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+          }
+          
+          const startTime = formatTime(startDate)
+          const endTime = formatTime(endDate)
+          const timeDisplay = hasTimeInfo ? `${startTime}${endTime && startTime !== endTime ? `-${endTime}` : ''}` : ''
+          
+          // Update title with time if available and not blocked
+          if (timeDisplay && !isBlocked) {
+            eventTitle = `${timeDisplay} ${eventTitle}`
+          }
 
           if (!isNaN(startDate.getTime())) {
             calendarEvents.push({
@@ -78,6 +108,7 @@ const NewEventCalendar = () => {
               title: eventTitle,
               start: startDate,
               end: endDate,
+              allDay: !hasTimeInfo,
               resource: {
                 ...event,
                 description: eventDescription,
@@ -92,10 +123,11 @@ const NewEventCalendar = () => {
       }
 
       // Process pending requests (admin only)
-      if (isAdminUser && pendingRequests.length > 0) {
+      if (isAdmin() && pendingRequests.length > 0) {
         pendingRequests.forEach(request => {
           const startDate = new Date(request.start_date)
           const endDate = request.end_date ? new Date(request.end_date) : new Date(request.start_date)
+          const hasTimeInfo = request.start_date && request.start_date.includes('T')
 
           if (!isNaN(startDate.getTime())) {
             calendarEvents.push({
@@ -103,6 +135,7 @@ const NewEventCalendar = () => {
               title: `${request.title} (Anfrage)`,
               start: startDate,
               end: endDate,
+              allDay: !hasTimeInfo,
               resource: {
                 ...request,
                 status: 'pending',
@@ -115,323 +148,638 @@ const NewEventCalendar = () => {
         })
       }
 
-      setEvents(calendarEvents)
+      // Process temporarily blocked dates
+      if (temporarilyBlocked && temporarilyBlocked.length > 0) {
+        temporarilyBlocked.forEach(blocked => {
+          let blockedStartDate = null
+          let blockedEndDate = null
 
+          try {
+            // Try to get exact times first
+            if (blocked.exact_start_datetime) {
+              blockedStartDate = new Date(blocked.exact_start_datetime)
+              blockedEndDate = new Date(blocked.exact_end_datetime || blocked.exact_start_datetime)
+            }
+            // Fallback to exact times if available
+            else if (!blockedStartDate && blocked.exact_start_datetime) {
+              blockedStartDate = new Date(blocked.exact_start_datetime)
+              blockedEndDate = new Date(blocked.exact_end_datetime || blocked.exact_start_datetime)
+            }
+            // Fallback to start_date/end_date
+            else if (!blockedStartDate && blocked.start_date) {
+              blockedStartDate = new Date(blocked.start_date)
+              blockedEndDate = new Date(blocked.end_date || blocked.start_date)
+            }
+          } catch (e) {
+            console.error('Error parsing dates for blocked event:', e, blocked)
+          }
+          
+          if (blockedStartDate && !isNaN(blockedStartDate.getTime())) {
+            // Show as "Temporarily blocked" for normal users, event name for admins
+            const title = isAdmin() ? `${blocked.event_name || blocked.title} (Vorläufig)` : 'Vorübergehend blockiert'
+            const description = isAdmin() 
+              ? `Anfrage von ${blocked.requester_name} - Status: ${blocked.request_stage}` 
+              : 'Dieser Zeitraum ist vorübergehend blockiert'
+            
+            // Check if this blocked event has time information
+            const hasTimeInfo = blocked.exact_start_datetime || 
+                               (blocked.start_date && blocked.start_date.includes('T'))
+            
+            calendarEvents.push({
+              id: `temp-blocked-${blocked.id}`,
+              title: title,
+              start: blockedStartDate,
+              end: blockedEndDate || blockedStartDate,
+              allDay: !hasTimeInfo,
+              resource: {
+                ...blocked,
+                description: description,
+                status: 'temporary_block',
+                isRequest: true,
+                isPrivate: false,
+                isBlocked: true,
+                isTemporaryBlock: true,
+                request_stage: blocked.request_stage
+              }
+            })
+          }
+        })
+      }
+
+      console.log('📅 Calendar loaded:', {
+        approved: allEvents?.length || 0,
+        pending: pendingRequests?.length || 0,
+        blocked: temporarilyBlocked?.length || 0,
+        total: calendarEvents.length
+      })
+
+      setEvents(calendarEvents)
     } catch (error) {
       console.error('Error loading events:', error)
-      setEvents([])
     } finally {
       setLoading(false)
     }
-  }, [isAdmin, user])
+  }, [isAdmin])
 
-  // Load events on mount and when user changes
+  // Load events on component mount and when dependencies change
   useEffect(() => {
     loadAllEvents()
   }, [loadAllEvents])
 
-  // Listen for event updates (when events are approved/rejected)
+  // Force month view on mount
   useEffect(() => {
-    const handleEventUpdate = () => {
-      loadAllEvents()
-    }
-
-    // Listen for event updates
-    eventBus.on('eventUpdated', handleEventUpdate)
-    eventBus.on('eventRequestApproved', handleEventUpdate)
-    eventBus.on('eventRequestRejected', handleEventUpdate)
-
-    return () => {
-      eventBus.off('eventUpdated', handleEventUpdate)
-      eventBus.off('eventRequestApproved', handleEventUpdate)
-      eventBus.off('eventRequestRejected', handleEventUpdate)
-    }
-  }, [loadAllEvents])
-
-  // Listen for custom event from HomePage button
-  useEffect(() => {
-    const handleOpenEventRequestModal = (event) => {
-      if (user) {
-        const selectedDate = event.detail?.selectedDate || new Date()
-        setSelectedDate({ 
-          start: selectedDate, 
-          end: new Date(selectedDate.getTime() + 24 * 60 * 60 * 1000) // Add 1 day
-        })
-        setShowEventRequestModal(true)
-      } else {
-        window.location.href = '/login'
+    // Force month view by manipulating DOM if needed
+    const timer = setTimeout(() => {
+      const timeView = document.querySelector('.rbc-time-view')
+      const monthView = document.querySelector('.rbc-month-view')
+      
+      if (timeView) {
+        timeView.style.display = 'none !important'
       }
-    }
+      if (monthView) {
+        monthView.style.display = 'block !important'
+      }
+    }, 100)
 
-    window.addEventListener('openEventRequestModal', handleOpenEventRequestModal)
-    
-    return () => {
-      window.removeEventListener('openEventRequestModal', handleOpenEventRequestModal)
-    }
-  }, [user])
+    return () => clearTimeout(timer)
+  }, [])
 
-  // Handle date selection for event requests
-  const handleSelectSlot = useCallback(({ start, end }) => {
-    if (!user) {
-      window.location.href = '/login'
-      return
+  // Handle date selection
+  const handleSelectSlot = useCallback((slotInfo) => {
+    if (onDateClick) {
+      setSelectedDate(slotInfo.start)
+      onDateClick(slotInfo.start)
     }
-    setSelectedDate({ start, end })
-    setShowEventRequestModal(true)
-  }, [user])
+  }, [onDateClick])
 
-  // Handle event click for details
+  // Handle event selection
   const handleSelectEvent = useCallback((event) => {
-    if (event.resource?.isBlocked && !isAdmin()) {
-      return
-    }
-    setSelectedEvent(event.resource)
-    setShowEventDetailsModal(true)
-  }, [isAdmin])
-
-  // Handle navigation (month change)
-  const handleNavigate = useCallback((date) => {
-    setCurrentDate(date)
-    // Don't reload all events - the calendar should already have them loaded
-    // The loadAllEvents function loads events for multiple months
+    setSelectedEvent(event)
+    setShowEventDetails(true)
   }, [])
 
-  // Event style getter
-  const eventStyleGetter = useCallback((event) => {
-    const isRequest = event.resource?.isRequest || false
-    const isBlocked = event.resource?.isBlocked || false
-
-    // Blocked events (private events for normal users) - gray
-    if (isBlocked) {
-      return {
-        style: {
-          backgroundColor: '#6b7280',
-          borderColor: '#4b5563',
-          color: 'white',
-          opacity: 0.6,
-          borderRadius: '4px',
-          border: '2px solid #4b5563',
-          fontSize: '12px',
-          padding: '2px 4px'
-        }
-      }
+  // Handle event update from details modal
+  const handleEventUpdate = useCallback(async () => {
+    await loadAllEvents()
+    if (onEventUpdated) {
+      onEventUpdated()
     }
-
-    // Special events (event requests) - yellow
-    if (isRequest) {
-      return {
-        style: {
-          backgroundColor: '#fbbf24',
-          borderColor: '#f59e0b',
-          color: 'white',
-          borderStyle: 'dashed',
-          opacity: 0.8,
-          borderRadius: '4px',
-          border: '2px dashed #f59e0b',
-          fontSize: '12px',
-          padding: '2px 4px'
-        }
-      }
-    }
-
-    // Public events - blue
-    return {
-      style: {
-        backgroundColor: '#3b82f6',
-        borderColor: '#2563eb',
-        color: 'white',
-        borderRadius: '4px',
-        fontSize: '12px',
-        padding: '2px 4px'
-      }
-    }
-  }, [])
+  }, [loadAllEvents, onEventUpdated])
 
   // Custom event component
-  const EventComponent = useCallback(({ event }) => (
-    <div className="flex items-center space-x-1">
-      <span className="truncate">{event.title}</span>
-      {event.resource?.isRequest && (
-        <Clock className="h-3 w-3 flex-shrink-0" title="Special Event" />
-      )}
-      {event.resource?.location && !event.resource?.isRequest && !event.resource?.isBlocked && (
-        <MapPin className="h-3 w-3 flex-shrink-0" />
-      )}
-    </div>
-  ), [])
+  const EventComponent = ({ event }) => {
+    const isBlocked = event.resource?.isBlocked
+    const isTemporaryBlock = event.resource?.isTemporaryBlock
+    const isPrivate = event.resource?.isPrivate
+    const isRequest = event.resource?.isRequest
+    
+    let backgroundColor = '#3b82f6' // Default: Public events - blue
+    let borderColor = '#2563eb'
+    let borderStyle = 'solid'
+    let opacity = 1
+    
+    if (isTemporaryBlock) {
+      backgroundColor = '#f59e0b' // Orange for temporarily blocked
+      borderColor = '#d97706'
+      borderStyle = 'dashed'
+      opacity = 0.7
+    } else if (isBlocked) {
+      backgroundColor = '#6b7280' // Gray for blocked
+      borderColor = '#4b5563'
+      opacity = 0.6
+    } else if (isRequest) {
+      backgroundColor = '#fbbf24' // Yellow for requests
+      borderColor = '#f59e0b'
+      borderStyle = 'dashed'
+      opacity = 0.8
+    } else if (isPrivate) {
+      backgroundColor = '#6054d9' // Purple for private events
+      borderColor = '#4A3BB5'
+    }
 
+    return (
+      <div 
+        style={{
+          backgroundColor,
+          color: 'white',
+          padding: '2px 4px',
+          margin: '1px',
+          borderRadius: '4px',
+          fontSize: '12px',
+          fontWeight: '600',
+          lineHeight: '1.3',
+          border: `2px ${borderStyle} ${borderColor}`,
+          opacity,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
+        }}
+      >
+        {event.title}
+      </div>
+    )
+  }
 
-
-  return (
-    <div className="w-full">
-      {/* Compact mobile styles for react-big-calendar */}
-      <style>{`
-        .compact-calendar .rbc-toolbar {
-          padding: 6px 8px;
-          gap: 6px;
-          flex-wrap: wrap;
-          width: 100%;
-          display: flex;
-          justify-content: center;
-        }
-        .compact-calendar .rbc-toolbar .rbc-btn-group {
-          display: flex;
-          flex-wrap: wrap;
-          justify-content: center;
-        }
-        .compact-calendar .rbc-toolbar-label {
-          font-size: 13px;
-          text-align: center;
-          width: 100%;
-        }
-        .compact-calendar .rbc-btn-group > button {
-          padding: 4px 8px;
-          font-size: 12px;
-          line-height: 1.2;
-        }
-        .compact-calendar .rbc-month-view {
-          font-size: 12px;
-        }
-        .compact-calendar .rbc-month-row {
-          min-height: 72px;
-        }
-        .compact-calendar .rbc-date-cell {
-          padding: 2px 4px;
-        }
-        .compact-calendar .rbc-event {
-          padding: 1px 3px;
-        }
-        .compact-calendar .rbc-calendar { height: 400px !important; width: 100% !important; }
-        .compact-calendar .rbc-month-view { width: 100% !important; }
-        .compact-calendar .rbc-time-view, .compact-calendar .rbc-agenda-view { width: 100% !important; }
-        @media (min-width: 640px) {
-          .compact-calendar .rbc-calendar { height: 560px !important; }
-          .compact-calendar .rbc-toolbar-label { font-size: 14px; }
-          .compact-calendar .rbc-month-view { font-size: 13px; }
-        }
-        @media (max-width: 360px) {
-          .compact-calendar .rbc-calendar { height: 360px !important; }
-          .compact-calendar .rbc-month-row { min-height: 64px; }
-        }
-        @media (max-width: 640px) {
-          .compact-calendar .rbc-toolbar {
-            flex-direction: column;
-            align-items: center;
-          }
-          .compact-calendar .rbc-toolbar .rbc-btn-group {
-            width: 100%;
-          }
-        }
-      `}</style>
-      {/* Header with Refresh Button */}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h2 className="text-4xl md:text-5xl font-extrabold mb-2 tracking-tight" style={{ color: '#252422' }}>Event-Kalender</h2>
-          <p className="text-base" style={{ color: '#A58C81' }}>
-            {user && 'Klicken Sie auf ein Datum, um ein Event anzufragen.'}
-          </p>
-        </div>
+  // Custom toolbar with proper navigation
+  const CustomToolbar = ({ label, onNavigate, onView, view }) => {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        marginBottom: '16px',
+        padding: '0 4px'
+      }}>
         <button
-          onClick={loadAllEvents}
-          disabled={loading}
-          className="inline-flex items-center px-4 py-2 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity duration-200"
-          style={{ backgroundColor: '#A58C81' }}
+          onClick={() => onNavigate('PREV')}
+          style={{
+            background: 'none',
+            border: 'none',
+            fontSize: '18px',
+            cursor: 'pointer',
+            color: isDarkMode ? '#ffffff' : '#252422',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            transition: 'background-color 0.2s'
+          }}
+          onMouseOver={(e) => e.target.style.backgroundColor = isDarkMode ? '#333333' : '#f0f0f0'}
+          onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
         >
-          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          {loading ? 'Lädt...' : 'Aktualisieren'}
+          ‹
+        </button>
+        
+        <span style={{
+          fontSize: '16px',
+          fontWeight: '600',
+          color: isDarkMode ? '#ffffff' : '#252422'
+        }}>
+          {label}
+        </span>
+        
+        <button
+          onClick={() => onNavigate('NEXT')}
+          style={{
+            background: 'none',
+            border: 'none',
+            fontSize: '18px',
+            cursor: 'pointer',
+            color: isDarkMode ? '#ffffff' : '#252422',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            transition: 'background-color 0.2s'
+          }}
+          onMouseOver={(e) => e.target.style.backgroundColor = isDarkMode ? '#333333' : '#f0f0f0'}
+          onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
+        >
+          ›
         </button>
       </div>
+    )
+  }
 
-      {/* Event Type Legend */}
-      <div className="mb-6 flex flex-wrap gap-6">
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '400px',
+        color: isDarkMode ? '#ffffff' : '#252422'
+      }}>
+        Lade Kalender...
+      </div>
+    )
+  }
+
+  return (
+    <>
+      {/* Legend */}
+      <div className="mb-6 flex flex-wrap gap-4">
         <div className="flex items-center space-x-2">
-          <div className="w-5 h-5 bg-blue-500 rounded"></div>
-          <span className="text-sm font-medium" style={{ color: '#252422' }}>Public Event</span>
+          <div className="w-4 h-4 bg-blue-500 rounded" style={{ backgroundColor: '#3b82f6' }}></div>
+          <span className="text-sm text-gray-600">Public Event</span>
         </div>
         <div className="flex items-center space-x-2">
-          <div className="w-5 h-5 bg-gray-500 rounded opacity-60"></div>
-          <X className="h-4 w-4" style={{ color: '#252422' }} />
-          <span className="text-sm font-medium" style={{ color: '#252422' }}>Blocked</span>
+          <div className="w-4 h-4 bg-gray-500 rounded opacity-60" style={{ backgroundColor: '#6b7280', opacity: 0.6 }}></div>
+          <span className="text-sm text-gray-600">Blockiert</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-4 h-4 bg-yellow-400 rounded border-2 border-yellow-500 border-dashed opacity-80" style={{ backgroundColor: '#fbbf24', border: '2px dashed #f59e0b', opacity: 0.8 }}></div>
+          <span className="text-sm text-gray-600">Anfrage</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-4 h-4 bg-orange-500 rounded border-2 border-orange-600 border-dashed opacity-70" style={{ backgroundColor: '#f59e0b', border: '2px dashed #d97706', opacity: 0.7 }}></div>
+          <span className="text-sm text-gray-600">Vorläufig blockiert</span>
         </div>
         {isAdmin() && (
           <div className="flex items-center space-x-2">
-            <div className="w-5 h-5 bg-yellow-400 rounded border-2 border-yellow-500 border-dashed opacity-80"></div>
-            <Clock className="h-4 w-4" style={{ color: '#252422' }} />
-            <span className="text-sm font-medium" style={{ color: '#252422' }}>Special Event</span>
+            <div className="w-4 h-4 bg-purple-600 rounded" style={{ backgroundColor: '#6054d9' }}></div>
+            <span className="text-sm text-gray-600">Privates Event</span>
           </div>
         )}
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center h-96">
-          <div className="flex items-center space-x-2">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-            <span className="text-gray-600">Lade Events...</span>
-          </div>
-        </div>
-      ) : (
-        <div className="compact-calendar">
-          <Calendar
-            localizer={localizer}
-            events={events}
-            startAccessor="start"
-            endAccessor="end"
-            style={{ height: '560px', width: '100%' }}
-            view="month"
-            views={['month']}
-            date={currentDate}
-            onSelectSlot={handleSelectSlot}
-            onSelectEvent={handleSelectEvent}
-            onNavigate={handleNavigate}
-            selectable={true}
-            eventPropGetter={eventStyleGetter}
-            components={{
-              event: EventComponent
-            }}
-            messages={{
-              next: 'Nächster',
-              previous: 'Vorheriger',
-              today: 'Heute',
-              month: 'Monat',
-              date: 'Datum',
-              time: 'Zeit',
-              event: 'Event',
-              noEventsInRange: 'Keine Events in diesem Zeitraum',
-              showMore: (total) => `+${total} weitere`
-            }}
-            step={30}
-            timeslots={2}
-            min={new Date(2024, 0, 1, 8, 0)}
-            max={new Date(2026, 11, 31, 22, 0)}
-          />
-        </div>
-      )}
+      <style>{`
+        /* Style default toolbar */
+        .rbc-toolbar {
+          margin-bottom: 16px;
+          padding: 0 4px;
+        }
 
-      {/* Event Request Modal */}
-      {showEventRequestModal && (
-        <EventRequestModalHTTP
-          isOpen={showEventRequestModal}
-          selectedDate={selectedDate}
-          onClose={() => {
-            setShowEventRequestModal(false)
-            setSelectedDate(null)
+        /* Calendar container - force month view */
+        .rbc-calendar {
+          background: ${isDarkMode ? '#000000' : '#ffffff'};
+          color: ${isDarkMode ? '#ffffff' : '#252422'};
+          border-radius: 12px;
+          overflow: hidden;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+          height: 600px;
+        }
+
+        /* Ensure proper month view layout */
+        .rbc-month-view {
+          display: block !important;
+        }
+
+        /* Force month view to show all days */
+        .rbc-month-view .rbc-calendar {
+          display: block !important;
+        }
+
+        /* Ensure all days are visible in month grid */
+        .rbc-month-view .rbc-body {
+          display: block !important;
+        }
+
+        .rbc-month-view .rbc-month-header {
+          display: flex !important;
+        }
+
+        .rbc-month-view .rbc-header {
+          flex: 1 !important;
+          text-align: center !important;
+        }
+
+        /* Header styling */
+        .rbc-header {
+          background: ${isDarkMode ? '#1a1a1a' : '#f8f9fa'};
+          color: ${isDarkMode ? '#ffffff' : '#252422'};
+          border-bottom: 1px solid ${isDarkMode ? '#333333' : '#e9ecef'};
+          font-weight: 600;
+          padding: 8px 4px;
+          font-size: 13px;
+        }
+
+        /* Day cells - ensure full month grid */
+        .rbc-month-row {
+          min-height: 120px;
+          border-bottom: 1px solid ${isDarkMode ? '#333333' : '#e9ecef'};
+          display: flex;
+          flex: 1;
+        }
+
+        .rbc-day-bg {
+          min-height: 120px;
+          border-right: 1px solid ${isDarkMode ? '#333333' : '#e9ecef'};
+          position: relative;
+          flex: 1;
+          width: calc(100% / 7);
+        }
+
+        /* Ensure all 7 days are visible */
+        .rbc-row {
+          display: flex;
+          flex: 1;
+        }
+
+        .rbc-day-bg:hover {
+          background-color: ${isDarkMode ? '#1a1a1a' : '#f8f9fa'};
+        }
+
+        /* Date numbers - make them very clear */
+        .rbc-date-cell {
+          position: absolute;
+          top: 6px;
+          left: 6px;
+          font-size: 14px;
+          font-weight: 700;
+          color: ${isDarkMode ? '#ffffff' : '#252422'};
+          z-index: 10;
+          background: ${isDarkMode ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.9)'};
+          padding: 2px 6px;
+          border-radius: 4px;
+          min-width: 24px;
+          text-align: center;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+
+        /* Events container */
+        .rbc-events-container {
+          margin: 20px 4px 4px 4px;
+          padding: 0;
+        }
+
+        /* Today highlight */
+        .rbc-today {
+          background-color: ${isDarkMode ? '#2a2a2a' : '#fff3cd'};
+        }
+
+        /* Event styling - removed default styling to let eventPropGetter handle it */
+        .rbc-event {
+          padding: 2px 4px !important;
+          margin: 1px !important;
+          border-radius: 4px !important;
+          font-size: 12px !important;
+          font-weight: 600 !important;
+          line-height: 1.3 !important;
+          height: auto !important;
+          min-height: 18px !important;
+          display: block !important;
+          width: calc(100% - 2px) !important;
+          position: relative !important;
+          z-index: 2 !important;
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
+          white-space: nowrap !important;
+        }
+
+        .rbc-event-content {
+          overflow: hidden !important;
+          white-space: nowrap !important;
+          text-overflow: ellipsis !important;
+        }
+
+        /* Show more link */
+        .rbc-show-more {
+          background: #6054d9 !important;
+          color: white !important;
+          padding: 1px 4px !important;
+          border-radius: 2px !important;
+          font-size: 9px !important;
+          font-weight: 600 !important;
+          margin-top: 1px !important;
+          cursor: pointer !important;
+        }
+
+        .rbc-show-more:hover {
+          background: #4A3BB5 !important;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+          .rbc-calendar {
+            height: 500px;
+          }
+          
+          .rbc-month-row {
+            min-height: 80px;
+          }
+          
+          .rbc-day-bg {
+            min-height: 80px;
+          }
+          
+          .rbc-event {
+            font-size: 10px !important;
+            min-height: 16px !important;
+          }
+        }
+
+        /* Dark mode specific adjustments */
+        .dark .rbc-calendar {
+          background: #000000;
+          color: #ffffff;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .dark .rbc-header {
+          background: #1a1a1a;
+          color: #ffffff;
+          border-bottom: 1px solid #333333;
+        }
+
+        .dark .rbc-day-bg {
+          border-right: 1px solid #333333;
+        }
+
+        .dark .rbc-day-bg:hover {
+          background-color: #1a1a1a;
+        }
+
+        .dark .rbc-today {
+          background-color: #2a2a2a;
+        }
+
+        .dark .rbc-date-cell {
+          color: #ffffff !important;
+          background: rgba(0,0,0,0.7) !important;
+        }
+
+        /* FORCE MONTH VIEW - Override everything */
+        .rbc-time-view {
+          display: none !important;
+        }
+
+        .rbc-time-header {
+          display: none !important;
+        }
+
+        .rbc-time-content {
+          display: none !important;
+        }
+
+        /* Ensure month view is always shown */
+        .rbc-month-view {
+          display: block !important;
+          width: 100% !important;
+          height: 100% !important;
+        }
+
+        /* Force month grid layout */
+        .rbc-month-view .rbc-body {
+          display: block !important;
+        }
+
+        .rbc-month-view .rbc-row {
+          display: flex !important;
+          width: 100% !important;
+          min-height: 120px !important;
+        }
+
+        .rbc-month-view .rbc-day-bg {
+          display: block !important;
+          width: calc(100% / 7) !important;
+          flex: 1 !important;
+          min-height: 120px !important;
+          border-right: 1px solid #ddd !important;
+          position: relative !important;
+        }
+
+        .rbc-month-view .rbc-row-content {
+          display: block !important;
+        }
+
+        /* Hide any week/day view elements */
+        .rbc-week-view {
+          display: none !important;
+        }
+
+        .rbc-day-view {
+          display: none !important;
+        }
+      `}</style>
+
+      <div className={isDarkMode ? 'dark' : ''}>
+        <Calendar
+          localizer={localizer}
+          events={events}
+          startAccessor="start"
+          endAccessor="end"
+          style={{ height: '600px' }}
+          view="month"
+          views={['month']}
+          onView={() => {}} // Prevent view changes
+          onSelectSlot={handleSelectSlot}
+          onSelectEvent={handleSelectEvent}
+          selectable
+          components={{
+            event: EventComponent
+          }}
+          messages={{
+            next: 'Nächster',
+            previous: 'Vorheriger',
+            today: 'Heute',
+            month: 'Monat',
+            week: 'Woche',
+            day: 'Tag',
+            agenda: 'Agenda',
+            date: 'Datum',
+            time: 'Zeit',
+            event: 'Event',
+            noEventsInRange: 'Keine Events in diesem Zeitraum',
+            showMore: (total) => `+${total} weitere`
+          }}
+          step={30}
+          timeslots={2}
+          min={new Date(2024, 0, 1, 8, 0)}
+          max={new Date(2026, 11, 31, 22, 0)}
+          eventPropGetter={(event) => {
+            const isBlocked = event.resource?.isBlocked
+            const isTemporaryBlock = event.resource?.isTemporaryBlock
+            const isPrivate = event.resource?.isPrivate
+            const isRequest = event.resource?.isRequest
+            
+            let backgroundColor = '#3b82f6' // Default: Public events - blue
+            let borderColor = '#2563eb'
+            let borderStyle = 'solid'
+            let opacity = 1
+            
+            if (isTemporaryBlock) {
+              backgroundColor = '#f59e0b' // Orange for temporarily blocked
+              borderColor = '#d97706'
+              borderStyle = 'dashed'
+              opacity = 0.7
+            } else if (isBlocked) {
+              backgroundColor = '#6b7280' // Gray for blocked
+              borderColor = '#4b5563'
+              opacity = 0.6
+            } else if (isRequest) {
+              backgroundColor = '#fbbf24' // Yellow for requests
+              borderColor = '#f59e0b'
+              borderStyle = 'dashed'
+              opacity = 0.8
+            } else if (isPrivate) {
+              backgroundColor = '#6054d9' // Purple for private events
+              borderColor = '#4A3BB5'
+            }
+
+            return {
+              style: {
+                backgroundColor,
+                borderColor,
+                color: 'white',
+                border: `2px ${borderStyle} ${borderColor}`,
+                borderRadius: '4px',
+                fontSize: '12px',
+                fontWeight: '600',
+                opacity,
+                padding: '2px 4px'
+              }
+            }
           }}
         />
-      )}
+      </div>
 
       {/* Event Details Modal */}
-      {showEventDetailsModal && (
+      {showEventDetails && selectedEvent && (
         <EventDetailsModal
           event={selectedEvent}
+          isOpen={showEventDetails}
           onClose={() => {
-            setShowEventDetailsModal(false)
+            setShowEventDetails(false)
             setSelectedEvent(null)
+          }}
+          onEventUpdated={handleEventUpdate}
+        />
+      )}
+
+      {/* Event Request Form Modal */}
+      {showEventRequestForm && (
+        <PublicEventRequestForm
+          isOpen={showEventRequestForm}
+          onClose={() => {
+            setShowEventRequestForm(false)
+            setSelectedDate(null)
+          }}
+          selectedDate={selectedDate}
+          onSuccess={() => {
+            setShowEventRequestForm(false)
+            setSelectedDate(null)
+            // Auto-refresh will handle updating the calendar
           }}
         />
       )}
-    </div>
+    </>
   )
 }
 

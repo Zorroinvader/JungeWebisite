@@ -205,43 +205,69 @@ export const AuthProvider = ({ children }) => {
 
   // Initialize auth state
   useEffect(() => {
-    // Get initial session
-    const getInitialSession = async () => {
+    const initializeAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        // Check if URL has email confirmation tokens
+        const urlParams = new URLSearchParams(window.location.search)
+        const hasConfirmation = urlParams.has('token') || 
+                               urlParams.has('type') || 
+                               window.location.hash.includes('access_token')
         
-        if (session?.user) {
-          setUser(session.user)
-          const userProfile = await getProfile(session.user.id)
-          setProfile(userProfile)
+        if (hasConfirmation) {
+          // User is coming back from email confirmation - let Supabase handle it
+          console.log('Email confirmation detected - preserving session')
+          
+          // Get the current session (Supabase will auto-exchange the token)
+          const { data: { session }, error } = await supabase.auth.getSession()
+          
+          if (session?.user) {
+            console.log('User confirmed email and logged in:', session.user.email)
+            setUser(session.user)
+            const userProfile = await getProfile(session.user.id)
+            setProfile(userProfile)
+            
+            // Clean up URL parameters
+            window.history.replaceState({}, document.title, window.location.pathname)
+          }
+        } else {
+          // Normal page load - clear any old sessions
+          const supabaseKeys = Object.keys(localStorage).filter(key => key.startsWith('sb-'))
+          supabaseKeys.forEach(key => {
+            localStorage.removeItem(key)
+          })
+          
+          await supabase.auth.signOut()
+          setUser(null)
+          setProfile(null)
         }
       } catch (error) {
-        console.error('Error getting initial session:', error)
+        console.error('Error during auth initialization:', error)
+        setUser(null)
+        setProfile(null)
       } finally {
         setLoading(false)
       }
     }
 
-    getInitialSession()
-
-    // No safety timeout - let it load naturally
+    // Initialize auth state
+    initializeAuth()
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log(`[${new Date().toLocaleTimeString()}] Auth state change:`, event, session?.user?.email)
-        if (session?.user) {
+        console.log(`Auth state change:`, event, session?.user?.email)
+        
+        // Handle sign in events (including email confirmation)
+        if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session?.user) {
           setUser(session.user)
           const userProfile = await getProfile(session.user.id)
           setProfile(userProfile)
-          console.log(`[${new Date().toLocaleTimeString()}] Profile loaded:`, userProfile)
-        } else {
+          console.log('User authenticated:', session.user.email)
+        } else if (event === 'SIGNED_OUT') {
           setUser(null)
           setProfile(null)
-          console.log(`[${new Date().toLocaleTimeString()}] User logged out`)
+          console.log('User signed out')
         }
-        setLoading(false)
-        console.log(`[${new Date().toLocaleTimeString()}] Auth loading set to false - user: ${!!session?.user}, profile: ${!!profile}`)
       }
     )
 

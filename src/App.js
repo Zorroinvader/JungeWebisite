@@ -1,6 +1,7 @@
 import React from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { DarkModeProvider } from './contexts/DarkModeContext'
 import Layout from './components/Layout/Layout'
 import HomePage from './pages/HomePage'
 import AboutPage from './pages/AboutPage'
@@ -10,6 +11,8 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import ProfilePage from './pages/ProfilePage'
 import ProfilePageSimple from './pages/ProfilePageSimple'
+import EventRequestTrackingPage from './pages/EventRequestTrackingPage'
+import EmailConfirmationHandler from './components/Auth/EmailConfirmationHandler'
 import AdminPanelClean from './components/Admin/AdminPanelClean'
 import './index.css'
 
@@ -57,6 +60,21 @@ const ProtectedRoute = ({ children, requireAuth = true, requireAdmin = false }) 
 
 // Main App Component
 const AppContent = () => {
+  // Check if URL has email confirmation
+  const urlParams = new URLSearchParams(window.location.search);
+  const hasConfirmation = urlParams.has('token') || 
+                         urlParams.has('type') || 
+                         window.location.hash.includes('access_token');
+
+  // Show confirmation handler if coming from email
+  if (hasConfirmation) {
+    return (
+      <Router>
+        <EmailConfirmationHandler />
+      </Router>
+    );
+  }
+
   return (
     <Router>
       <Routes>
@@ -65,6 +83,7 @@ const AppContent = () => {
         <Route path="/about" element={<Layout><AboutPage /></Layout>} />
         <Route path="/faq" element={<Layout><FAQPage /></Layout>} />
         <Route path="/contact" element={<Layout><ContactPage /></Layout>} />
+        <Route path="/event-tracking" element={<EventRequestTrackingPage />} />
         
         {/* Test Route */}
         <Route path="/test" element={<div>Test Route Works!</div>} />
@@ -100,12 +119,14 @@ const AppContent = () => {
   )
 }
 
-// App Component with AuthProvider
+// App Component with AuthProvider and DarkModeProvider
 const App = () => {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <DarkModeProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </DarkModeProvider>
   )
 }
 

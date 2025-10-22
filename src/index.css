@@ -314,6 +314,58 @@
   }
 }
 
+/* Museum Gallery Styles */
+.shadow-3xl {
+  box-shadow: 0 35px 60px -12px rgba(0, 0, 0, 0.25);
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Museum Card Hover Effects */
+.museum-card {
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.museum-card:hover {
+  transform: translateY(-8px) scale(1.02);
+}
+
+/* Enhanced Image Transitions */
+.museum-image {
+  transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.museum-card:hover .museum-image {
+  transform: scale(1.1);
+}
+
+/* Museum Overlay Animation */
+.museum-overlay {
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.museum-card:hover .museum-overlay {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Museum Stats Animation */
+.museum-stats {
+  transition: all 0.3s ease;
+}
+
+.museum-stats:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px rgba(165, 140, 129, 0.15);
+}
+
 /* Print styles */
 @media print {
   .no-print {

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { Eye, EyeOff, Mail, Lock, AlertCircle } from 'lucide-react'
+import { useDarkMode } from '../../contexts/DarkModeContext'
+import { Eye, EyeOff, Mail, Lock, AlertCircle, Moon, Sun } from 'lucide-react'
 
 const LoginForm = () => {
   const { signIn, user } = useAuth()
+  const { isDarkMode, toggleDarkMode } = useDarkMode()
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
     email: '',
@@ -63,9 +65,9 @@ const LoginForm = () => {
   console.log('LoginForm rendering, loading:', loading, 'error:', error)
   
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#F4F1E8' }}>
+    <div className="min-h-screen bg-[#F4F1E8] dark:bg-[#252422]">
       {/* Navigation Header */}
-      <nav className="w-full border-b" style={{ backgroundColor: '#F4F1E8', borderColor: '#A58C81' }}>
+      <nav className="w-full border-b border-[#A58C81] dark:border-[#EBE9E9] bg-[#F4F1E8] dark:bg-[#252422]">
         <div className="w-full px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo on the left */}
@@ -75,15 +77,20 @@ const LoginForm = () => {
                 alt="Junge Gesellschaft Logo" 
                 className="h-8 w-8 object-contain"
               />
-              <span className="text-lg font-semibold" style={{ color: '#252422' }}>Junge Gesellschaft</span>
+              <span className="text-lg font-semibold text-[#252422] dark:text-[#F4F1E8]">Junge Gesellschaft</span>
             </div>
             
             {/* Navigation on the right */}
             <div className="flex items-center space-x-4">
+              <button
+                onClick={toggleDarkMode}
+                className="p-2 hover:opacity-70 transition-opacity rounded-lg text-[#252422] dark:text-[#F4F1E8]"
+              >
+                {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+              </button>
               <Link
                 to="/"
-                className="text-sm font-medium hover:opacity-70 transition-opacity"
-                style={{ color: '#252422' }}
+                className="text-sm font-medium hover:opacity-70 transition-opacity text-[#252422] dark:text-[#F4F1E8]"
               >
                 Zurück zur Startseite
               </Link>
@@ -95,26 +102,26 @@ const LoginForm = () => {
       {/* Main Content */}
       <div className="flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full space-y-8">
-          <div className="bg-white rounded-2xl shadow-xl p-8" style={{ border: '2px solid #A58C81' }}>
+          <div className="bg-white dark:bg-[#252422] rounded-2xl shadow-xl p-8 border-2 border-[#A58C81] dark:border-[#EBE9E9]">
             <div className="text-center mb-8">
-              <div className="mx-auto h-12 w-12 rounded-lg flex items-center justify-center mb-4" style={{ backgroundColor: '#A58C81' }}>
-                <Lock className="h-6 w-6 text-white" />
+              <div className="mx-auto h-12 w-12 rounded-lg flex items-center justify-center mb-4 bg-[#A58C81] dark:bg-[#EBE9E9]">
+                <Lock className="h-6 w-6 text-white dark:text-[#252422]" />
               </div>
-              <h2 className="text-3xl font-bold mb-2" style={{ color: '#252422' }}>
+              <h2 className="text-3xl font-bold mb-2 text-[#252422] dark:text-[#F4F1E8]">
                 Bei Ihrem Konto anmelden
               </h2>
-              <p className="text-base" style={{ color: '#A58C81' }}>
+              <p className="text-base text-[#A58C81] dark:text-[#EBE9E9]">
                 Melden Sie sich in Ihrem Konto an
               </p>
             </div>
 
             <form className="space-y-6" onSubmit={handleSubmit}>
               {error && (
-                <div className="rounded-lg p-4" style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca' }}>
+                <div className="rounded-lg p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
                   <div className="flex">
-                    <AlertCircle className="h-5 w-5" style={{ color: '#dc2626' }} />
+                    <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
                     <div className="ml-3">
-                      <p className="text-sm" style={{ color: '#dc2626' }}>{error}</p>
+                      <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
                     </div>
                   </div>
                 </div>
@@ -122,12 +129,12 @@ const LoginForm = () => {
 
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium mb-2" style={{ color: '#252422' }}>
+                  <label htmlFor="email" className="block text-sm font-medium mb-2 text-[#252422] dark:text-[#F4F1E8]">
                     E-Mail-Adresse
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Mail className="h-5 w-5" style={{ color: '#A58C81' }} />
+                      <Mail className="h-5 w-5 text-[#A58C81] dark:text-[#EBE9E9]" />
                     </div>
                     <input
                       id="email"
@@ -137,24 +144,19 @@ const LoginForm = () => {
                       required
                       value={formData.email}
                       onChange={handleChange}
-                      className="w-full px-3 py-3 pl-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50 transition-colors"
-                      style={{ 
-                        borderColor: '#A58C81', 
-                        focusRingColor: '#A58C81',
-                        backgroundColor: '#ffffff'
-                      }}
+                      className="w-full px-3 py-3 pl-10 border border-[#A58C81] dark:border-[#EBE9E9] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] dark:focus:ring-[#EBE9E9] focus:ring-opacity-50 transition-colors bg-white dark:bg-[#252422] text-[#252422] dark:text-[#F4F1E8]"
                       placeholder="ihre@email.de"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label htmlFor="password" className="block text-sm font-medium mb-2" style={{ color: '#252422' }}>
+                  <label htmlFor="password" className="block text-sm font-medium mb-2 text-[#252422] dark:text-[#F4F1E8]">
                     Passwort
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Lock className="h-5 w-5" style={{ color: '#A58C81' }} />
+                      <Lock className="h-5 w-5 text-[#A58C81] dark:text-[#EBE9E9]" />
                     </div>
                     <input
                       id="password"
@@ -164,18 +166,12 @@ const LoginForm = () => {
                       required
                       value={formData.password}
                       onChange={handleChange}
-                      className="w-full px-3 py-3 pl-10 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50 transition-colors"
-                      style={{ 
-                        borderColor: '#A58C81', 
-                        focusRingColor: '#A58C81',
-                        backgroundColor: '#ffffff'
-                      }}
+                      className="w-full px-3 py-3 pl-10 pr-10 border border-[#A58C81] dark:border-[#EBE9E9] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] dark:focus:ring-[#EBE9E9] focus:ring-opacity-50 transition-colors bg-white dark:bg-[#252422] text-[#252422] dark:text-[#F4F1E8]"
                       placeholder="Ihr Passwort"
                     />
                     <button
                       type="button"
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center hover:opacity-70 transition-opacity"
-                      style={{ color: '#A58C81' }}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center hover:opacity-70 transition-opacity text-[#A58C81] dark:text-[#EBE9E9]"
                       onClick={() => setShowPassword(!showPassword)}
                     >
                       {showPassword ? (
@@ -192,8 +188,7 @@ const LoginForm = () => {
                 <div className="text-sm">
                   <a
                     href="/forgot-password"
-                    className="font-medium hover:opacity-80 transition-opacity"
-                    style={{ color: '#A58C81' }}
+                    className="font-medium hover:opacity-80 transition-opacity text-[#A58C81] dark:text-[#EBE9E9]"
                   >
                     Passwort vergessen?
                   </a>
@@ -204,12 +199,11 @@ const LoginForm = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full flex justify-center py-3 px-4 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
-                  style={{ backgroundColor: '#A58C81' }}
+                  className="w-full flex justify-center py-3 px-4 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity bg-[#2E07D4] hover:bg-[#2506B8]"
                 >
                   {loading ? (
                     <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white dark:border-[#252422] mr-2"></div>
                       Wird angemeldet...
                     </>
                   ) : (
@@ -218,12 +212,11 @@ const LoginForm = () => {
                 </button>
                 
                 <div className="text-center">
-                  <p className="text-sm" style={{ color: '#666' }}>
+                  <p className="text-sm text-gray-600 dark:text-[#EBE9E9]">
                     Noch kein Konto?{' '}
                     <Link
                       to="/register"
-                      className="font-medium hover:opacity-80 transition-opacity"
-                      style={{ color: '#A58C81' }}
+                      className="font-medium hover:opacity-80 transition-opacity text-[#A58C81] dark:text-[#F4F1E8]"
                     >
                       Jetzt registrieren
                     </Link>
