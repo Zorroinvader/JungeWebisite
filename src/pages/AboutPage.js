@@ -1,5 +1,6 @@
 import React from 'react'
-import { MapPin, Mail, Heart, Crown, UserCheck, Shield, Users, Target } from 'lucide-react'
+import { MapPin, Mail, Heart, Crown, UserCheck, Shield, Users, Target, Camera } from 'lucide-react'
+import MuseumGallery from '../components/UI/MuseumGallery'
 
 const AboutPage = () => {
   return (
@@ -15,6 +16,25 @@ const AboutPage = () => {
               <p className="text-xl md:text-2xl text-[#A58C81] dark:text-[#EBE9E9] mb-8">
                 Die Begegnungsstätte für Junge (und jung gebliebene) Leute in unserer Gemeinde
             </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Visual Museum Section - Moved to Top */}
+      <div className="w-full bg-white dark:bg-gray-900 py-20">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8">
+          <div className="relative">
+            {/* Museum Background Elements */}
+            <div className="absolute inset-0 bg-gradient-to-br from-[#A58C81]/3 to-[#8B6F5F]/3 rounded-3xl"></div>
+            <div className="absolute top-0 left-0 w-96 h-96 bg-[#A58C81]/5 rounded-full -translate-y-48 -translate-x-48"></div>
+            <div className="absolute bottom-0 right-0 w-80 h-80 bg-[#8B6F5F]/5 rounded-full translate-y-40 translate-x-40"></div>
+            <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-gradient-to-r from-[#A58C81]/10 to-[#8B6F5F]/10 rounded-full -translate-x-32 -translate-y-32"></div>
+            
+            <div className="relative z-10 p-8 lg:p-16">
+              <MuseumGallery 
+                title="Unser Clubhaus - Eine visuelle Entdeckungsreise"
+              />
             </div>
           </div>
         </div>
