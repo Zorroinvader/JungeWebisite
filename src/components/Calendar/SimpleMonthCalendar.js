@@ -26,19 +26,54 @@ const SimpleMonthCalendar = ({
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [showEventRequestForm, setShowEventRequestForm] = useState(false)
   const [selectedDate, setSelectedDate] = useState(null)
+  const [lastLoadedMonth, setLastLoadedMonth] = useState(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
-  // Load all events and requests
+  // Load all events and requests - Optimized for calendar view
   const loadAllEvents = useCallback(async () => {
+    // Prevent multiple simultaneous refreshes
+    if (isRefreshing) {
+      console.log('📅 Calendar: Already refreshing, skipping')
+      return
+    }
+    
+    setIsRefreshing(true)
     try {
       setLoading(true)
       
-      // Load approved events
-      const allEvents = await httpAPI.events.getAll()
+      // Use currentDate or fallback to today's date
+      const dateToUse = currentDate || new Date()
       
-      // Load pending requests (admin only)
+      // Calculate date range for current month view (current month ± 1 month)
+      const startOfMonth = new Date(dateToUse.getFullYear(), dateToUse.getMonth() - 1, 1)
+      const endOfMonth = new Date(dateToUse.getFullYear(), dateToUse.getMonth() + 2, 0)
+      
+      // Check if we already loaded this month range
+      const currentMonthKey = `${dateToUse.getFullYear()}-${dateToUse.getMonth()}`
+      if (lastLoadedMonth === currentMonthKey) {
+        console.log('📅 Calendar: Month already loaded, using cache')
+        setLoading(false)
+        return
+      }
+      
+      // Load approved events for current month range only
+      let allEvents = []
+      try {
+        allEvents = await httpAPI.events.getCalendarEvents(startOfMonth, endOfMonth)
+      } catch (dateError) {
+        console.warn('Date range optimization failed, falling back to all events:', dateError)
+        allEvents = await httpAPI.events.getAll()
+      }
+      
+      // Load pending requests (admin only) for current month range only
       let pendingRequests = []
       if (isAdmin()) {
-        pendingRequests = await httpAPI.eventRequests.getAll()
+        try {
+          pendingRequests = await httpAPI.eventRequests.getCalendarRequests(startOfMonth, endOfMonth)
+        } catch (dateError) {
+          console.warn('Date range optimization failed for requests, falling back to all requests:', dateError)
+          pendingRequests = await httpAPI.eventRequests.getAll()
+        }
       }
       
       // Load temporarily blocked dates
@@ -224,12 +259,14 @@ const SimpleMonthCalendar = ({
       }
 
       setEvents(calendarEvents)
+      setLastLoadedMonth(currentMonthKey) // Update cache key
     } catch (error) {
       console.error('Error loading events:', error)
     } finally {
       setLoading(false)
+      setIsRefreshing(false)
     }
-  }, [isAdmin])
+  }, [isAdmin, currentDate, isRefreshing])
 
   // Load events on component mount and when dependencies change
   useEffect(() => {
@@ -552,7 +589,7 @@ const SimpleMonthCalendar = ({
           onSuccess={() => {
             setShowEventRequestForm(false)
             setSelectedDate(null)
-            loadAllEvents()
+            // Auto-refresh will handle updating the calendar
           }}
         />
       )}

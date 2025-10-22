@@ -1,27 +1,77 @@
 // HTTP-based API service that bypasses the problematic Supabase client
-// Uses direct HTTP calls to Supabase REST API
+// Uses direct HTTP calls to Supabase REST API with security hardening
+
+import { supabase } from '../lib/supabase'
 
 const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL
 const SUPABASE_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY
+
+// Security validation functions
+const validateEmail = (email) => {
+  const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
+  return emailRegex.test(email) && email.length <= 254
+}
+
+const validatePhone = (phone) => {
+  const phoneRegex = /^(\+49|0)[1-9]\d{1,14}$/
+  return phoneRegex.test(phone) && phone.length <= 20
+}
+
+const sanitizeText = (text) => {
+  if (!text) return text
+  return text
+    .replace(/[<>'"]/g, '')
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const detectSQLInjection = (text) => {
+  if (!text) return false
+  const dangerousPatterns = [
+    /union|select|insert|update|delete|drop|create|alter|exec|execute/i,
+    /[';]/,
+    /--/,
+    /\/\*.*\*\//
+  ]
+  return dangerousPatterns.some(pattern => pattern.test(text))
+}
+
+// eslint-disable-next-line no-unused-vars
+const validateFileUpload = (fileName, fileSize, fileType, maxSize = 10485760) => {
+  const allowedExtensions = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'gif']
+  const fileExtension = fileName.split('.').pop()?.toLowerCase()
+  
+  return fileSize <= maxSize && allowedExtensions.includes(fileExtension)
+}
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   throw new Error('Missing Supabase environment variables. Please check your .env file.')
 }
 
-const getHeaders = () => ({
-  'apikey': SUPABASE_KEY,
-  'Authorization': `Bearer ${SUPABASE_KEY}`,
-  'Content-Type': 'application/json',
-  'Prefer': 'return=minimal'
-})
+const getHeaders = async (userEmail = null) => {
+  // Get the current session from Supabase
+  const { data: { session } } = await supabase.auth.getSession()
+  const userToken = session?.access_token || SUPABASE_KEY
+  
+  return {
+    'apikey': SUPABASE_KEY,
+    'Authorization': `Bearer ${userToken}`,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=minimal',
+    'X-User-Email': userEmail || '',
+    'X-Session-ID': sessionStorage.getItem('sessionId') || ''
+  }
+}
 
 // Events API
 export const eventsAPI = {
   async getAll() {
     try {
+      const headers = await getHeaders()
       const response = await fetch(`${SUPABASE_URL}/rest/v1/events?select=*&order=start_date.asc`, {
         method: 'GET',
-        headers: getHeaders()
+        headers
       })
 
       if (!response.ok) {
@@ -39,9 +89,10 @@ export const eventsAPI = {
 
   async getById(id) {
     try {
+      const headers = await getHeaders()
       const response = await fetch(`${SUPABASE_URL}/rest/v1/events?id=eq.${id}&select=*`, {
         method: 'GET',
-        headers: getHeaders()
+        headers
       })
 
       if (!response.ok) {
@@ -58,9 +109,10 @@ export const eventsAPI = {
 
   async create(data) {
     try {
+      const headers = await getHeaders()
       const response = await fetch(`${SUPABASE_URL}/rest/v1/events`, {
         method: 'POST',
-        headers: getHeaders(),
+        headers,
         body: JSON.stringify(data)
       })
 
@@ -84,9 +136,10 @@ export const eventsAPI = {
 
   async update(id, data) {
     try {
+      const headers = await getHeaders()
       const response = await fetch(`${SUPABASE_URL}/rest/v1/events?id=eq.${id}`, {
         method: 'PATCH',
-        headers: getHeaders(),
+        headers,
         body: JSON.stringify(data)
       })
 
@@ -110,9 +163,10 @@ export const eventsAPI = {
 
   async delete(id) {
     try {
+      const headers = await getHeaders()
       const response = await fetch(`${SUPABASE_URL}/rest/v1/events?id=eq.${id}`, {
         method: 'DELETE',
-        headers: getHeaders()
+        headers
       })
 
       if (!response.ok) {
@@ -124,17 +178,56 @@ export const eventsAPI = {
       console.error('HTTP API deleteEvent error:', error)
       throw error
     }
+  },
+
+  // Optimized method for calendar display - only essential columns
+  async getCalendarEvents(startDate = null, endDate = null) {
+    try {
+      const headers = await getHeaders()
+      
+      // Build date filter if provided
+      let dateFilter = ''
+      if (startDate && endDate) {
+        try {
+          const start = new Date(startDate).toISOString()
+          const end = new Date(endDate).toISOString()
+          dateFilter = `&start_date=gte.${start}&start_date=lte.${end}`
+        } catch (dateError) {
+          console.warn('Invalid date range provided, loading all events:', dateError)
+          // Fallback to loading all events if date parsing fails
+        }
+      }
+      
+      // Only select essential columns for calendar display
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/events?select=id,title,start_date,end_date,is_private,event_type,requester_name,schluesselannahme_time,schluesselabgabe_time,additional_notes,uploaded_mietvertrag_url&order=start_date.asc${dateFilter}`, {
+        method: 'GET',
+        headers
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      const result = await response.json()
+      return result
+    } catch (error) {
+      console.error('HTTP API getCalendarEvents error:', error)
+      throw error
+    }
   }
 }
 
 // Event Requests API - 3-Step Workflow
 export const eventRequestsAPI = {
-  // Get all event requests (admin only)
+  // Get all event requests (admin only) - Optimized for admin panel
   async getAll() {
     try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?select=*&order=created_at.desc`, {
+      const headers = await getHeaders()
+      // Only select essential columns for admin panel display
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?select=id,title,event_name,requester_name,requester_email,start_date,end_date,requested_days,request_stage,status,is_private,event_type,created_at,initial_accepted_at,details_submitted_at,final_accepted_at,rejected_at,admin_notes,rejection_reason&order=created_at.desc`, {
         method: 'GET',
-        headers: getHeaders()
+        headers
       })
 
       if (!response.ok) {
@@ -150,12 +243,36 @@ export const eventRequestsAPI = {
     }
   },
 
-  // Get requests by stage
+  // Get admin panel data - Ultra-optimized for fast loading
+  async getAdminPanelData(limit = 50, offset = 0) {
+    try {
+      const headers = await getHeaders()
+      // Only select the absolute minimum columns needed for admin panel
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?select=id,title,event_name,requester_name,requester_email,start_date,request_stage,status,created_at,details_submitted_at,initial_accepted_at,final_accepted_at&order=created_at.desc&limit=${limit}&offset=${offset}`, {
+        method: 'GET',
+        headers
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      const result = await response.json()
+      return result
+    } catch (error) {
+      console.error('HTTP API getAdminPanelData error:', error)
+      throw error
+    }
+  },
+
+  // Get requests by stage - Optimized
   async getByStage(stage) {
     try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?request_stage=eq.${stage}&select=*&order=created_at.desc`, {
+      const headers = await getHeaders()
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?request_stage=eq.${stage}&select=id,title,event_name,requester_name,requester_email,start_date,end_date,request_stage,status,created_at&order=created_at.desc`, {
         method: 'GET',
-        headers: getHeaders()
+        headers
       })
 
       if (!response.ok) {
@@ -173,17 +290,26 @@ export const eventRequestsAPI = {
   // Get request by email (for non-logged-in users)
   async getByEmail(email) {
     try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?requester_email=eq.${email}&select=*&order=created_at.desc`, {
+      console.log('Searching for requests with email:', email)
+      const headers = await getHeaders(email)
+      console.log('Headers for email search:', headers)
+      
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?requester_email=eq.${email}&select=id,title,event_name,requester_name,requester_email,start_date,end_date,request_stage,status,created_at&order=created_at.desc`, {
         method: 'GET',
-        headers: getHeaders()
+        headers
       })
 
+      console.log('Response status:', response.status)
+      
       if (!response.ok) {
         const errorText = await response.text()
+        console.error('API Error:', errorText)
         throw new Error(`HTTP ${response.status}: ${errorText}`)
       }
 
-      return await response.json()
+      const data = await response.json()
+      console.log('Found requests:', data)
+      return data
     } catch (error) {
       console.error('HTTP API getByEmail error:', error)
       throw error
@@ -192,9 +318,10 @@ export const eventRequestsAPI = {
 
   async getByUser(userId) {
     try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?requested_by=eq.${userId}&select=*&order=created_at.desc`, {
+      const headers = await getHeaders()
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?requested_by=eq.${userId}&select=id,title,event_name,requester_name,requester_email,start_date,end_date,request_stage,status,created_at&order=created_at.desc`, {
         method: 'GET',
-        headers: getHeaders()
+        headers
       })
 
       if (!response.ok) {
@@ -210,9 +337,10 @@ export const eventRequestsAPI = {
 
   async getById(id) {
     try {
+      const headers = await getHeaders()
       const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}&select=*`, {
         method: 'GET',
-        headers: getHeaders()
+        headers
       })
 
       if (!response.ok) {
@@ -228,14 +356,44 @@ export const eventRequestsAPI = {
   },
 
   // STEP 1: Create initial event request (no login required)
-  // Uses same structure as existing event requests for compatibility
   async createInitialRequest(data) {
     try {
+      // Security validation
+      if (!validateEmail(data.requester_email)) {
+        throw new Error('Invalid email format')
+      }
+      
+      if (data.requester_phone && !validatePhone(data.requester_phone)) {
+        throw new Error('Invalid phone format')
+      }
+
+      // Sanitize text inputs
+      const sanitizedData = {
+        requester_name: sanitizeText(data.requester_name),
+        initial_notes: sanitizeText(data.initial_notes || data.description || ''),
+        event_name: sanitizeText(data.event_name || data.title)
+      }
+
+      // Check for SQL injection
+      const textFields = [sanitizedData.requester_name, sanitizedData.initial_notes, sanitizedData.event_name]
+      for (const field of textFields) {
+        if (detectSQLInjection(field)) {
+          await securityAPI.logSuspiciousActivity('sql_injection_attempt', `SQL injection detected in event request: ${field}`, 'high')
+          throw new Error('Invalid input detected')
+        }
+      }
+
+      // Rate limiting check
+      const rateLimitOk = await securityAPI.checkRateLimit(data.requester_email, 'event_request_create', 5, 60)
+      if (!rateLimitOk) {
+        throw new Error('Too many requests. Please try again later.')
+      }
+
       const requestData = {
         // Existing fields
-        title: data.title || data.event_name,
-        description: data.description || data.initial_notes || '',
-        requester_name: data.requester_name,
+        title: sanitizedData.event_name,
+        description: sanitizedData.initial_notes,
+        requester_name: sanitizedData.requester_name,
         requester_email: data.requester_email,
         start_date: data.start_date,
         end_date: data.end_date,
@@ -245,17 +403,18 @@ export const eventRequestsAPI = {
         created_at: data.created_at || new Date().toISOString(),
         
         // New fields for 3-step workflow
-        event_name: data.event_name || data.title,
+        event_name: sanitizedData.event_name,
         requester_phone: data.requester_phone || null,
         requested_days: data.requested_days || null,
-        initial_notes: data.initial_notes || data.description || '',
+        initial_notes: sanitizedData.initial_notes,
         request_stage: 'initial'
       }
 
+      const headers = await getHeaders(data.requester_email)
       const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests`, {
         method: 'POST',
         headers: {
-          ...getHeaders(),
+          ...headers,
           'Prefer': 'return=representation'
         },
         body: JSON.stringify(requestData)
@@ -267,6 +426,10 @@ export const eventRequestsAPI = {
       }
 
       const result = await response.json()
+      
+      // Log successful creation
+      await securityAPI.logSuspiciousActivity('event_request_created', `Event request created for ${data.requester_email}`, 'low', null, null)
+      
       return Array.isArray(result) ? result[0] : result
     } catch (error) {
       console.error('HTTP API createInitialRequest error:', error)
@@ -277,9 +440,10 @@ export const eventRequestsAPI = {
   // STEP 2: Admin accepts initial request
   async acceptInitialRequest(id, adminNotes = '') {
     try {
+      const headers = await getHeaders()
       const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}`, {
         method: 'PATCH',
-        headers: getHeaders(),
+        headers,
         body: JSON.stringify({
           request_stage: 'initial_accepted',
           initial_accepted_at: new Date().toISOString(),
@@ -302,9 +466,10 @@ export const eventRequestsAPI = {
   // STEP 3: Admin rejects request
   async rejectRequest(id, rejectionReason = '') {
     try {
+      const headers = await getHeaders()
       const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}`, {
         method: 'PATCH',
-        headers: getHeaders(),
+        headers,
         body: JSON.stringify({
           request_stage: 'rejected',
           status: 'rejected',
@@ -327,9 +492,10 @@ export const eventRequestsAPI = {
   // USER: Cancel own request at any stage
   async cancelRequest(id) {
     try {
+      const headers = await getHeaders()
       const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}`, {
         method: 'PATCH',
-        headers: getHeaders(),
+        headers,
         body: JSON.stringify({
           request_stage: 'cancelled',
           status: 'cancelled',
@@ -352,6 +518,9 @@ export const eventRequestsAPI = {
   // STEP 4: User submits detailed information
   async submitDetailedRequest(id, data) {
     try {
+      console.log('📝 Submitting detailed request for ID:', id)
+      console.log('📝 Data to submit:', data)
+      
       const requestData = {
         exact_start_datetime: data.exact_start_datetime,
         exact_end_datetime: data.exact_end_datetime,
@@ -370,17 +539,34 @@ export const eventRequestsAPI = {
         details_submitted_at: new Date().toISOString()
       }
 
+      console.log('📝 Request data to send:', requestData)
+
+      // For detailed form submission, use anon key to allow updates by email
+      const headers = {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      }
+      
+      console.log('📝 Headers:', headers)
+      
       const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}`, {
         method: 'PATCH',
-        headers: getHeaders(),
+        headers,
         body: JSON.stringify(requestData)
       })
 
+      console.log('📝 Response status:', response.status)
+      console.log('📝 Response ok:', response.ok)
+
       if (!response.ok) {
         const errorText = await response.text()
+        console.error('📝 Error response:', errorText)
         throw new Error(`HTTP ${response.status}: ${errorText}`)
       }
 
+      console.log('✅ Detailed request submitted successfully')
       return { success: true }
     } catch (error) {
       console.error('HTTP API submitDetailedRequest error:', error)
@@ -392,9 +578,10 @@ export const eventRequestsAPI = {
   async finalAcceptRequest(id) {
     try {
       // First, get the request details
+      const headers = await getHeaders()
       const requestResponse = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}&select=*`, {
         method: 'GET',
-        headers: getHeaders()
+        headers
       })
 
       if (!requestResponse.ok) {
@@ -413,7 +600,7 @@ export const eventRequestsAPI = {
       // Update request status
       const updateResponse = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}`, {
         method: 'PATCH',
-        headers: getHeaders(),
+        headers,
         body: JSON.stringify({
           request_stage: 'final_accepted',
           status: 'approved',
@@ -427,7 +614,6 @@ export const eventRequestsAPI = {
       }
 
       // Create the event in the events table
-      // Use ONLY fields that exist in the events table schema
       const eventData = {
         // Required fields
         title: request.event_name || request.title,
@@ -458,11 +644,7 @@ export const eventRequestsAPI = {
         // Additional notes
         additional_notes: request.additional_notes,
         
-        // File data (from database backup)
-        uploaded_file_name: request.uploaded_file_name,
-        uploaded_file_size: request.uploaded_file_size,
-        uploaded_file_type: request.uploaded_file_type,
-        uploaded_file_data: request.uploaded_file_data,
+        // Contract URL (only field that exists in events table)
         uploaded_mietvertrag_url: request.signed_contract_url,
         
         // Status
@@ -473,7 +655,7 @@ export const eventRequestsAPI = {
 
       const createEventResponse = await fetch(`${SUPABASE_URL}/rest/v1/events`, {
         method: 'POST',
-        headers: getHeaders(),
+        headers,
         body: JSON.stringify(eventData)
       })
 
@@ -494,9 +676,10 @@ export const eventRequestsAPI = {
   // Legacy create method for backwards compatibility
   async create(data) {
     try {
+      const headers = await getHeaders()
       const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests`, {
         method: 'POST',
-        headers: getHeaders(),
+        headers,
         body: JSON.stringify(data)
       })
 
@@ -520,9 +703,10 @@ export const eventRequestsAPI = {
 
   async update(id, data) {
     try {
+      const headers = await getHeaders()
       const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}`, {
         method: 'PATCH',
-        headers: getHeaders(),
+        headers,
         body: JSON.stringify(data)
       })
 
@@ -546,9 +730,10 @@ export const eventRequestsAPI = {
 
   async delete(id) {
     try {
+      const headers = await getHeaders()
       const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}`, {
         method: 'DELETE',
-        headers: getHeaders()
+        headers
       })
 
       if (!response.ok) {
@@ -560,6 +745,43 @@ export const eventRequestsAPI = {
       console.error('HTTP API deleteEventRequest error:', error)
       throw error
     }
+  },
+
+  // Optimized method for calendar display - only essential columns for requests
+  async getCalendarRequests(startDate = null, endDate = null) {
+    try {
+      const headers = await getHeaders()
+      
+      // Build date filter if provided
+      let dateFilter = ''
+      if (startDate && endDate) {
+        try {
+          const start = new Date(startDate).toISOString()
+          const end = new Date(endDate).toISOString()
+          dateFilter = `&start_date=gte.${start}&start_date=lte.${end}`
+        } catch (dateError) {
+          console.warn('Invalid date range provided, loading all requests:', dateError)
+          // Fallback to loading all requests if date parsing fails
+        }
+      }
+      
+      // Only select essential columns for calendar display
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?select=id,title,event_name,start_date,end_date,request_stage,status,is_private,requester_name,requester_email,exact_start_datetime,exact_end_datetime,additional_notes&order=start_date.asc${dateFilter}`, {
+        method: 'GET',
+        headers
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      const result = await response.json()
+      return result
+    } catch (error) {
+      console.error('HTTP API getCalendarRequests error:', error)
+      throw error
+    }
   }
 }
 
@@ -567,9 +789,10 @@ export const eventRequestsAPI = {
 export const profilesAPI = {
   async getById(id) {
     try {
+      const headers = await getHeaders()
       const response = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${id}&select=*`, {
         method: 'GET',
-        headers: getHeaders()
+        headers
       })
 
       if (!response.ok) {
@@ -586,9 +809,10 @@ export const profilesAPI = {
 
   async create(data) {
     try {
+      const headers = await getHeaders()
       const response = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
         method: 'POST',
-        headers: getHeaders(),
+        headers,
         body: JSON.stringify(data)
       })
 
@@ -612,9 +836,10 @@ export const profilesAPI = {
 
   async update(id, data) {
     try {
+      const headers = await getHeaders()
       const response = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${id}`, {
         method: 'PATCH',
-        headers: getHeaders(),
+        headers,
         body: JSON.stringify(data)
       })
 
@@ -638,9 +863,10 @@ export const profilesAPI = {
 
   async getAll() {
     try {
+      const headers = await getHeaders()
       const response = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=*&order=created_at.desc`, {
         method: 'GET',
-        headers: getHeaders()
+        headers
       })
 
       if (!response.ok) {
@@ -658,9 +884,10 @@ export const profilesAPI = {
 
   async updateUserRole(id, role) {
     try {
+      const headers = await getHeaders()
       const response = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${id}`, {
         method: 'PATCH',
-        headers: getHeaders(),
+        headers,
         body: JSON.stringify({ role })
       })
 
@@ -705,9 +932,10 @@ export const profilesAPI = {
       const authUser = await authResponse.json()
 
       // Check if profile already exists (might be created by trigger)
+      const headers = await getHeaders()
       const existingProfileResponse = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${authUser.user.id}&select=*`, {
         method: 'GET',
-        headers: getHeaders()
+        headers
       })
 
       if (existingProfileResponse.ok) {
@@ -717,7 +945,7 @@ export const profilesAPI = {
           // Profile already exists, update it with the provided data
           const updateResponse = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${authUser.user.id}`, {
             method: 'PATCH',
-            headers: getHeaders(),
+            headers,
             body: JSON.stringify({
               email: userData.email,
               full_name: userData.full_name,
@@ -733,7 +961,7 @@ export const profilesAPI = {
           // Profile doesn't exist, create it
           const profileResponse = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
             method: 'POST',
-            headers: getHeaders(),
+            headers,
             body: JSON.stringify({
               id: authUser.user.id,
               email: userData.email,
@@ -751,7 +979,7 @@ export const profilesAPI = {
         // If we can't check, try to create the profile
         const profileResponse = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
           method: 'POST',
-          headers: getHeaders(),
+          headers,
           body: JSON.stringify({
             id: authUser.user.id,
             email: userData.email,
@@ -816,7 +1044,6 @@ export const storageAPI = {
       }
 
       // IMPORTANT: For private buckets, use authenticated URL
-      // Don't use /public/ in the URL for private buckets!
       const authenticatedURL = `${SUPABASE_URL}/storage/v1/object/authenticated/signed-contracts/${fileName}`
       return { success: true, url: authenticatedURL, fileName }
     } catch (error) {
@@ -852,9 +1079,10 @@ export const storageAPI = {
 export const blockedDatesAPI = {
   async getTemporarilyBlocked() {
     try {
+      const headers = await getHeaders()
       const response = await fetch(`${SUPABASE_URL}/rest/v1/temporarily_blocked_dates?select=*`, {
         method: 'GET',
-        headers: getHeaders()
+        headers
       })
 
       if (!response.ok) {
@@ -875,13 +1103,255 @@ export const profileAPI = {
   getProfile: profilesAPI.getById
 };
 
+// DSGVO Compliance API
+export const dsgvoAPI = {
+  // Get user data export (Article 15 - Right to Access)
+  async getUserDataExport(userId) {
+    try {
+      const headers = await getHeaders()
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_user_data_export`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ user_id_param: userId })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('DSGVO getUserDataExport error:', error)
+      throw error
+    }
+  },
+
+  // Delete user data (Article 17 - Right to Erasure)
+  async deleteUserData(userId) {
+    try {
+      const headers = await getHeaders()
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/delete_user_data`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ user_id_param: userId })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      return true
+    } catch (error) {
+      console.error('DSGVO deleteUserData error:', error)
+      throw error
+    }
+  },
+
+  // Update user data (Article 16 - Right to Rectification)
+  async updateUserData(userId, newEmail = null, newFullName = null) {
+    try {
+      const headers = await getHeaders()
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/update_user_data`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ 
+          user_id_param: userId,
+          new_email: newEmail,
+          new_full_name: newFullName
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      return true
+    } catch (error) {
+      console.error('DSGVO updateUserData error:', error)
+      throw error
+    }
+  },
+
+  // Record consent
+  async recordConsent(userId, consentType, granted, consentText, expiresAt = null) {
+    try {
+      const headers = await getHeaders()
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/record_consent`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          user_id_param: userId,
+          consent_type_param: consentType,
+          granted_param: granted,
+          consent_text_param: consentText,
+          expires_at_param: expiresAt
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('DSGVO recordConsent error:', error)
+      throw error
+    }
+  },
+
+  // Withdraw consent
+  async withdrawConsent(consentId) {
+    try {
+      const headers = await getHeaders()
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/withdraw_consent`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ consent_id_param: consentId })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      return true
+    } catch (error) {
+      console.error('DSGVO withdrawConsent error:', error)
+      throw error
+    }
+  }
+}
+
+// Security API
+export const securityAPI = {
+  // Validate email
+  async validateEmail(email) {
+    try {
+      const headers = await getHeaders()
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/validate_email`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ email_input: email })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('Security validateEmail error:', error)
+      // Fallback to client-side validation
+      return validateEmail(email)
+    }
+  },
+
+  // Validate phone
+  async validatePhone(phone) {
+    try {
+      const headers = await getHeaders()
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/validate_phone`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ phone_input: phone })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('Security validatePhone error:', error)
+      // Fallback to client-side validation
+      return validatePhone(phone)
+    }
+  },
+
+  // Sanitize text
+  async sanitizeText(text) {
+    try {
+      const headers = await getHeaders()
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/sanitize_text`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ input_text: text })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('Security sanitizeText error:', error)
+      // Fallback to client-side sanitization
+      return sanitizeText(text)
+    }
+  },
+
+  // Check rate limit
+  async checkRateLimit(identifier, endpoint, maxRequests = 100, windowMinutes = 60) {
+    try {
+      const headers = await getHeaders()
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/check_rate_limit`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          identifier_param: identifier,
+          endpoint_param: endpoint,
+          max_requests: maxRequests,
+          window_minutes: windowMinutes
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('Security checkRateLimit error:', error)
+      return true // Allow request if rate limiting fails
+    }
+  },
+
+  // Log suspicious activity
+  async logSuspiciousActivity(activityType, description, severity = 'low', userId = null, ipAddress = null) {
+    try {
+      const headers = await getHeaders()
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/log_suspicious_activity`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          activity_type: activityType,
+          description: description,
+          severity: severity,
+          user_id_param: userId,
+          ip_address_param: ipAddress
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('Security logSuspiciousActivity error:', error)
+      return null
+    }
+  }
+}
+
 // Default export for backward compatibility
 const httpAPI = {
   events: eventsAPI,
   eventRequests: eventRequestsAPI,
   profiles: profilesAPI,
   storage: storageAPI,
-  blockedDates: blockedDatesAPI
+  blockedDates: blockedDatesAPI,
+  dsgvo: dsgvoAPI,
+  security: securityAPI
 }
 
 export default httpAPI

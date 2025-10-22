@@ -1,16 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { eventRequestsAPI } from '../services/httpApi'
-import { Calendar, Clock, CheckCircle, XCircle, AlertCircle, User, Mail } from 'lucide-react'
-import moment from 'moment'
+import { User, Mail } from 'lucide-react'
 import eventBus from '../utils/eventBus'
 import MyEventRequests from '../components/Profile/MyEventRequests'
+import DSGVOCompliance from '../components/Profile/DSGVOCompliance'
 
 const ProfilePage = () => {
   const { user, profile } = useAuth()
-  const [eventRequests, setEventRequests] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [isLoadingRequests, setIsLoadingRequests] = useState(false)
 
   const loadEventRequests = useCallback(async () => {
@@ -21,15 +19,10 @@ const ProfilePage = () => {
     try {
       const data = await eventRequestsAPI.getByUser(user?.id)
       if (data) {
-        setEventRequests(data || [])
-        setError('')
-      } else {
-        setEventRequests([])
-        setError('Keine Event-Anfragen gefunden')
+        setLoading(false)
       }
     } catch (err) {
-      setEventRequests([])
-      setError(`Ein unerwarteter Fehler ist aufgetreten: ${err.message}`)
+      console.error('Error loading event requests:', err)
     } finally {
       setLoading(false)
       setIsLoadingRequests(false)
@@ -64,44 +57,6 @@ const ProfilePage = () => {
 
   // loadEventRequests is memoized above
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'approved':
-        return <CheckCircle className="h-5 w-5 text-green-500" />
-      case 'rejected':
-        return <XCircle className="h-5 w-5 text-red-500" />
-      case 'pending':
-        return <AlertCircle className="h-5 w-5 text-yellow-500" />
-      default:
-        return <AlertCircle className="h-5 w-5 text-gray-500" />
-    }
-  }
-
-  const getStatusText = (status) => {
-    switch (status) {
-      case 'approved':
-        return 'Genehmigt'
-      case 'rejected':
-        return 'Abgelehnt'
-      case 'pending':
-        return 'Ausstehend'
-      default:
-        return 'Unbekannt'
-    }
-  }
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'approved':
-        return { backgroundColor: '#d1fae5', color: '#065f46' }
-      case 'rejected':
-        return { backgroundColor: '#fee2e2', color: '#991b1b' }
-      case 'pending':
-        return { backgroundColor: '#fef3c7', color: '#92400e' }
-      default:
-        return { backgroundColor: '#f3f4f6', color: '#374151' }
-    }
-  }
 
   return (
     <div className="min-h-screen bg-[#F4F1E8] dark:bg-[#252422]">
@@ -156,6 +111,11 @@ const ProfilePage = () => {
 
           <div className="p-8">
             <MyEventRequests />
+          </div>
+
+          {/* DSGVO Compliance Section */}
+          <div className="p-8 border-t border-gray-200 dark:border-gray-700">
+            <DSGVOCompliance userId={user?.id} userEmail={user?.email} />
           </div>
         </div>
       </div>

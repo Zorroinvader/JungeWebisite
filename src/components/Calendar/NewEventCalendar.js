@@ -27,18 +27,36 @@ const NewEventCalendar = ({
   const [showEventRequestForm, setShowEventRequestForm] = useState(false)
   const [selectedDate, setSelectedDate] = useState(null)
 
-  // Load all events and requests
+  // Load all events and requests - Optimized for calendar view
   const loadAllEvents = useCallback(async () => {
     try {
       setLoading(true)
       
-      // Load approved events
-      const allEvents = await httpAPI.events.getAll()
+      // Use currentDate or fallback to today's date
+      const dateToUse = currentDate || new Date()
       
-      // Load pending requests (admin only)
+      // Calculate date range for current month view (current month ± 1 month)
+      const startOfMonth = new Date(dateToUse.getFullYear(), dateToUse.getMonth() - 1, 1)
+      const endOfMonth = new Date(dateToUse.getFullYear(), dateToUse.getMonth() + 2, 0)
+      
+      // Load approved events for current month range only
+      let allEvents = []
+      try {
+        allEvents = await httpAPI.events.getCalendarEvents(startOfMonth, endOfMonth)
+      } catch (dateError) {
+        console.warn('Date range optimization failed, falling back to all events:', dateError)
+        allEvents = await httpAPI.events.getAll()
+      }
+      
+      // Load pending requests (admin only) for current month range only
       let pendingRequests = []
       if (isAdmin()) {
-        pendingRequests = await httpAPI.eventRequests.getAll()
+        try {
+          pendingRequests = await httpAPI.eventRequests.getCalendarRequests(startOfMonth, endOfMonth)
+        } catch (dateError) {
+          console.warn('Date range optimization failed for requests, falling back to all requests:', dateError)
+          pendingRequests = await httpAPI.eventRequests.getAll()
+        }
       }
       
       // Load temporarily blocked dates
@@ -757,7 +775,7 @@ const NewEventCalendar = ({
           onSuccess={() => {
             setShowEventRequestForm(false)
             setSelectedDate(null)
-            loadAllEvents()
+            // Auto-refresh will handle updating the calendar
           }}
         />
       )}

@@ -25,11 +25,18 @@ const EventRequestTrackingPage = () => {
     setSearched(true);
 
     try {
+      console.log('Searching for requests with email:', email);
       const data = await eventRequestsAPI.getByEmail(email);
+      console.log('Search results:', data);
       setRequests(data || []);
     } catch (err) {
       console.error('Error fetching requests:', err);
-      setError('Fehler beim Laden der Anfragen');
+      console.error('Error details:', {
+        message: err.message,
+        stack: err.stack,
+        name: err.name
+      });
+      setError('Fehler beim Laden der Anfragen: ' + err.message);
     } finally {
       setLoading(false);
     }

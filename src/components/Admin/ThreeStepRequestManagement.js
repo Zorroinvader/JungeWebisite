@@ -3,6 +3,7 @@ import { eventRequestsAPI } from '../../services/httpApi';
 import { CheckCircle, XCircle, Clock, Download, X } from 'lucide-react';
 import { useDarkMode } from '../../contexts/DarkModeContext';
 import { sendUserNotification } from '../../utils/settingsHelper';
+import { supabase } from '../../lib/supabase';
 
 const ThreeStepRequestManagement = () => {
   const { isDarkMode } = useDarkMode();
@@ -11,24 +12,43 @@ const ThreeStepRequestManagement = () => {
   const [error, setError] = useState('');
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [hasMoreRequests, setHasMoreRequests] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const loadRequests = async () => {
     try {
       setLoading(true);
       setError('');
       
-      const data = await eventRequestsAPI.getAll();
+      console.log('Loading event requests...');
+      const session = await supabase.auth.getSession();
+      console.log('Current user session:', session);
+      console.log('Current user ID:', session.data.session?.user?.id);
+      console.log('Current user email:', session.data.session?.user?.email);
       
-      // Filter for requests that use the 3-step workflow (have request_stage field)
-      const threeStepRequests = data.filter(r => r.request_stage);
+      // Load only the most recent 50 requests for faster loading
+      const data = await eventRequestsAPI.getAdminPanelData(50, 0);
+      console.log('Raw API data:', data);
+      
+      // Show all requests, but prioritize 3-step workflow ones
+      const allRequests = data || [];
+      console.log('All requests:', allRequests);
       
       // Sort by created_at, newest first
-      threeStepRequests.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      allRequests.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       
-      setRequests(threeStepRequests || []);
+      setRequests(allRequests);
+      setHasMoreRequests(allRequests.length === 50); // If we got exactly 50, there might be more
+      setLastUpdated(new Date());
     } catch (err) {
       console.error('Error loading requests:', err);
-      setError('Fehler beim Laden der Anfragen');
+      console.error('Error details:', {
+        message: err.message,
+        stack: err.stack,
+        name: err.name
+      });
+      setError(`Fehler beim Laden der Anfragen: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -36,6 +56,13 @@ const ThreeStepRequestManagement = () => {
 
   useEffect(() => {
     loadRequests();
+    
+    // Auto-refresh every 60 seconds to catch updates (less frequent for better performance)
+    const interval = setInterval(() => {
+      loadRequests();
+    }, 60000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   // Helper functions - Using your color palette
@@ -88,6 +115,17 @@ const ThreeStepRequestManagement = () => {
     return 'Nicht verfügbar';
   };
 
+  // Check if request was recently updated (within last 5 minutes)
+  const isRecentlyUpdated = (request) => {
+    if (!request.details_submitted_at && !request.initial_accepted_at && !request.final_accepted_at) {
+      return false;
+    }
+    
+    const updateTime = request.details_submitted_at || request.initial_accepted_at || request.final_accepted_at;
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    return new Date(updateTime) > fiveMinutesAgo;
+  };
+
   const getStageIcon = (stage) => {
     switch (stage) {
       case 'initial':
@@ -113,7 +151,7 @@ const ThreeStepRequestManagement = () => {
           setSelectedRequest(request);
           setShowDetailModal(true);
         }}
-        className={`${getStageColor(request.request_stage)} bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-lg p-4 cursor-pointer hover:shadow-lg transition-all duration-200 border border-gray-200 ${isDarkMode ? 'dark:border-gray-700' : ''}`}
+        className={`${getStageColor(request.request_stage)} bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-lg p-4 cursor-pointer hover:shadow-lg transition-all duration-200 border border-gray-200 ${isDarkMode ? 'dark:border-gray-700' : ''} ${isRecentlyUpdated(request) ? 'ring-2 ring-blue-400 ring-opacity-50' : ''}`}
       >
         <div className="flex justify-between items-start">
           <div className="flex-1">
@@ -122,6 +160,11 @@ const ThreeStepRequestManagement = () => {
             </h3>
             <p className={`text-xs text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mb-3`}>
               {getStageLabel(request.request_stage)}
+              {isRecentlyUpdated(request) && (
+                <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                  🔄 Neu aktualisiert
+                </span>
+              )}
             </p>
             <div className={`text-xs space-y-1 text-gray-600 ${isDarkMode ? 'dark:text-gray-400' : ''}`}>
               <p>{request.requester_name}</p>
@@ -145,7 +188,9 @@ const ThreeStepRequestManagement = () => {
     const handleLocalAcceptInitial = async () => {
       setLocalLoading(true);
       try {
+        console.log('Accepting request:', request.id, 'with notes:', localNotes);
         await eventRequestsAPI.acceptInitialRequest(request.id, localNotes);
+        console.log('Request accepted successfully');
         
         // Send email to user informing them to fill detailed form
         try {
@@ -563,13 +608,41 @@ const ThreeStepRequestManagement = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h2 className={`text-2xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
-          Anfragen
-        </h2>
-        <p className={`text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mt-1`}>
-          {requests.length} Anfrage{requests.length !== 1 ? 'n' : ''} • Klicken für Details
-        </p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className={`text-2xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
+            Anfragen
+          </h2>
+          <p className={`text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mt-1`}>
+            {requests.length} Anfrage{requests.length !== 1 ? 'n' : ''} • Klicken für Details
+            {lastUpdated && (
+              <span className="ml-2 text-sm">
+                • Letzte Aktualisierung: {lastUpdated.toLocaleTimeString()}
+              </span>
+            )}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={loadRequests}
+            disabled={loading}
+            className="px-4 py-2 bg-[#A58C81] text-white rounded-lg hover:bg-[#8B6F5F] disabled:opacity-50 transition-colors flex items-center gap-2"
+          >
+            {loading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Lädt...
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Aktualisieren
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Error Message */}
