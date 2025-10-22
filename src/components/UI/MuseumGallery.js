@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { X, ChevronLeft, ChevronRight, ZoomIn, Download, Eye, Info, MapPin, Users, Calendar } from 'lucide-react'
 
-const MuseumGallery = ({ images = [], title = "Unser Clubhaus - Eine visuelle Entdeckungsreise" }) => {
+const MuseumGallery = ({ images = [], title = "Unser Clubhaus - Eine visuelle Entdeckungsreise", showFullGalleryButton = false }) => {
   const [selectedImage, setSelectedImage] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -299,6 +299,26 @@ const MuseumGallery = ({ images = [], title = "Unser Clubhaus - Eine visuelle En
           </div>
         ))}
       </div>
+
+      {/* View Full Gallery Button */}
+      {showFullGalleryButton && (
+        <div className="text-center mb-16">
+          <button
+            onClick={() => {
+              // Open the first image in full gallery mode
+              openModal(filteredImages[0], 0)
+            }}
+            className="group inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-[#A58C81] to-[#8B6F5F] hover:from-[#8B6F5F] hover:to-[#A58C81] text-white font-bold text-lg rounded-2xl shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
+          >
+            <Eye className="h-6 w-6 mr-3 group-hover:scale-110 transition-transform duration-300" />
+            Vollständige Galerie anzeigen
+            <ChevronRight className="h-6 w-6 ml-3 group-hover:translate-x-1 transition-transform duration-300" />
+          </button>
+          <p className="text-gray-600 dark:text-gray-400 text-sm mt-4">
+            Klicken Sie hier, um alle Bilder in voller Größe zu betrachten
+          </p>
+        </div>
+      )}
 
       {/* Museum Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">

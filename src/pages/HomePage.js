@@ -69,10 +69,10 @@ const HomePage = () => {
   return (
     <div className="min-h-screen">
 
-      {/* Hero Section - Modern & Compact */}
+      {/* Hero Section - Consistent Design */}
       <div className="w-full bg-[#F4F1E8] dark:bg-[#252422]">
-        <div className="w-full px-[4vw] sm:px-[5vw] md:px-[6vw] lg:px-[8vw] xl:px-[10vw] py-[4vh] sm:py-[5vh] md:py-[6vh]">
-          <div className="max-w-6xl mx-auto">
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-16">
+          <div className="max-w-7xl mx-auto">
             {/* Modern Hero Layout */}
             <div className="flex flex-col lg:flex-row items-start lg:items-start gap-[3vw] lg:gap-[4vw]">
               {/* Left: Logo + Title - Fixed width to prevent shifting */}
