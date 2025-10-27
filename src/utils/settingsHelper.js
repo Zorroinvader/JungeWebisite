@@ -31,7 +31,15 @@ export const getAdminSettings = () => {
  */
 export const getAdminNotificationEmails = () => {
   const settings = getAdminSettings()
-  return settings.adminEmails || []
+  const emails = settings.adminEmails || []
+  
+  // If no emails configured, use admin@admin.com as default
+  if (emails.length === 0) {
+    console.warn('No admin emails configured, using default: admin@admin.com')
+    return ['admin@admin.com']
+  }
+  
+  return emails
 }
 
 /**

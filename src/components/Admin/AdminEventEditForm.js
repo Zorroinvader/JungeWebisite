@@ -30,16 +30,25 @@ const AdminEventEditForm = ({ isOpen, onClose, onSuccess, event, onSaveAsTemplat
   useEffect(() => {
     const loadEventData = async () => {
       if (event && isOpen) {
-        const startDate = new Date(event.start_date);
-        const endDate = new Date(event.end_date);
+        // Validate and safely parse dates
+        const startDate = event.start_date ? new Date(event.start_date) : new Date();
+        const endDate = event.end_date ? new Date(event.end_date) : new Date();
+        
+        // Check if dates are valid
+        const isValidStartDate = !isNaN(startDate.getTime());
+        const isValidEndDate = !isNaN(endDate.getTime());
+        
+        // Use current date/time as fallback for invalid dates
+        const safeStartDate = isValidStartDate ? startDate : new Date();
+        const safeEndDate = isValidEndDate ? endDate : new Date();
 
         setFormData({
           title: event.title || '',
           description: event.description || '',
-          event_start_date: startDate.toISOString().split('T')[0],
-          event_start_time: startDate.toTimeString().substring(0, 5),
-          event_end_date: endDate.toISOString().split('T')[0],
-          event_end_time: endDate.toTimeString().substring(0, 5),
+          event_start_date: safeStartDate.toISOString().split('T')[0],
+          event_start_time: safeStartDate.toTimeString().substring(0, 5),
+          event_end_date: safeEndDate.toISOString().split('T')[0],
+          event_end_time: safeEndDate.toTimeString().substring(0, 5),
           is_private: event.is_private || false,
           location: event.location || '',
           event_type: event.event_type || 'Privates Event'

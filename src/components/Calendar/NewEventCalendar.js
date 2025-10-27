@@ -87,20 +87,8 @@ const NewEventCalendar = ({
           // Check if event has time information
           const hasTimeInfo = event.start_date && event.start_date.includes('T')
           
-          // Format time display for title
-          const formatTime = (date) => {
-            if (!hasTimeInfo) return ''
-            return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
-          }
-          
-          const startTime = formatTime(startDate)
-          const endTime = formatTime(endDate)
-          const timeDisplay = hasTimeInfo ? `${startTime}${endTime && startTime !== endTime ? `-${endTime}` : ''}` : ''
-          
-          // Update title with time if available and not blocked
-          if (timeDisplay && !isBlocked) {
-            eventTitle = `${timeDisplay} ${eventTitle}`
-          }
+          // Time is NOT shown in calendar title - only in event details modal
+          // Keep event title clean without time display
 
           if (!isNaN(startDate.getTime())) {
             calendarEvents.push({
