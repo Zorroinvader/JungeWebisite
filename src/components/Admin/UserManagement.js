@@ -521,6 +521,7 @@ const RoleChangeModal = ({ user, onClose, onUpdateRole }) => {
 // SuperAdmin User Creation Form Component
 const SuperAdminUserForm = ({ onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
+    username: '',
     fullName: '',
     email: '',
     password: '',
@@ -556,6 +557,9 @@ const SuperAdminUserForm = ({ onClose, onSuccess }) => {
 
     try {
       // Validate form
+      if (!formData.username.trim()) {
+        throw new Error('Bitte geben Sie einen Benutzernamen ein')
+      }
       if (!formData.fullName.trim()) {
         throw new Error('Bitte geben Sie einen Namen ein')
       }
@@ -585,6 +589,7 @@ const SuperAdminUserForm = ({ onClose, onSuccess }) => {
         password: formData.password,
         options: {
           data: {
+            username: formData.username,
             full_name: formData.fullName,
             role: formData.role // Pass role in metadata
           }
@@ -609,7 +614,8 @@ const SuperAdminUserForm = ({ onClose, onSuccess }) => {
           user_id: user.id,
           user_email: formData.email,
           user_full_name: formData.fullName,
-          user_role: formData.role
+          user_role: formData.role,
+          user_username: formData.username
         })
         
         if (error) {
@@ -636,7 +642,8 @@ const SuperAdminUserForm = ({ onClose, onSuccess }) => {
             user_id: user.id,
             user_email: formData.email,
             user_full_name: formData.fullName,
-            user_role: formData.role
+            user_role: formData.role,
+            username: formData.username
           })
           console.log('✅ Profile created via fallback')
         } catch (profileError) {
@@ -714,7 +721,7 @@ const SuperAdminUserForm = ({ onClose, onSuccess }) => {
                     ✅ Benutzer erfolgreich erstellt!
                   </h3>
                   <p className="text-sm text-green-700 dark:text-green-300 mt-1">
-                    <strong>{formData.email}</strong> wurde als <strong>{roles.find(r => r.value === formData.role)?.label}</strong> erstellt.
+                    <strong>{formData.username}</strong> wurde als <strong>{roles.find(r => r.value === formData.role)?.label}</strong> erstellt.
                   </p>
                   <div className="mt-3 space-y-1">
                     <div className="flex items-center text-xs text-green-600 dark:text-green-400">
@@ -740,6 +747,22 @@ const SuperAdminUserForm = ({ onClose, onSuccess }) => {
             </div>
           )}
 
+          {/* Username */}
+          <div>
+            <label className="block text-sm font-medium text-[#252422] dark:text-[#F4F1E8] mb-1">
+              Benutzername *
+            </label>
+            <input
+              type="text"
+              name="username"
+              value={formData.username}
+              onChange={handleChange}
+              required
+              className="w-full px-3 py-2 border border-gray-300 dark:border-[#EBE9E9]/20 rounded-lg bg-white dark:bg-[#2a2a2a] text-[#252422] dark:text-[#F4F1E8] focus:outline-none focus:ring-2 focus:ring-[#6054d9]"
+              placeholder="z.B. max.mustermann"
+            />
+          </div>
+
           {/* Full Name */}
           <div>
             <label className="block text-sm font-medium text-[#252422] dark:text-[#F4F1E8] mb-1">
@@ -752,13 +775,14 @@ const SuperAdminUserForm = ({ onClose, onSuccess }) => {
               onChange={handleChange}
               required
               className="w-full px-3 py-2 border border-gray-300 dark:border-[#EBE9E9]/20 rounded-lg bg-white dark:bg-[#2a2a2a] text-[#252422] dark:text-[#F4F1E8] focus:outline-none focus:ring-2 focus:ring-[#6054d9]"
+              placeholder="z.B. Max Mustermann"
             />
           </div>
 
           {/* Email */}
           <div>
             <label className="block text-sm font-medium text-[#252422] dark:text-[#F4F1E8] mb-1">
-              E-Mail *
+              E-Mail (nur für Kontakt) *
             </label>
             <input
               type="email"
@@ -767,6 +791,7 @@ const SuperAdminUserForm = ({ onClose, onSuccess }) => {
               onChange={handleChange}
               required
               className="w-full px-3 py-2 border border-gray-300 dark:border-[#EBE9E9]/20 rounded-lg bg-white dark:bg-[#2a2a2a] text-[#252422] dark:text-[#F4F1E8] focus:outline-none focus:ring-2 focus:ring-[#6054d9]"
+              placeholder="max@mustermann.de"
             />
           </div>
 

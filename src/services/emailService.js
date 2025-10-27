@@ -1,140 +1,194 @@
 /**
- * Email Service
- * 
- * This service handles sending notification emails to admins.
- * Currently supports EmailJS for quick setup without backend.
- * 
- * To activate email sending:
- * 1. Sign up at https://www.emailjs.com/
- * 2. Get your Service ID, Template ID, and Public Key
- * 3. Add them to .env.local file (see EMAIL_SETUP_GUIDE.md)
- * 4. Uncomment the EmailJS implementation below
- * 5. Run: npm install @emailjs/browser
+ * Email Service using Supabase Edge Function with Resend
+ * This service sends emails to both users and admins for event notifications
  */
 
-// Uncomment these lines after installing @emailjs/browser
-// import emailjs from '@emailjs/browser';
-
 /**
- * Initialize EmailJS (call this once when app starts)
- */
-export const initializeEmailService = () => {
-  // Uncomment after adding environment variables
-  /*
-  const publicKey = process.env.REACT_APP_EMAILJS_PUBLIC_KEY;
-  
-  if (!publicKey) {
-    console.warn('EmailJS public key not found. Email notifications will not be sent.');
-    return false;
-  }
-  
-  emailjs.init(publicKey);
-  console.log('✅ EmailJS initialized');
-  return true;
-  */
-  
-  console.warn('⚠️ Email service not configured. Please see EMAIL_SETUP_GUIDE.md');
-  return false;
-}
-
-/**
- * Send email using EmailJS
+ * Send email using Supabase Edge Function (Resend API)
  * @param {Array<string>} recipients - Array of email addresses
  * @param {string} subject - Email subject
  * @param {string} messageText - Plain text message
- * @param {string} messageHTML - HTML formatted message
+ * @param {string} htmlContent - HTML formatted message
  * @returns {Promise<boolean>} Success status
  */
-export const sendEmail = async (recipients, subject, messageText, messageHTML = null) => {
-  // Check if EmailJS is configured
-  const serviceId = process.env.REACT_APP_EMAILJS_SERVICE_ID;
-  const templateId = process.env.REACT_APP_EMAILJS_TEMPLATE_ID;
-  
-  if (!serviceId || !templateId) {
-    console.warn('⚠️ EmailJS not configured. Email not sent.');
-    console.log('Recipients:', recipients);
-    console.log('Subject:', subject);
-    console.log('Message:', messageText);
+export const sendEmail = async (recipients, subject, messageText, htmlContent = null) => {
+  if (!recipients || recipients.length === 0) {
+    console.warn('No recipients provided for email');
     return false;
   }
-  
+
+  const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+  const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    console.warn('⚠️ Supabase credentials not found');
+    return false;
+  }
+
   try {
-    // Uncomment this section after installing @emailjs/browser and configuring
-    /*
-    // EmailJS template parameters
-    const templateParams = {
-      to_email: recipients.join(', '), // EmailJS will send to all recipients
-      subject: subject,
-      message_text: messageText,
-      message_html: messageHTML || messageText.replace(/\n/g, '<br>')
-    };
-    
-    // Send email
-    const response = await emailjs.send(
-      serviceId,
-      templateId,
-      templateParams
-    );
-    
-    if (response.status === 200) {
+    const response = await fetch(`${supabaseUrl}/functions/v1/send-admin-notification`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseKey}`,
+      },
+      body: JSON.stringify({
+        adminEmails: recipients,
+        subject,
+        message: messageText,
+        htmlContent: htmlContent || messageText.replace(/\n/g, '<br>'),
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Email service returned an error: ${errorText}`);
+    }
+
+    const result = await response.json();
+
+    if (result.success) {
       console.log('✅ Email sent successfully to:', recipients);
       return true;
     } else {
-      console.error('❌ Email sending failed:', response);
-      return false;
+      throw new Error(result.error || 'Unknown error');
     }
-    */
-    
-    // Temporary: Show alert until email service is configured
-    alert(`📧 EMAIL WÜRDE GESENDET WERDEN\n\n` +
-          `An: ${recipients.join(', ')}\n` +
-          `Betreff: ${subject}\n\n` +
-          `${messageText}\n\n` +
-          `⚠️ Um echte E-Mails zu versenden, folgen Sie der Anleitung in EMAIL_SETUP_GUIDE.md`);
-    
-    return false;
-    
+
   } catch (error) {
-    console.error('❌ Error sending email:', error);
+    console.error('❌ Failed to send email:', error);
     return false;
   }
 }
 
 /**
- * Alternative: Send email using custom backend API
- * Uncomment and modify this if you have your own email API
+ * Send notification email to user (event requester)
+ * @param {string} userEmail - User's email address
+ * @param {Object} eventData - The event request data
+ * @param {string} type - Type of notification ('initial_request', 'accepted', 'rejected', 'approved')
  */
-export const sendEmailViaAPI = async (recipients, subject, messageText, messageHTML = null) => {
-  try {
-    const response = await fetch('/api/send-email', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        to: recipients,
-        subject: subject,
-        text: messageText,
-        html: messageHTML
-      })
-    });
-    
-    if (response.ok) {
-      console.log('✅ Email sent successfully via API');
-      return true;
-    } else {
-      console.error('❌ API email sending failed');
-      return false;
-    }
-  } catch (error) {
-    console.error('❌ Error sending email via API:', error);
-    return false;
+export const sendUserNotification = async (userEmail, eventData, type = 'initial_request') => {
+  if (!userEmail) {
+    console.warn('No user email provided');
+    return;
   }
+
+  let subject = '';
+  let message = '';
+
+  switch (type) {
+    case 'initial_request':
+      subject = 'Ihre Event-Anfrage wurde empfangen';
+      message = `Guten Tag ${eventData.requester_name || ''},\n\n` +
+                `vielen Dank für Ihre Event-Anfrage!\n\n` +
+                `EVENT-DETAILS\n` +
+                `${'-'.repeat(50)}\n` +
+                `Event: ${eventData.title || eventData.event_name}\n` +
+                `Zeitraum: ${eventData.start_date ? new Date(eventData.start_date).toLocaleDateString('de-DE') : ''}\n` +
+                `Kategorie: ${eventData.event_type || 'Nicht angegeben'}\n\n` +
+                `STATUS\n` +
+                `${'-'.repeat(50)}\n` +
+                `Anfrage eingegangen: Ja\n` +
+                `Zeitraum reserviert: Vorläufig\n` +
+                `In Bearbeitung: Ein Administrator prüft Ihre Anfrage\n\n` +
+                `Sie erhalten eine weitere E-Mail, sobald Ihre Anfrage bearbeitet wurde.\n\n` +
+                `Mit freundlichen Grüßen\n` +
+                `Ihr Event-Management-Team`;
+      break;
+
+    case 'accepted':
+      subject = 'Ihre Event-Anfrage wurde akzeptiert';
+      message = `Guten Tag ${eventData.requester_name || ''},\n\n` +
+                `gute Neuigkeiten! Ihre Event-Anfrage wurde akzeptiert.\n\n` +
+                `EVENT-DETAILS\n` +
+                `${'-'.repeat(50)}\n` +
+                `Event: ${eventData.title || eventData.event_name}\n` +
+                `Start: ${eventData.start_datetime ? new Date(eventData.start_datetime).toLocaleString('de-DE') : eventData.start_date}\n` +
+                `Ende: ${eventData.end_datetime ? new Date(eventData.end_datetime).toLocaleString('de-DE') : eventData.end_date}\n\n` +
+                `Ihr Event ist jetzt im Kalender eingetragen.\n\n` +
+                `Mit freundlichen Grüßen\n` +
+                `Ihr Event-Management-Team`;
+      break;
+
+    case 'rejected':
+      subject = 'Ihre Event-Anfrage - Update';
+      message = `Guten Tag ${eventData.requester_name || ''},\n\n` +
+                `leider konnte Ihre Event-Anfrage nicht angenommen werden.\n\n` +
+                `Event: ${eventData.title || eventData.event_name}\n` +
+                `Zeitraum: ${eventData.start_date ? new Date(eventData.start_date).toLocaleDateString('de-DE') : ''}\n\n` +
+                `Für Rückfragen kontaktieren Sie uns bitte.\n\n` +
+                `Mit freundlichen Grüßen\n` +
+                `Ihr Event-Management-Team`;
+      break;
+
+    default:
+      subject = 'Update zu Ihrer Event-Anfrage';
+      message = `Guten Tag,\n\nEs gibt ein Update zu Ihrer Event-Anfrage.\n\nMit freundlichen Grüßen\nIhr Event-Management-Team`;
+  }
+
+  // Generate HTML content
+  const htmlContent = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #333;">${subject}</h2>
+      <div style="white-space: pre-line; line-height: 1.6;">${message.replace(/\n/g, '<br>')}</div>
+    </div>
+  `;
+
+  return await sendEmail([userEmail], subject, message, htmlContent);
+}
+
+/**
+ * Send notification email to admins
+ * @param {Array<string>} adminEmails - Array of admin email addresses
+ * @param {Object} eventData - The event request data
+ * @param {string} type - Type of notification
+ */
+export const sendAdminNotificationEmail = async (adminEmails, eventData, type = 'new_request') => {
+  if (!adminEmails || adminEmails.length === 0) {
+    console.warn('No admin emails configured');
+    return;
+  }
+
+  let subject = '';
+  let message = '';
+
+  switch (type) {
+    case 'new_request':
+      subject = 'Neue Event-Anfrage';
+      message = `Guten Tag,\n\n` +
+                `eine neue Event-Anfrage steht zur Bearbeitung bereit.\n\n` +
+                `EVENT-DETAILS\n` +
+                `${'-'.repeat(50)}\n` +
+                `Event: ${eventData.title || eventData.event_name || 'Unbekannt'}\n` +
+                `Antragsteller: ${eventData.requester_name}\n` +
+                `Kontakt: ${eventData.requester_email}\n` +
+                `Zeitraum: ${eventData.start_date ? new Date(eventData.start_date).toLocaleDateString('de-DE') : 'N/A'}\n` +
+                `Kategorie: ${eventData.event_type || 'N/A'}\n\n` +
+                `Zum Admin-Panel: ${window.location.origin}/admin\n\n` +
+                `Mit freundlichen Grüßen\n` +
+                `Ihr Event-Management-System`;
+      break;
+
+    default:
+      subject = 'Event-Anfrage Update';
+      message = `Event: ${eventData.title || eventData.event_name}\n` +
+                `Von: ${eventData.requester_name}\n\n` +
+                `Weitere Details im Admin-Panel.`;
+  }
+
+  // Generate HTML content
+  const htmlContent = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #d32f2f;">${subject}</h2>
+      <div style="white-space: pre-line; line-height: 1.6;">${message.replace(/\n/g, '<br>')}</div>
+    </div>
+  `;
+
+  return await sendEmail(adminEmails, subject, message, htmlContent);
 }
 
 /**
  * Test email functionality
- * Use this to verify your email setup is working
+ * @param {string} testEmail - Email address to send test to
  */
 export const sendTestEmail = async (testEmail) => {
   const subject = 'Test-E-Mail vom Event-Management-System';
@@ -144,6 +198,13 @@ export const sendTestEmail = async (testEmail) => {
                   `Mit freundlichen Grüßen\n` +
                   `Ihr Event-Management-System`;
   
-  return await sendEmail([testEmail], subject, message);
+  const htmlContent = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #333;">${subject}</h2>
+      <div style="white-space: pre-line; line-height: 1.6;">${message.replace(/\n/g, '<br>')}</div>
+    </div>
+  `;
+  
+  return await sendEmail([testEmail], subject, message, htmlContent);
 }
 

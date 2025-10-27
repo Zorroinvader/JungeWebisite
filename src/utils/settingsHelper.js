@@ -194,7 +194,7 @@ export const sendUserNotification = async (userEmail, eventData, type) => {
         'Authorization': `Bearer ${supabaseKey}`,
       },
       body: JSON.stringify({
-        adminEmails: [userEmail],
+        recipients: [userEmail],
         subject,
         message,
         htmlContent,
@@ -339,7 +339,7 @@ export const sendAdminNotification = async (eventData, type = 'initial_request')
         'Authorization': `Bearer ${supabaseKey}`,
       },
       body: JSON.stringify({
-        adminEmails,
+        recipients: adminEmails,
         subject,
         message,
         htmlContent,

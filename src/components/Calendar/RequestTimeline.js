@@ -62,51 +62,66 @@ const RequestTimeline = ({ request }) => {
   }
 
   return (
-    <div className="py-2">
-      {/* Ultra Minimal Timeline: 1----2----3----4 */}
-      <div className="flex items-center justify-between px-4">
+    <div className="py-4">
+      {/* Enhanced Timeline with Labels */}
+      <div className="space-y-3">
         {stages.map((stage, index) => {
           const status = getStageStatus(stage.id);
           const isLast = index === stages.length - 1;
-          const nextStatus = !isLast ? getStageStatus(stages[index + 1].id) : null;
           
           return (
-            <React.Fragment key={stage.id}>
-              {/* Number */}
-              <div className={`
-                w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold
-                ${status === 'completed' ? `bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#A58C81]' : ''} text-white` : ''}
-                ${status === 'current' ? `bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#A58C81]' : ''} text-white` : ''}
-                ${status === 'pending' ? `bg-gray-200 ${isDarkMode ? 'dark:bg-gray-700' : ''} text-gray-400` : ''}
-              `}>
-                {status === 'completed' ? '✓' : stage.number}
+            <div key={stage.id} className="relative flex items-start">
+              {/* Timeline Circle */}
+              <div className="flex flex-col items-center mr-3">
+                <div className={`
+                  w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold z-10
+                  ${status === 'completed' ? `bg-green-500 ${isDarkMode ? 'dark:bg-green-500' : ''} text-white` : ''}
+                  ${status === 'current' ? `bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#A58C81]' : ''} text-white animate-pulse` : ''}
+                  ${status === 'pending' ? `bg-gray-300 ${isDarkMode ? 'dark:bg-gray-600' : ''} text-gray-500` : ''}
+                  transition-all duration-300
+                `}>
+                  {status === 'completed' ? '✓' : stage.number}
+                </div>
+                
+                {/* Vertical Line */}
+                {!isLast && (
+                  <div className={`
+                    w-0.5 flex-1 mt-2
+                    ${status === 'completed' ? `bg-green-500 ${isDarkMode ? 'dark:bg-green-500' : ''}` : `bg-gray-300 ${isDarkMode ? 'dark:bg-gray-600' : ''}`}
+                  `} style={{ minHeight: '2rem' }} />
+                )}
               </div>
               
-              {/* Line: ---- */}
-              {!isLast && (
-                <div className={`
-                  flex-1 h-px mx-1
-                  ${status === 'completed' ? `bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#A58C81]' : ''}` : `bg-gray-200 ${isDarkMode ? 'dark:bg-gray-700' : ''}`}
-                `} />
-              )}
-            </React.Fragment>
+              {/* Stage Info */}
+              <div className="flex-1 pt-1">
+                <p className={`text-sm font-semibold ${
+                  status === 'completed' ? `text-green-700 ${isDarkMode ? 'dark:text-green-300' : ''}` : 
+                  status === 'current' ? `text-[#A58C81] ${isDarkMode ? 'dark:text-[#A58C81]' : ''}` : 
+                  `text-gray-400 ${isDarkMode ? 'dark:text-gray-500' : ''}`
+                }`}>
+                  {stage.name}
+                </p>
+                {status === 'current' && (
+                  <p className={`text-xs text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mt-1`}>
+                    {request.request_stage === 'initial' && 'Wird gerade geprüft...'}
+                    {request.request_stage === 'initial_accepted' && 'Bitte Details ausfüllen →'}
+                    {request.request_stage === 'details_submitted' && 'Wird final geprüft...'}
+                    {request.request_stage === 'final_accepted' && 'Freigegeben ✓'}
+                  </p>
+                )}
+              </div>
+            </div>
           );
         })}
       </div>
 
-      {/* Simple Status Text */}
-      <p className={`text-xs text-center mt-2 text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>
-        {request.request_stage === 'initial' && 'Wird geprüft...'}
-        {request.request_stage === 'initial_accepted' && 'Akzeptiert - Details ausfüllen'}
-        {request.request_stage === 'details_submitted' && 'Wird final geprüft...'}
-        {request.request_stage === 'final_accepted' && 'Freigegeben ✓'}
-      </p>
-
       {/* Admin Notes (if any) */}
       {request.admin_notes && (
-        <p className={`text-xs text-center mt-2 text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} italic`}>
-          "{request.admin_notes}"
-        </p>
+        <div className={`mt-4 p-3 rounded-lg bg-blue-50 ${isDarkMode ? 'dark:bg-blue-900/20' : ''} border border-blue-200 ${isDarkMode ? 'dark:border-blue-800' : ''}`}>
+          <p className={`text-xs text-blue-800 ${isDarkMode ? 'dark:text-blue-300' : ''} italic`}>
+            <strong>Hinweis:</strong> {request.admin_notes}
+          </p>
+        </div>
       )}
     </div>
   );

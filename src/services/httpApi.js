@@ -2,6 +2,8 @@
 // Uses direct HTTP calls to Supabase REST API with security hardening
 
 import { supabase } from '../lib/supabase'
+import { sendUserNotification, sendAdminNotification } from '../utils/settingsHelper'
+import { getAdminNotificationEmails } from '../utils/settingsHelper'
 
 const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL
 const SUPABASE_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY
@@ -518,6 +520,18 @@ export const eventRequestsAPI = {
       // Log successful creation
       await securityAPI.logSuspiciousActivity('event_request_created', `Event request created for ${data.requester_email}`, 'low', null, null)
       
+      // Send emails
+      try {
+        const requestData = Array.isArray(result) ? result[0] : result
+        // Send confirmation email to user
+        await sendUserNotification(data.requester_email, requestData, 'initial_request_received')
+        // Send notification email to admins
+        await sendAdminNotification(requestData, 'initial_request')
+      } catch (emailError) {
+        console.error('Failed to send notification emails:', emailError)
+        // Don't fail the request creation if emails fail
+      }
+      
       return Array.isArray(result) ? result[0] : result
     } catch (error) {
       console.error('HTTP API createInitialRequest error:', error)
@@ -583,6 +597,15 @@ export const eventRequestsAPI = {
         // Don't fail the whole operation if blocker creation fails
       }
 
+      // Send email to user
+      try {
+        await sendUserNotification(request.requester_email, request, 'initial_request_accepted')
+        // Also notify admins that the request was accepted
+        await sendAdminNotification(request, 'detailed_info_submitted')
+      } catch (emailError) {
+        console.error('Failed to send acceptance email:', emailError)
+      }
+
       return { success: true }
     } catch (error) {
       console.error('HTTP API acceptInitialRequest error:', error)
@@ -594,6 +617,20 @@ export const eventRequestsAPI = {
   async rejectRequest(id, rejectionReason = '') {
     try {
       const headers = await getHeaders()
+      
+      // Get request details first
+      const getRequestResponse = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}&select=*`, {
+        method: 'GET',
+        headers
+      })
+      
+      if (!getRequestResponse.ok) {
+        throw new Error(`Failed to get request details`)
+      }
+      
+      const requests = await getRequestResponse.json()
+      const request = requests[0]
+      
       const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}`, {
         method: 'PATCH',
         headers,
@@ -607,6 +644,18 @@ export const eventRequestsAPI = {
       if (!response.ok) {
         const errorText = await response.text()
         throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      // Send email to user
+      if (request) {
+        try {
+          await sendUserNotification(request.requester_email, {
+            ...request,
+            rejection_reason: rejectionReason
+          }, 'rejected')
+        } catch (emailError) {
+          console.error('Failed to send rejection email:', emailError)
+        }
       }
 
       return { success: true }
@@ -691,6 +740,32 @@ export const eventRequestsAPI = {
         const errorText = await response.text()
         console.error('📝 Error response:', errorText)
         throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      // Send notifications
+      try {
+        // Get the updated request to send notifications
+        const updatedRequestResponse = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}&select=*`, {
+          method: 'GET',
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        if (updatedRequestResponse.ok) {
+          const updatedRequests = await updatedRequestResponse.json()
+          const updatedRequest = updatedRequests[0]
+          
+          if (updatedRequest) {
+            // Notify admins that detailed info was submitted
+            await sendAdminNotification(updatedRequest, 'detailed_info_submitted')
+          }
+        }
+      } catch (emailError) {
+        console.error('Failed to send notifications:', emailError)
+        // Don't fail the request if notifications fail
       }
 
       console.log('✅ Detailed request submitted successfully')
@@ -793,6 +868,17 @@ export const eventRequestsAPI = {
       }
 
       console.log('✅ Event created successfully!');
+      
+      // Send notifications
+      try {
+        // Notify user of final approval
+        await sendUserNotification(request.requester_email, request, 'final_approval')
+        // Notify admins of final acceptance
+        await sendAdminNotification(request, 'final_acceptance')
+      } catch (emailError) {
+        console.error('Failed to send final acceptance notifications:', emailError)
+        // Don't fail if notifications fail
+      }
       
       // Delete the temporary blocker since event is now created
       try {
