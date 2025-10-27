@@ -1,0 +1,47 @@
+# Security headers to prevent source code viewing
+
+# Prevent directory listing
+Options -Indexes
+
+# Prevent access to source map files
+<FilesMatch "\.(map)$">
+  Order allow,deny
+  Deny from all
+</FilesMatch>
+
+# Prevent direct access to JS and CSS files (optional - may break your app)
+# Uncomment if you want to block direct URL access
+# <FilesMatch "\.(js|css)$">
+#   SetEnvIf Referer "^https?://yourdomain\.com" ref_ok
+#   Order Deny,Allow
+#   Deny from all
+#   Allow from env=ref_ok
+# </FilesMatch>
+
+# Security headers
+<IfModule mod_headers.c>
+  # Prevent site from being framed
+  Header always set X-Frame-Options "SAMEORIGIN"
+  
+  # Prevent MIME sniffing
+  Header always set X-Content-Type-Options "nosniff"
+  
+  # Enable XSS protection
+  Header always set X-XSS-Protection "1; mode=block"
+  
+  # Referrer Policy
+  Header always set Referrer-Policy "no-referrer-when-downgrade"
+  
+  # Content Security Policy
+  Header always set Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval' https:; img-src 'self' data: https:; font-src 'self' data:; style-src 'self' 'unsafe-inline';"
+</IfModule>
+
+# Disable ETags (prevents caching attacks)
+<IfModule mod_headers.c>
+  Header unset ETag
+</IfModule>
+FileETag None
+
+# Remove server signature
+ServerSignature Off
+
