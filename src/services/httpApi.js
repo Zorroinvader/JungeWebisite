@@ -1,23 +1,193 @@
-  // HTTP-based API service that bypasses the problematic Supabase client
-  // Uses direct HTTP calls to Supabase REST API with security hardening
+// HTTP-based API service that bypasses the problematic Supabase client
+// Uses direct HTTP calls to Supabase REST API with security hardening
 
-  import { supabase } from '../lib/supabase'
-  import { sendUserNotification, sendAdminNotification } from '../utils/settingsHelper'
-  import { getAdminNotificationEmails } from '../utils/settingsHelper'
+import { supabase } from '../lib/supabase'
+import { sendUserNotification, sendAdminNotification } from '../utils/settingsHelper'
+import { getAdminNotificationEmails } from '../utils/settingsHelper'
 
-  const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL
-  const SUPABASE_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY
+const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL
+const SUPABASE_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY
 
-  // Security validation functions
-  const validateEmail = (email) => {
-    const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
-    return emailRegex.test(email) && email.length <= 254
+// Security validation functions
+const validateEmail = (email) => {
+  const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
+  return emailRegex.test(email) && email.length <= 254
+}
+
+const validatePhone = (phone) => {
+  const phoneRegex = /^(\+49|0)[1-9]\d{1,14}$/
+  return phoneRegex.test(phone) && phone.length <= 20
+}
+
+const sanitizeText = (text) => {
+  if (!text) return text
+  return text
+    .replace(/[<>'"]/g, '')
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const detectSQLInjection = (text) => {
+  if (!text) return false
+  const dangerousPatterns = [
+    /union|select|insert|update|delete|drop|create|alter|exec|execute/i,
+    /[';]/,
+    /--/,
+    /\/\*.*\*\//
+  ]
+  return dangerousPatterns.some(pattern => pattern.test(text))
+}
+
+// eslint-disable-next-line no-unused-vars
+const validateFileUpload = (fileName, fileSize, fileType, maxSize = 10485760) => {
+  const allowedExtensions = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'gif']
+  const fileExtension = fileName.split('.').pop()?.toLowerCase()
+  
+  return fileSize <= maxSize && allowedExtensions.includes(fileExtension)
+}
+
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  throw new Error('Missing Supabase environment variables. Please check your .env file.')
+}
+
+const getHeaders = async (userEmail = null) => {
+  // Get the current session from Supabase
+  const { data: { session } } = await supabase.auth.getSession()
+  const userToken = session?.access_token || SUPABASE_KEY
+  
+  console.log('🔍 getHeaders: Session:', session?.user?.email || 'No session')
+  console.log('🔍 getHeaders: Using token:', userToken ? 'Yes' : 'No')
+  
+  const headers = {
+    'apikey': SUPABASE_KEY,
+    'Authorization': `Bearer ${userToken}`,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=minimal',
+    'X-User-Email': userEmail || '',
+    'X-Session-ID': sessionStorage.getItem('sessionId') || ''
   }
+  
+  console.log('🔍 getHeaders: Headers created:', headers)
+  return headers
+}
 
-  const validatePhone = (phone) => {
-    const phoneRegex = /^(\+49|0)[1-9]\d{1,14}$/
-    return phoneRegex.test(phone) && phone.length <= 20
-  }
+// Events API
+export const eventsAPI = {
+  // New simple API call that bypasses complex authentication
+  async getAll() {
+    try {
+      console.log('🔍 Events API: Starting simple getAll()...')
+      
+      // Use simple headers without complex authentication
+      const simpleHeaders = {
+        'apikey': SUPABASE_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      }
+      
+      console.log('🔍 Events API: Using simple headers:', simpleHeaders)
+      console.log('🔍 Events API: Making request to:', `${SUPABASE_URL}/rest/v1/events?select=id,title,description,start_date,end_date,created_by,is_private,status&order=start_date.asc`)
+      
+      // Add timeout to prevent hanging
+           const controller = new AbortController()
+           const timeoutId = setTimeout(() => controller.abort(), 3000) // 3 second timeout for faster loading
+      
+      try {
+        // Only select needed fields for faster loading
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/events?select=id,title,description,start_date,end_date,created_by,is_private,status&order=start_date.asc`, {
+          method: 'GET',
+          headers: simpleHeaders,
+          signal: controller.signal
+        })
+
+        clearTimeout(timeoutId)
+        console.log('🔍 Events API: Response status:', response.status)
+        console.log('🔍 Events API: Response ok:', response.ok)
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error('🔍 Events API: Error response:', errorText)
+          throw new Error(`HTTP ${response.status}: ${errorText}`)
+        }
+
+        const result = await response.json()
+        console.log('🔍 Events API: Response data:', result)
+        console.log('🔍 Events API: Response count:', result.length)
+        return result
+      } catch (fetchError) {
+        clearTimeout(timeoutId)
+        if (fetchError.name === 'AbortError') {
+          throw new Error('Request timeout - API call took too long')
+        }
+        throw fetchError
+      }
+    } catch (error) {
+      console.error('🔍 Events API: Error:', error)
+      throw error
+    }
+  },
+
+  // Fallback API call using direct Supabase client
+  async getAllDirect() {
+    try {
+      console.log('🔍 Events API: Trying direct Supabase call...')
+      
+      const { data, error } = await supabase
+        .from('events')
+        .select('id,title,description,start_date,end_date,created_by,is_private,status')
+        .order('start_date', { ascending: true })
+      
+      if (error) {
+        console.error('🔍 Events API: Direct call error:', error)
+        throw error
+      }
+      
+      console.log('🔍 Events API: Direct call success:', data?.length || 0, 'events')
+      return data || []
+    } catch (error) {
+      console.error('🔍 Events API: Direct call failed:', error)
+      throw error
+    }
+  },
+
+  // Ultra-simple API call with minimal headers
+  async getAllSimple() {
+    try {
+      console.log('🔍 Events API: Trying ultra-simple call...')
+      
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/events?select=id,title,description,start_date,end_date,created_by,is_private,status&order=start_date.asc`, {
+        method: 'GET',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      
+      const data = await response.json()
+      console.log('🔍 Events API: Ultra-simple call success:', data?.length || 0, 'events')
+      return data || []
+    } catch (error) {
+      console.error('🔍 Events API: Ultra-simple call failed:', error)
+      throw error
+    }
+  },
+
+  async getById(id) {
+    try {
+      const headers = await getHeaders()
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/events?id=eq.${id}&select=*`, {
+        method: 'GET',
+        headers
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
 
   const sanitizeText = (text) => {
     if (!text) return text
@@ -151,29 +321,27 @@
       }
     },
 
-    // Ultra-simple API call with minimal headers
-    async getAllSimple() {
-      try {
-        console.log('🔍 Events API: Trying ultra-simple call...')
-        
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/events?select=id,title,description,start_date,end_date,created_by,is_private,status&order=start_date.asc`, {
-          method: 'GET',
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Content-Type': 'application/json'
-          }
-        })
-        
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-        }
-        
-        const data = await response.json()
-        console.log('🔍 Events API: Ultra-simple call success:', data?.length || 0, 'events')
-        return data || []
-      } catch (error) {
-        console.error('🔍 Events API: Ultra-simple call failed:', error)
-        throw error
+      const result = await response.json()
+      return result
+    } catch (error) {
+      console.error('HTTP API getEventRequests error:', error)
+      throw error
+    }
+  },
+
+  // Get admin panel data - Ultra-optimized for fast loading
+  async getAdminPanelData(limit = 50, offset = 0) {
+    try {
+      const headers = await getHeaders()
+      // Select columns needed for admin panel including PDF fields
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?select=id,title,event_name,requester_name,requester_email,start_date,end_date,request_stage,status,created_at,details_submitted_at,initial_accepted_at,final_accepted_at,signed_contract_url,uploaded_file_data,uploaded_file_name,uploaded_file_size,uploaded_file_type,exact_start_datetime,exact_end_datetime,event_type,additional_notes,admin_notes&order=created_at.desc&limit=${limit}&offset=${offset}`, {
+        method: 'GET',
+        headers
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
       }
     },
 
@@ -270,54 +438,60 @@
       }
     },
 
-    // Optimized method for calendar display - only essential columns
-    async getCalendarEvents(startDate = null, endDate = null) {
+      const result = await response.json()
+      
+      // Log successful creation
+      await securityAPI.logSuspiciousActivity('event_request_created', `Event request created for ${data.requester_email}`, 'low', null, null)
+      
+      // Send emails
       try {
-        const headers = await getHeaders()
-        
-        // Build date filter if provided
-        let dateFilter = ''
-        if (startDate && endDate) {
-          try {
-            const start = new Date(startDate).toISOString()
-            const end = new Date(endDate).toISOString()
-            dateFilter = `&start_date=gte.${start}&start_date=lte.${end}`
-          } catch (dateError) {
-            console.warn('Invalid date range provided, loading all events:', dateError)
-            // Fallback to loading all events if date parsing fails
-          }
-        }
-        
-        // Only select essential columns for calendar display
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/events?select=id,title,start_date,end_date,is_private,event_type,requester_name,schluesselannahme_time,schluesselabgabe_time,additional_notes,uploaded_mietvertrag_url&order=start_date.asc${dateFilter}`, {
-          method: 'GET',
-          headers
-        })
-
-        if (!response.ok) {
-          const errorText = await response.text()
-          throw new Error(`HTTP ${response.status}: ${errorText}`)
-        }
-
-        const result = await response.json()
-        return result
-      } catch (error) {
-        console.error('HTTP API getCalendarEvents error:', error)
-        throw error
+        const requestData = Array.isArray(result) ? result[0] : result
+        // Send confirmation email to user
+        await sendUserNotification(data.requester_email, requestData, 'initial_request_received')
+        // Send notification email to admins
+        await sendAdminNotification(requestData, 'initial_request')
+      } catch (emailError) {
+        console.error('Failed to send notification emails:', emailError)
+        // Don't fail the request creation if emails fail
       }
+      
+      return Array.isArray(result) ? result[0] : result
+    } catch (error) {
+      console.error('HTTP API createInitialRequest error:', error)
+      throw error
     }
-  }
+  },
 
-  // Event Requests API - 3-Step Workflow
-  export const eventRequestsAPI = {
-    // Get all event requests (admin only) - Optimized for admin panel
-    async getAll() {
-      try {
-        const headers = await getHeaders()
-        // Only select essential columns for admin panel display
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?select=id,title,event_name,requester_name,requester_email,start_date,end_date,requested_days,request_stage,status,is_private,event_type,created_at,initial_accepted_at,details_submitted_at,final_accepted_at,rejected_at,admin_notes,rejection_reason&order=created_at.desc`, {
-          method: 'GET',
-          headers
+  // STEP 2: Admin accepts initial request
+  async acceptInitialRequest(id, adminNotes = '') {
+    try {
+      const headers = await getHeaders()
+      
+      // First, get the request details
+      const getRequestResponse = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}&select=*`, {
+        method: 'GET',
+        headers
+      })
+      
+      if (!getRequestResponse.ok) {
+        throw new Error(`Failed to get request details`)
+      }
+      
+      const requests = await getRequestResponse.json()
+      const request = requests[0]
+      
+      if (!request) {
+        throw new Error('Request not found')
+      }
+      
+      // Update request status
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({
+          request_stage: 'initial_accepted',
+          initial_accepted_at: new Date().toISOString(),
+          admin_notes: adminNotes
         })
 
         if (!response.ok) {
@@ -325,22 +499,104 @@
           throw new Error(`HTTP ${response.status}: ${errorText}`)
         }
 
-        const result = await response.json()
-        return result
-      } catch (error) {
-        console.error('HTTP API getEventRequests error:', error)
-        throw error
-      }
-    },
-
-    // Get admin panel data - Ultra-optimized for fast loading
-    async getAdminPanelData(limit = 50, offset = 0) {
+      // Create temporary blocker for the dates
       try {
-        const headers = await getHeaders()
-        // Select columns needed for admin panel including PDF fields
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?select=id,title,event_name,requester_name,requester_email,start_date,end_date,request_stage,status,created_at,details_submitted_at,initial_accepted_at,final_accepted_at,signed_contract_url,uploaded_file_data,uploaded_file_name,uploaded_file_size,uploaded_file_type,exact_start_datetime,exact_end_datetime,event_type,additional_notes,admin_notes&order=created_at.desc&limit=${limit}&offset=${offset}`, {
-          method: 'GET',
-          headers
+        const blockData = {
+          request_id: id,
+          event_name: request.title || request.event_name,
+          requester_name: request.requester_name,
+          requester_email: request.requester_email,
+          start_date: request.start_date,
+          end_date: request.end_date,
+          request_stage: 'initial_accepted',
+          is_temporary: true
+        }
+        
+        await blockedDatesAPI.createTemporaryBlock(blockData)
+        console.log('✅ Temporary blocker created for request:', id)
+      } catch (blockError) {
+        console.warn('Failed to create temporary blocker:', blockError)
+        // Don't fail the whole operation if blocker creation fails
+      }
+
+      // Send email to user
+      try {
+        await sendUserNotification(request.requester_email, request, 'initial_request_accepted')
+        // Also notify admins that the request was accepted
+        await sendAdminNotification(request, 'detailed_info_submitted')
+      } catch (emailError) {
+        console.error('Failed to send acceptance email:', emailError)
+      }
+
+      return { success: true }
+    } catch (error) {
+      console.error('HTTP API acceptInitialRequest error:', error)
+      throw error
+    }
+  },
+
+  // STEP 3: Admin rejects request
+  async rejectRequest(id, rejectionReason = '') {
+    try {
+      const headers = await getHeaders()
+      
+      // Get request details first
+      const getRequestResponse = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}&select=*`, {
+        method: 'GET',
+        headers
+      })
+      
+      if (!getRequestResponse.ok) {
+        throw new Error(`Failed to get request details`)
+      }
+      
+      const requests = await getRequestResponse.json()
+      const request = requests[0]
+      
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({
+          request_stage: 'rejected',
+          status: 'rejected',
+          rejection_reason: rejectionReason
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          throw new Error(`HTTP ${response.status}: ${errorText}`)
+        }
+
+      // Send email to user
+      if (request) {
+        try {
+          await sendUserNotification(request.requester_email, {
+            ...request,
+            rejection_reason: rejectionReason
+          }, 'rejected')
+        } catch (emailError) {
+          console.error('Failed to send rejection email:', emailError)
+        }
+      }
+
+      return { success: true }
+    } catch (error) {
+      console.error('HTTP API rejectRequest error:', error)
+      throw error
+    }
+  },
+
+  // USER: Cancel own request at any stage
+  async cancelRequest(id) {
+    try {
+      const headers = await getHeaders()
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({
+          request_stage: 'cancelled',
+          status: 'cancelled',
+          rejection_reason: 'Vom Benutzer storniert'
         })
 
         if (!response.ok) {
@@ -414,14 +670,52 @@
           headers
         })
 
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      // Send notifications
+      try {
+        // Get the updated request to send notifications
+        const updatedRequestResponse = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}&select=*`, {
+          method: 'GET',
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        if (updatedRequestResponse.ok) {
+          const updatedRequests = await updatedRequestResponse.json()
+          const updatedRequest = updatedRequests[0]
+          
+          if (updatedRequest) {
+            // Notify admins that detailed info was submitted
+            await sendAdminNotification(updatedRequest, 'detailed_info_submitted')
+          }
         }
+      } catch (emailError) {
+        console.error('Failed to send notifications:', emailError)
+        // Don't fail the request if notifications fail
+      }
 
-        return await response.json()
-      } catch (error) {
-        console.error('HTTP API getByUser error:', error)
-        throw error
+      console.log('✅ Detailed request submitted successfully')
+      return { success: true }
+    } catch (error) {
+      console.error('HTTP API submitDetailedRequest error:', error)
+      throw error
+    }
+  },
+
+  // STEP 5: Admin gives final acceptance and creates event
+  async finalAcceptRequest(id) {
+    try {
+      // First, get the request details
+      const headers = await getHeaders()
+      const requestResponse = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}&select=*`, {
+        method: 'GET',
+        headers
+      })
+
+      if (!requestResponse.ok) {
+        throw new Error('Failed to fetch request details')
       }
     },
 
@@ -606,10 +900,56 @@
           console.error('Failed to send acceptance email:', emailError)
         }
 
-        return { success: true }
-      } catch (error) {
-        console.error('HTTP API acceptInitialRequest error:', error)
-        throw error
+      console.log('✅ Event created successfully!');
+      
+      // Send notifications
+      try {
+        // Notify user of final approval
+        await sendUserNotification(request.requester_email, request, 'final_approval')
+        // Notify admins of final acceptance
+        await sendAdminNotification(request, 'final_acceptance')
+      } catch (emailError) {
+        console.error('Failed to send final acceptance notifications:', emailError)
+        // Don't fail if notifications fail
+      }
+      
+      // Delete the temporary blocker since event is now created
+      try {
+        // Find and delete the temporary blocker for this request
+        const blockers = await blockedDatesAPI.getTemporarilyBlocked()
+        const blocker = blockers.find(b => b.request_id === id)
+        
+        if (blocker) {
+          await blockedDatesAPI.deleteTemporaryBlock(blocker.id)
+          console.log('✅ Temporary blocker deleted for request:', id)
+        } else {
+          console.log('⚠️ No temporary blocker found for request:', id)
+        }
+      } catch (blockError) {
+        console.warn('Failed to delete temporary blocker:', blockError)
+        // Don't fail the whole operation if blocker deletion fails
+      }
+      
+      return { success: true }
+    } catch (error) {
+      console.error('HTTP API finalAcceptRequest error:', error)
+      throw error
+    }
+  },
+
+  // Legacy create method for backwards compatibility
+  async create(data) {
+    try {
+      const headers = await getHeaders()
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(data)
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
       }
     },
 
@@ -1014,90 +1354,152 @@
         throw error
       }
     }
-  }
+  },
 
-  // Profiles API
-  export const profilesAPI = {
-    async getById(id) {
-      try {
-        const headers = await getHeaders()
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${id}&select=*`, {
-          method: 'GET',
-          headers
-        })
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-        }
-
-        const data = await response.json()
-        return data[0] || null
-      } catch (error) {
-        console.error('HTTP API getProfileById error:', error)
-        throw error
+  async getAll() {
+    try {
+      console.log('👥 Profiles API: Starting getAll()...')
+      
+      // Use simple headers for faster loading
+      const simpleHeaders = {
+        'apikey': SUPABASE_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
       }
-    },
-
-    async create(data) {
+      
+      // Add timeout to prevent hanging
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 3000) // 3 second timeout
+      
       try {
-        const headers = await getHeaders()
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(data)
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id,email,full_name,role,created_at&order=created_at.desc`, {
+          method: 'GET',
+          headers: simpleHeaders,
+          signal: controller.signal
         })
 
+        clearTimeout(timeoutId)
+        
         if (!response.ok) {
           const errorText = await response.text()
           throw new Error(`HTTP ${response.status}: ${errorText}`)
         }
 
-        const contentType = response.headers.get('content-type')
-        if (contentType && contentType.includes('application/json')) {
-          const result = await response.json()
-          return result
-        } else {
-          return { success: true }
+        const result = await response.json()
+        console.log('👥 Profiles API: Loaded', result.length, 'users')
+        return result
+      } catch (fetchError) {
+        clearTimeout(timeoutId)
+        if (fetchError.name === 'AbortError') {
+          throw new Error('Request timeout - Profiles API call took too long')
         }
-      } catch (error) {
-        console.error('HTTP API createProfile error:', error)
+        throw fetchError
+      }
+    } catch (error) {
+      console.error('👥 Profiles API: Error:', error)
+      throw error
+    }
+  },
+
+  async getAllDirect() {
+    try {
+      console.log('👥 Profiles API: Trying direct Supabase call...')
+      
+      const { supabase } = await import('../lib/supabase')
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id,email,full_name,role,created_at')
+        .order('created_at', { ascending: false })
+      
+      if (error) {
+        console.error('👥 Profiles API: Direct call error:', error)
         throw error
       }
-    },
+      
+      console.log('👥 Profiles API: Direct call success:', data?.length || 0, 'users')
+      return data || []
+    } catch (error) {
+      console.error('👥 Profiles API: Direct call failed:', error)
+      throw error
+    }
+  },
 
-    async update(id, data) {
+  async getAllSimple() {
+    try {
+      console.log('👥 Profiles API: Trying ultra-simple call...')
+      
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id,email,full_name,role,created_at&order=created_at.desc`, {
+        method: 'GET',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      
+      const data = await response.json()
+      console.log('👥 Profiles API: Ultra-simple call success:', data?.length || 0, 'users')
+      return data || []
+    } catch (error) {
+      console.error('👥 Profiles API: Ultra-simple call failed:', error)
+      throw error
+    }
+  },
+
+  async updateUserRole(id, role) {
+    try {
+      console.log('👥 Profiles API: Updating role for user', id, 'to', role)
+      
+      // Use simple headers for faster updates
+      const simpleHeaders = {
+        'apikey': SUPABASE_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      }
+      
+      // Add timeout to prevent hanging
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 3000) // 3 second timeout
+      
       try {
-        const headers = await getHeaders()
         const response = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${id}`, {
           method: 'PATCH',
-          headers,
-          body: JSON.stringify(data)
+          headers: simpleHeaders,
+          body: JSON.stringify({ role }),
+          signal: controller.signal
         })
+
+        clearTimeout(timeoutId)
 
         if (!response.ok) {
           const errorText = await response.text()
           throw new Error(`HTTP ${response.status}: ${errorText}`)
         }
 
-        const contentType = response.headers.get('content-type')
-        if (contentType && contentType.includes('application/json')) {
-          const result = await response.json()
-          return result
-        } else {
-          return { success: true }
+        console.log('👥 Profiles API: Role updated successfully')
+        return { success: true }
+      } catch (fetchError) {
+        clearTimeout(timeoutId)
+        if (fetchError.name === 'AbortError') {
+          throw new Error('Request timeout - Role update took too long')
         }
-      } catch (error) {
-        console.error('HTTP API updateProfile error:', error)
-        throw error
+        throw fetchError
       }
-    },
+    } catch (error) {
+      console.error('👥 Profiles API: updateUserRole error:', error)
+      throw error
+    }
+  },
 
-    async getAll() {
-      try {
-        console.log('👥 Profiles API: Starting getAll()...')
-        
-        // Use simple headers for faster loading
-        const simpleHeaders = {
+  async createUser(userData) {
+    try {
+      // Use Supabase admin API to create user with auto-confirmation
+      const authResponse = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+        method: 'POST',
+        headers: {
           'apikey': SUPABASE_KEY,
           'Content-Type': 'application/json',
           'Prefer': 'return=minimal'
@@ -1463,6 +1865,47 @@
         console.error('HTTP API deleteTemporaryBlock error:', error)
         throw error
       }
+    }
+  },
+
+  async createTemporaryBlock(data) {
+    try {
+      const headers = await getHeaders()
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/temporarily_blocked_dates`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(data)
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('HTTP API createTemporaryBlock error:', error)
+      throw error
+    }
+  },
+
+  async deleteTemporaryBlock(id) {
+    try {
+      const headers = await getHeaders()
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/temporarily_blocked_dates?id=eq.${id}`, {
+        method: 'DELETE',
+        headers
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      return { success: true }
+    } catch (error) {
+      console.error('HTTP API deleteTemporaryBlock error:', error)
+      throw error
     }
   }
 
