@@ -20,6 +20,7 @@ const AdminPanelClean = () => {
   const tabs = [
     { id: 'three-step-requests', name: '3-Schritt Anfragen', icon: Workflow },
     { id: 'events', name: 'Events verwalten', icon: FileText },
+    { id: 'special-events', name: 'Special Events', icon: Eye },
     { id: 'users', name: 'Benutzer verwalten', icon: Users },
     { id: 'settings', name: 'Einstellungen', icon: Settings }
   ]
@@ -92,6 +93,8 @@ const AdminPanelClean = () => {
         return <ThreeStepRequestManagement />
       case 'events':
         return <EventsTab />
+      case 'special-events':
+        return <SpecialEventsTab />
       case 'users':
         return <UsersTab />
       case 'settings':
@@ -1112,3 +1115,11 @@ const SettingsTab = () => {
 }
 
 export default AdminPanelClean
+
+const SpecialEventsTab = () => {
+  const [mounted, setMounted] = React.useState(false)
+  useEffect(() => { setMounted(true) }, [])
+  if (!mounted) return null
+  const SpecialEventModeration = require('./SpecialEventModeration').default
+  return <SpecialEventModeration />
+}

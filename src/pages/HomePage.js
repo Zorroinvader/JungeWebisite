@@ -142,7 +142,7 @@ const HomePage = () => {
           <div className="text-center">
             <button
               onClick={() => handleEventRequest()}
-              className="group inline-flex items-center justify-center px-[8vw] sm:px-[6vw] md:px-[5vw] lg:px-[4vw] py-[2.5vh] sm:py-[2.2vh] md:py-[2vh] text-[3.5vw] sm:text-[3vw] md:text-[2.4vw] lg:text-[2vw] xl:text-[1.6vw] font-bold text-white bg-[#6054d9] hover:bg-[#4f44c7] dark:bg-[#6054d9] dark:hover:bg-[#4f44c7] rounded-2xl hover:scale-105 transition-all duration-200 shadow-2xl hover:shadow-3xl"
+              className="group inline-flex items-center justify-center px-[7vw] sm:px-[5.5vw] md:px-[4.5vw] lg:px-[3.5vw] py-[2.2vh] sm:py-[2vh] md:py-[1.8vh] text-[3.2vw] sm:text-[2.7vw] md:text-[2.2vw] lg:text-[1.8vw] xl:text-[1.5vw] font-semibold text-white bg-[#6054d9] hover:bg-[#4f44c7] dark:bg-[#6054d9] dark:hover:bg-[#4f44c7] rounded-lg transition-colors duration-200 shadow-xl"
             >
               <Calendar className="h-[4.5vw] sm:h-[4vw] md:h-[3.5vw] lg:h-[2.8vw] xl:h-[2.2vw] w-[4.5vw] sm:w-[4vw] md:w-[3.5vw] lg:w-[2.8vw] xl:w-[2.2vw] mr-[2vw] sm:mr-[1.8vw] md:mr-[1.5vw] lg:mr-[1.2vw]" />
               Event anfragen

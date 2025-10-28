@@ -14,6 +14,8 @@ import ProfilePageSimple from './pages/ProfilePageSimple'
 import EventRequestTrackingPage from './pages/EventRequestTrackingPage'
 import EmailConfirmationHandler from './components/Auth/EmailConfirmationHandler'
 import AdminPanelClean from './components/Admin/AdminPanelClean'
+import SpecialEventsPage from './pages/SpecialEventsPage'
+import SpecialEventDetailPage from './pages/SpecialEventDetailPage'
 import './index.css'
 
 // Protected Route Component
@@ -84,6 +86,8 @@ const AppContent = () => {
         <Route path="/faq" element={<Layout><FAQPage /></Layout>} />
         <Route path="/contact" element={<Layout><ContactPage /></Layout>} />
         <Route path="/event-tracking" element={<EventRequestTrackingPage />} />
+        <Route path="/special-events" element={<Layout><SpecialEventsPage /></Layout>} />
+        <Route path="/special-events/:slug" element={<Layout><SpecialEventDetailPage /></Layout>} />
         
         {/* Test Route */}
         <Route path="/test" element={<div>Test Route Works!</div>} />
