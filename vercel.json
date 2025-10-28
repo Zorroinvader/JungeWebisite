@@ -24,6 +24,7 @@
   "env": {
     "REACT_APP_SUPABASE_URL": "https://wthsritnjosieqxpprsl.supabase.co",
     "REACT_APP_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0aHNyaXRuam9zaWVxeHBwcnNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5NDEwNjAsImV4cCI6MjA3NTUxNzA2MH0.kIdmad-ohH_r2Ss6OsoqMbZw10cgNiF0FDj1zbgszlE",
+    "RESEND_API_KEY": "re_JKMpswbZ_4DvskWaQ3iV6zdhEq12pW3A6",
     "CI": "false",
     "DISABLE_ESLINT_PLUGIN": "true"
   }
