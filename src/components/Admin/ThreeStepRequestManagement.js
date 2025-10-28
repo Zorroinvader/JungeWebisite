@@ -62,7 +62,15 @@ const ThreeStepRequestManagement = () => {
       loadRequests();
     }, 60000);
     
-    return () => clearInterval(interval);
+    // Safety timeout to prevent infinite loading
+    const timeout = setTimeout(() => {
+      setLoading(false);
+    }, 3000); // 3 second timeout
+    
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
   }, []);
 
   // Helper functions - Using your color palette

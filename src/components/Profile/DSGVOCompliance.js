@@ -133,22 +133,22 @@ const DSGVOCompliance = ({ userId, userEmail }) => {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+    <div>
       <div className="flex items-center gap-3 mb-6">
         <Shield className="h-6 w-6 text-[#A58C81]" />
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">DSGVO Data Rights</h2>
+        <h2 className="text-2xl font-bold text-[#252422] dark:text-[#F4F1E8]">DSGVO Datenrechte</h2>
       </div>
 
       <div className="space-y-4">
         {/* Information */}
-        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+        <div className="p-4 bg-[#A58C81]/10 dark:bg-[#A58C81]/20 rounded-lg border border-[#A58C81]/20">
           <div className="flex items-start gap-3">
-            <CheckCircle className="h-5 w-5 text-blue-600 mt-0.5" />
+            <CheckCircle className="h-5 w-5 text-[#A58C81] mt-0.5" />
             <div>
-              <h3 className="font-medium text-blue-800 dark:text-blue-400 mb-1">Your Data Rights</h3>
-              <p className="text-sm text-blue-700 dark:text-blue-300">
-                Under DSGVO, you have the right to access, rectify, erase, and port your personal data. 
-                You can also withdraw consent at any time.
+              <h3 className="font-medium text-[#252422] dark:text-[#F4F1E8] mb-1">Ihre Datenrechte</h3>
+              <p className="text-sm text-[#A58C81] dark:text-[#EBE9E9]">
+                Unter DSGVO haben Sie das Recht auf Zugang, Berichtigung, Löschung und Portabilität Ihrer persönlichen Daten. 
+                Sie können Ihre Einwilligung jederzeit widerrufen.
               </p>
             </div>
           </div>
@@ -159,19 +159,19 @@ const DSGVOCompliance = ({ userId, userEmail }) => {
           <button
             onClick={handleDataExport}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-2 px-4 py-3 bg-[#6054d9] text-white rounded-lg hover:bg-[#4f44c7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Download className="h-4 w-4" />
-            {loading ? 'Exporting...' : 'Export My Data'}
+            {loading ? 'Exportiere...' : 'Meine Daten exportieren'}
           </button>
 
           <button
             onClick={handleDataUpdate}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-2 px-4 py-3 bg-[#A58C81] text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
           >
             <Edit className="h-4 w-4" />
-            {loading ? 'Updating...' : 'Update My Data'}
+            {loading ? 'Aktualisiere...' : 'Meine Daten aktualisieren'}
           </button>
 
           <button
@@ -180,7 +180,7 @@ const DSGVOCompliance = ({ userId, userEmail }) => {
             className="flex items-center gap-2 px-4 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <AlertTriangle className="h-4 w-4" />
-            {loading ? 'Processing...' : 'Withdraw Consent'}
+            {loading ? 'Verarbeite...' : 'Einwilligung widerrufen'}
           </button>
 
           <button
@@ -189,7 +189,7 @@ const DSGVOCompliance = ({ userId, userEmail }) => {
             className="flex items-center gap-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Trash2 className="h-4 w-4" />
-            {loading ? 'Deleting...' : 'Delete All My Data'}
+            {loading ? 'Lösche...' : 'Alle meine Daten löschen'}
           </button>
         </div>
 
@@ -205,18 +205,18 @@ const DSGVOCompliance = ({ userId, userEmail }) => {
         )}
 
         {/* Additional Information */}
-        <div className="text-sm text-gray-600 dark:text-gray-400">
+        <div className="text-sm text-[#A58C81] dark:text-[#EBE9E9]">
           <p className="mb-2">
-            <strong>Data Export:</strong> Download a complete copy of all your personal data in JSON format.
+            <strong className="text-[#252422] dark:text-[#F4F1E8]">Datenexport:</strong> Laden Sie eine vollständige Kopie aller Ihrer persönlichen Daten im JSON-Format herunter.
           </p>
           <p className="mb-2">
-            <strong>Data Update:</strong> Request changes to your personal information.
+            <strong className="text-[#252422] dark:text-[#F4F1E8]">Datenaktualisierung:</strong> Fordern Sie Änderungen an Ihren persönlichen Informationen an.
           </p>
           <p className="mb-2">
-            <strong>Consent Withdrawal:</strong> Withdraw your consent for data processing.
+            <strong className="text-[#252422] dark:text-[#F4F1E8]">Einwilligung widerrufen:</strong> Widerrufen Sie Ihre Einwilligung zur Datenverarbeitung.
           </p>
           <p>
-            <strong>Data Deletion:</strong> Permanently delete all your personal data from our systems.
+            <strong className="text-[#252422] dark:text-[#F4F1E8]">Datenlöschung:</strong> Löschen Sie dauerhaft alle Ihre persönlichen Daten aus unseren Systemen.
           </p>
         </div>
       </div>

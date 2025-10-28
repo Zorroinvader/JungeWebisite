@@ -40,11 +40,12 @@ export const TABLES = {
   PROFILES: 'profiles'
 }
 
-// User roles
+// User roles - hierarchical permission system
 export const USER_ROLES = {
-  ADMIN: 'admin',
-  MEMBER: 'member',
-  GUEST: 'guest'
+  SUPERADMIN: 'superadmin', // Can do everything, including create/manage users
+  ADMIN: 'admin',           // Can accept events, manage requests
+  MEMBER: 'member',         // Logged in user
+  GUEST: 'guest'            // Not logged in
 }
 
 // Event status

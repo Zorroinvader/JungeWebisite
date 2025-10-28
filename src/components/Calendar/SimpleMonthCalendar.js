@@ -18,7 +18,7 @@ const SimpleMonthCalendar = ({
   onDateClick,
   onEventUpdated 
 }) => {
-  const { user, isAdmin } = useAuth()
+  const { user, isAdmin, loading: authLoading } = useAuth()
   const { isDarkMode } = useDarkMode()
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
@@ -29,11 +29,17 @@ const SimpleMonthCalendar = ({
   const [lastLoadedMonth, setLastLoadedMonth] = useState(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
 
+  // Debug authentication state
+  console.log('📅 Calendar: Auth state:', { 
+    user: user?.email, 
+    isAdmin: isAdmin(), 
+    authLoading 
+  })
+
   // Load all events and requests - Optimized for calendar view
   const loadAllEvents = useCallback(async () => {
     // Prevent multiple simultaneous refreshes
     if (isRefreshing) {
-      console.log('📅 Calendar: Already refreshing, skipping')
       return
     }
     
@@ -41,49 +47,100 @@ const SimpleMonthCalendar = ({
     try {
       setLoading(true)
       
-      // Use currentDate or fallback to today's date
-      const dateToUse = currentDate || new Date()
+      console.log('📅 Calendar: Loading events...')
+      console.log('📅 Calendar: User:', user?.email, 'isAdmin:', isAdmin())
       
-      // Calculate date range for current month view (current month ± 1 month)
-      const startOfMonth = new Date(dateToUse.getFullYear(), dateToUse.getMonth() - 1, 1)
-      const endOfMonth = new Date(dateToUse.getFullYear(), dateToUse.getMonth() + 2, 0)
-      
-      // Check if we already loaded this month range
-      const currentMonthKey = `${dateToUse.getFullYear()}-${dateToUse.getMonth()}`
-      if (lastLoadedMonth === currentMonthKey) {
-        console.log('📅 Calendar: Month already loaded, using cache')
-        setLoading(false)
-        return
-      }
-      
-      // Load approved events for current month range only
+      // Load all events (not just current month) to show all available events
       let allEvents = []
-      try {
-        allEvents = await httpAPI.events.getCalendarEvents(startOfMonth, endOfMonth)
-      } catch (dateError) {
-        console.warn('Date range optimization failed, falling back to all events:', dateError)
-        allEvents = await httpAPI.events.getAll()
-      }
       
-      // Load pending requests (admin only) for current month range only
-      let pendingRequests = []
-      if (isAdmin()) {
+      // Add test events first to see if calendar rendering works
+      const testEvents = [
+        {
+          id: 'test-1',
+          title: 'Test Event 1',
+          start_date: new Date().toISOString(),
+          end_date: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(), // 2 hours later
+          is_private: false,
+          status: 'approved',
+          description: 'This is a test event'
+        },
+        {
+          id: 'test-2',
+          title: 'Test Event 2',
+          start_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // tomorrow
+          end_date: new Date(Date.now() + 25 * 60 * 60 * 1000).toISOString(), // tomorrow + 1 hour
+          is_private: false,
+          status: 'approved',
+          description: 'This is another test event'
+        }
+      ]
+      
+      console.log('📅 Calendar: Adding test events first:', testEvents.length)
+      allEvents = [...testEvents]
+      
+      try {
+        console.log('📅 Calendar: Calling httpAPI.events.getAll()...')
+        const apiEvents = await httpAPI.events.getAll()
+        console.log('📅 Calendar: API response:', apiEvents)
+        console.log('📅 Calendar: Loaded events count:', apiEvents.length)
+        
+        if (apiEvents.length > 0) {
+          console.log('📅 Calendar: First event sample:', apiEvents[0])
+          allEvents = [...allEvents, ...apiEvents]
+        }
+      } catch (error) {
+        console.error('📅 Calendar: Primary API failed, trying fallback:', error)
         try {
-          pendingRequests = await httpAPI.eventRequests.getCalendarRequests(startOfMonth, endOfMonth)
-        } catch (dateError) {
-          console.warn('Date range optimization failed for requests, falling back to all requests:', dateError)
-          pendingRequests = await httpAPI.eventRequests.getAll()
+          console.log('📅 Calendar: Trying getAllDirect()...')
+          const directEvents = await httpAPI.events.getAllDirect()
+          console.log('📅 Calendar: Fallback API success:', directEvents.length, 'events')
+          allEvents = [...allEvents, ...directEvents]
+        } catch (fallbackError) {
+          console.error('📅 Calendar: Direct API failed, trying ultra-simple:', fallbackError)
+          try {
+            console.log('📅 Calendar: Trying getAllSimple()...')
+            const simpleEvents = await httpAPI.events.getAllSimple()
+            console.log('📅 Calendar: Ultra-simple API success:', simpleEvents.length, 'events')
+            allEvents = [...allEvents, ...simpleEvents]
+          } catch (simpleError) {
+            console.error('📅 Calendar: All API methods failed:', simpleError)
+            console.log('📅 Calendar: Using only test events')
+          }
         }
       }
       
-      // Load temporarily blocked dates
-      const temporarilyBlocked = await httpAPI.blockedDates.getTemporarilyBlocked()
+      console.log('📅 Calendar: Final events array:', allEvents.length, 'events')
+      console.log('📅 Calendar: Sample events:', allEvents.slice(0, 3))
+      
+      // Load pending requests (admin only) - DISABLED to remove requests from calendar
+      let pendingRequests = []
+      // if (isAdmin()) {
+      //   try {
+      //     pendingRequests = await httpAPI.eventRequests.getCalendarRequests(startOfMonth, endOfMonth)
+      //   } catch (dateError) {
+      //     console.warn('Date range optimization failed for requests, falling back to all requests:', dateError)
+      //     pendingRequests = await httpAPI.eventRequests.getAll()
+      //   }
+      // }
+      
+      // Load temporarily blocked dates (these show as orange blockers in calendar) - DISABLED for speed
+      console.log('📅 Calendar: Skipping temporarily blocked dates for faster loading...')
+      const temporarilyBlocked = []
       
       const calendarEvents = []
+      console.log('📅 Calendar: Created empty calendarEvents array')
       
       // Process approved events
-      if (allEvents && allEvents.length > 0) {
-        allEvents.forEach(event => {
+      try {
+        if (allEvents && allEvents.length > 0) {
+        console.log('📅 Calendar: Processing', allEvents.length, 'events')
+        allEvents.forEach((event, index) => {
+          // Check if this is a public event that should be visible
+          const isPublicEvent = !event.is_private && event.status === 'approved'
+          
+          // For test events, always show them
+          const isTestEvent = event.id.startsWith('test-')
+          
           const isPrivate = event.is_private || false
           // Check if user owns this event (check multiple possible ID fields)
           const isOwnEvent = user && (
@@ -97,16 +154,7 @@ const SimpleMonthCalendar = ({
           let isBlocked = false
 
           // Handle privacy based on user role
-          if (isPrivate) {
-            // Debug logging
-            console.log(`🔒 Private event: "${event.title}"`, {
-              isAdmin: isAdmin(),
-              isOwnEvent,
-              userId: user?.id,
-              eventRequesterId: event.requester_id,
-              eventUserId: event.user_id,
-              eventCreatedBy: event.created_by
-            })
+          if (isPrivate && !isTestEvent) {
             
             if (isAdmin()) {
               // Admin sees everything with full details
@@ -125,7 +173,7 @@ const SimpleMonthCalendar = ({
               isBlocked = true
             }
           } else {
-            // Public event - everyone can see
+            // Public event or test event - everyone can see
             eventTitle = event.title
             eventDescription = event.description
             isBlocked = false
@@ -138,23 +186,11 @@ const SimpleMonthCalendar = ({
           // Check if event has time information
           const hasTimeInfo = event.start_date && event.start_date.includes('T')
           
-          // Format time display for title
-          const formatTime = (date) => {
-            if (!hasTimeInfo) return ''
-            return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
-          }
-          
-          const startTime = formatTime(startDate)
-          const endTime = formatTime(endDate)
-          const timeDisplay = hasTimeInfo ? `${startTime}${endTime && startTime !== endTime ? `-${endTime}` : ''}` : ''
-          
-          // Update title with time if available and not blocked
-          if (timeDisplay && !isBlocked) {
-            eventTitle = `${timeDisplay} ${eventTitle}`
-          }
+          // Time is NOT shown in calendar title - only in event details modal
+          // Keep event title clean without time display
 
           if (!isNaN(startDate.getTime())) {
-            calendarEvents.push({
+            const calendarEvent = {
               id: event.id,
               title: eventTitle,
               start: startDate,
@@ -169,13 +205,22 @@ const SimpleMonthCalendar = ({
                 isBlocked: isBlocked,
                 isOwnEvent: isOwnEvent
               }
-            })
+            }
+            calendarEvents.push(calendarEvent)
+          } else {
+            // Skip events with invalid dates
           }
         })
+        } else {
+          console.log('📅 Calendar: No events to process. allEvents:', allEvents)
+        }
+      } catch (processingError) {
+        console.error('📅 Calendar: Error processing events:', processingError)
+        console.log('📅 Calendar: allEvents at error:', allEvents)
       }
 
-      // Process pending requests (admin only)
-      if (isAdmin() && pendingRequests && pendingRequests.length > 0) {
+      // Process pending requests (admin only) - DISABLED
+      if (false && isAdmin() && pendingRequests && pendingRequests.length > 0) {
         pendingRequests.forEach(request => {
           const startDate = new Date(request.start_date)
           const endDate = request.end_date ? new Date(request.end_date) : new Date(request.start_date)
@@ -227,8 +272,8 @@ const SimpleMonthCalendar = ({
           }
           
           if (blockedStartDate && !isNaN(blockedStartDate.getTime())) {
-            // Show as "Temporarily blocked" for normal users, event name for admins
-            const title = isAdmin() ? `${blocked.event_name || blocked.title} (Vorläufig)` : 'Vorübergehend blockiert'
+            // Show as "Vorläufig blockiert" for everyone (admin and non-admin)
+            const title = 'Vorläufig blockiert'
             const description = isAdmin() 
               ? `Anfrage von ${blocked.requester_name} - Status: ${blocked.request_stage}` 
               : 'Dieser Zeitraum ist vorübergehend blockiert'
@@ -259,19 +304,53 @@ const SimpleMonthCalendar = ({
       }
 
       setEvents(calendarEvents)
-      setLastLoadedMonth(currentMonthKey) // Update cache key
+      console.log('📅 Calendar: Loaded', calendarEvents.length, 'events')
     } catch (error) {
       console.error('Error loading events:', error)
     } finally {
       setLoading(false)
       setIsRefreshing(false)
     }
-  }, [isAdmin, currentDate, isRefreshing])
+  }, [isAdmin, currentDate, user])
 
-  // Load events on component mount and when dependencies change
+  // Load events on component mount only - wait for auth to complete
   useEffect(() => {
-    loadAllEvents()
-  }, [loadAllEvents])
+    let mounted = true
+    
+    const loadEventsSafely = async () => {
+      // Load events regardless of authentication status
+      // Events should be visible to all users (logged in or not)
+      if (mounted) {
+        console.log('📅 Calendar: Loading events (auth status:', authLoading ? 'loading' : 'complete', ')')
+        try {
+          await loadAllEvents()
+        } catch (error) {
+          console.error('Error loading events:', error)
+          if (mounted) {
+            setLoading(false)
+            setIsRefreshing(false)
+          }
+        }
+      }
+    }
+
+    // Load events immediately - no need to wait for auth
+    loadEventsSafely()
+    
+    // Safety timeout to prevent infinite loading - reduced to 3 seconds for faster response
+        const timeout = setTimeout(() => {
+          if (mounted) {
+            setLoading(false)
+            setIsRefreshing(false)
+          }
+        }, 1500) // 1.5 second timeout for faster loading
+    
+    return () => {
+      mounted = false
+      clearTimeout(timeout)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Handle date selection
   const handleSelectSlot = useCallback((slotInfo) => {
@@ -360,6 +439,7 @@ const SimpleMonthCalendar = ({
       </div>
     )
   }
+
 
   if (loading) {
     return (

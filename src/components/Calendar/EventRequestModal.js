@@ -29,8 +29,15 @@ const EventRequestModal = ({ selectedDate, onClose, onSuccess }) => {
   // Set default date if selectedDate is provided
   React.useEffect(() => {
     if (selectedDate?.start) {
-      const date = selectedDate.start.toISOString().split('T')[0] // Get YYYY-MM-DD format
-      setFormData(prev => ({ ...prev, event_date: date }))
+      try {
+        const dateObj = new Date(selectedDate.start)
+        if (!isNaN(dateObj.getTime())) {
+          const date = dateObj.toISOString().split('T')[0] // Get YYYY-MM-DD format
+          setFormData(prev => ({ ...prev, event_date: date }))
+        }
+      } catch (error) {
+        console.warn('Invalid selectedDate.start:', error)
+      }
     }
   }, [selectedDate])
 

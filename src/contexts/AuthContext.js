@@ -188,11 +188,19 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
-  // Check if user is admin
+  // Check if user is superadmin
+  const isSuperAdmin = () => {
+    const isSuperAdminByEmail = user?.email === 'admin@admin.com'
+    const isSuperAdminByRole = profile?.role === USER_ROLES.SUPERADMIN
+    
+    return isSuperAdminByRole || isSuperAdminByEmail
+  }
+
+  // Check if user is admin (includes superadmin)
   const isAdmin = () => {
     // Check if user email is admin@admin.com as fallback
     const isAdminByEmail = user?.email === 'admin@admin.com'
-    const isAdminByRole = profile?.role === USER_ROLES.ADMIN
+    const isAdminByRole = profile?.role === USER_ROLES.ADMIN || profile?.role === USER_ROLES.SUPERADMIN
     
     const isAdminUser = isAdminByRole || isAdminByEmail
     return isAdminUser
@@ -200,7 +208,7 @@ export const AuthProvider = ({ children }) => {
 
   // Check if user is member or admin
   const isMember = () => {
-    return profile?.role === USER_ROLES.MEMBER || profile?.role === USER_ROLES.ADMIN
+    return profile?.role === USER_ROLES.MEMBER || profile?.role === USER_ROLES.ADMIN || profile?.role === USER_ROLES.SUPERADMIN
   }
 
   // Initialize auth state
@@ -230,15 +238,19 @@ export const AuthProvider = ({ children }) => {
             window.history.replaceState({}, document.title, window.location.pathname)
           }
         } else {
-          // Normal page load - clear any old sessions
-          const supabaseKeys = Object.keys(localStorage).filter(key => key.startsWith('sb-'))
-          supabaseKeys.forEach(key => {
-            localStorage.removeItem(key)
-          })
+          // Normal page load - check for existing session
+          const { data: { session }, error } = await supabase.auth.getSession()
           
-          await supabase.auth.signOut()
-          setUser(null)
-          setProfile(null)
+          if (session?.user) {
+            console.log('Existing session found:', session.user.email)
+            setUser(session.user)
+            const userProfile = await getProfile(session.user.id)
+            setProfile(userProfile)
+          } else {
+            console.log('No existing session found')
+            setUser(null)
+            setProfile(null)
+          }
         }
       } catch (error) {
         console.error('Error during auth initialization:', error)
@@ -284,6 +296,7 @@ export const AuthProvider = ({ children }) => {
     signIn,
     signOut,
     updateProfile,
+    isSuperAdmin,
     isAdmin,
     isMember
   }

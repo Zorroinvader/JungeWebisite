@@ -12,19 +12,19 @@ const ProfilePage = () => {
   const [isLoadingRequests, setIsLoadingRequests] = useState(false)
 
   const loadEventRequests = useCallback(async () => {
-    if (isLoadingRequests) {
+    if (isLoadingRequests || !user?.id) {
       return
     }
     setIsLoadingRequests(true)
     try {
-      const data = await eventRequestsAPI.getByUser(user?.id)
+      const data = await eventRequestsAPI.getByUser(user.id)
       if (data) {
         setLoading(false)
       }
     } catch (err) {
       console.error('Error loading event requests:', err)
-    } finally {
       setLoading(false)
+    } finally {
       setIsLoadingRequests(false)
     }
   }, [isLoadingRequests, user?.id])
@@ -46,7 +46,7 @@ const ProfilePage = () => {
     const safetyTimeout = setTimeout(() => {
       setLoading(false)
       setIsLoadingRequests(false)
-    }, 10000) // 10 second timeout
+    }, 5000) // 5 second timeout
     
     return () => {
       clearInterval(refreshInterval)
@@ -85,14 +85,14 @@ const ProfilePage = () => {
         </div>
 
         {/* Event Requests Section */}
-        <div className="bg-white dark:bg-[#EBE9E9] rounded-2xl shadow-xl border-2 border-[#A58C81] dark:border-[#A58C81]">
+        <div className="bg-white dark:bg-[#2a2a2a] rounded-2xl shadow-xl border-2 border-[#A58C81] dark:border-[#A58C81]">
           <div className="p-8 border-b border-[#A58C81] dark:border-[#A58C81]">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold mb-2 text-[#252422] dark:text-[#252422]">
+                <h2 className="text-2xl font-bold mb-2 text-[#252422] dark:text-[#F4F1E8]">
                   Meine Event-Anfragen
                 </h2>
-                <p className="text-base text-[#A58C81] dark:text-[#A58C81]">
+                <p className="text-base text-[#A58C81] dark:text-[#EBE9E9]">
                   Hier sehen Sie alle Ihre eingereichten Event-Anfragen und deren Status
                 </p>
               </div>
@@ -114,7 +114,7 @@ const ProfilePage = () => {
           </div>
 
           {/* DSGVO Compliance Section */}
-          <div className="p-8 border-t border-gray-200 dark:border-gray-700">
+          <div className="p-8 border-t border-[#A58C81] dark:border-[#A58C81]">
             <DSGVOCompliance userId={user?.id} userEmail={user?.email} />
           </div>
         </div>

@@ -31,7 +31,15 @@ export const getAdminSettings = () => {
  */
 export const getAdminNotificationEmails = () => {
   const settings = getAdminSettings()
-  return settings.adminEmails || []
+  const emails = settings.adminEmails || []
+  
+  // If no emails configured, use admin@admin.com as default
+  if (emails.length === 0) {
+    console.warn('No admin emails configured, using default: admin@admin.com')
+    return ['admin@admin.com']
+  }
+  
+  return emails
 }
 
 /**
@@ -186,7 +194,7 @@ export const sendUserNotification = async (userEmail, eventData, type) => {
         'Authorization': `Bearer ${supabaseKey}`,
       },
       body: JSON.stringify({
-        adminEmails: [userEmail],
+        recipients: [userEmail],
         subject,
         message,
         htmlContent,
@@ -331,7 +339,7 @@ export const sendAdminNotification = async (eventData, type = 'initial_request')
         'Authorization': `Bearer ${supabaseKey}`,
       },
       body: JSON.stringify({
-        adminEmails,
+        recipients: adminEmails,
         subject,
         message,
         htmlContent,

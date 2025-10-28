@@ -9,6 +9,7 @@ import UserManagement from './UserManagement'
 import ThreeStepRequestManagement from './ThreeStepRequestManagement'
 import AdminEventCreationForm from './AdminEventCreationForm'
 import AdminEventEditForm from './AdminEventEditForm'
+// import SimpleMonthCalendar from '../Calendar/SimpleMonthCalendar' // Removed to speed up admin panel
 import { fetchAndParseICS, convertToDBEvent } from '../../utils/icsParser'
 
 const AdminPanelClean = () => {
@@ -18,7 +19,8 @@ const AdminPanelClean = () => {
 
   const tabs = [
     { id: 'three-step-requests', name: '3-Schritt Anfragen', icon: Workflow },
-    { id: 'events', name: 'Events verwalten', icon: Calendar },
+    { id: 'events', name: 'Events verwalten', icon: FileText },
+    { id: 'special-events', name: 'Special Events', icon: Eye },
     { id: 'users', name: 'Benutzer verwalten', icon: Users },
     { id: 'settings', name: 'Einstellungen', icon: Settings }
   ]
@@ -91,6 +93,8 @@ const AdminPanelClean = () => {
         return <ThreeStepRequestManagement />
       case 'events':
         return <EventsTab />
+      case 'special-events':
+        return <SpecialEventsTab />
       case 'users':
         return <UsersTab />
       case 'settings':
@@ -147,6 +151,57 @@ const AdminPanelClean = () => {
   )
 }
 
+// Calendar tab component - REMOVED to speed up admin panel loading
+// const CalendarTab = () => {
+//   const [currentDate, setCurrentDate] = useState(new Date())
+//   const [onEventUpdated, setOnEventUpdated] = useState(0)
+//   const [shouldLoad, setShouldLoad] = useState(false)
+
+//   // Only load calendar when component mounts (tab is active)
+//   useEffect(() => {
+//     setShouldLoad(true)
+//     return () => setShouldLoad(false)
+//   }, [])
+
+//   const handleNavigate = (date) => {
+//     setCurrentDate(date)
+//   }
+
+//   const handleDateClick = (date) => {
+//     // Handle date click if needed
+//   }
+
+//   const handleEventUpdated = () => {
+//     // Trigger calendar refresh
+//     setOnEventUpdated(prev => prev + 1)
+//   }
+
+//   return (
+//     <div>
+//       <div className="mb-6">
+//         <h2 className="text-xl font-semibold text-gray-900 dark:text-[#F4F1E8] mb-2">
+//           Kalender-Ansicht
+//         </h2>
+//         <p className="text-sm text-gray-600 dark:text-[#EBE9E9]">
+//           Übersicht aller Events im Kalenderformat
+//         </p>
+//       </div>
+      
+//       <div className="bg-white dark:bg-[#2a2a2a] rounded-lg border-2 border-[#A58C81] dark:border-[#4a4a4a] p-4">
+//         {shouldLoad && (
+//           <SimpleMonthCalendar
+//             currentDate={currentDate}
+//             onNavigate={handleNavigate}
+//             onDateClick={handleDateClick}
+//             onEventUpdated={handleEventUpdated}
+//             key={`admin-calendar-${onEventUpdated}`}
+//           />
+//         )}
+//       </div>
+//     </div>
+//   )
+// }
+
 // Events tab component
 const EventsTab = () => {
   const [events, setEvents] = useState([])
@@ -158,15 +213,57 @@ const EventsTab = () => {
 
   useEffect(() => {
     loadEvents()
+    
+    // Safety timeout to prevent infinite loading
+    const timeout = setTimeout(() => {
+      setLoading(false)
+    }, 5000) // 5 second timeout
+    
+    return () => clearTimeout(timeout)
   }, [])
 
   const loadEvents = async () => {
     try {
       setLoading(true)
+      setError(null)
+      
+      console.log('📋 Admin Events: Loading events...')
       // Get all events directly from events table
-      const data = await eventsAPI.getAll()
-      setEvents(data || [])
+      let data = []
+      try {
+        data = await eventsAPI.getAll()
+        console.log('📋 Admin Events: API response:', data)
+        console.log('📋 Admin Events: Total events loaded:', data?.length || 0)
+      } catch (error) {
+        console.error('📋 Admin Events: Primary API failed, trying fallback:', error)
+        try {
+          data = await eventsAPI.getAllDirect()
+          console.log('📋 Admin Events: Fallback API success:', data?.length || 0, 'events')
+        } catch (fallbackError) {
+          console.error('📋 Admin Events: Direct API failed, trying ultra-simple:', fallbackError)
+          try {
+            data = await eventsAPI.getAllSimple()
+            console.log('📋 Admin Events: Ultra-simple API success:', data?.length || 0, 'events')
+          } catch (simpleError) {
+            console.error('📋 Admin Events: All API methods failed:', simpleError)
+            data = []
+          }
+        }
+      }
+      
+      // Filter out past events - only show future events
+      const now = new Date()
+      const futureEvents = (data || []).filter(event => {
+        const eventDate = new Date(event.start_date || event.end_date)
+        const isFuture = eventDate >= now
+        console.log(`📋 Admin Events: Event "${event.title}" - Date: ${event.start_date}, Is Future: ${isFuture}`)
+        return isFuture
+      })
+      
+      console.log('📋 Admin Events: Future events count:', futureEvents.length)
+      setEvents(futureEvents)
     } catch (err) {
+      console.error('📋 Admin Events: Error loading events:', err)
       setError(err.message)
     } finally {
       setLoading(false)
@@ -1018,3 +1115,11 @@ const SettingsTab = () => {
 }
 
 export default AdminPanelClean
+
+const SpecialEventsTab = () => {
+  const [mounted, setMounted] = React.useState(false)
+  useEffect(() => { setMounted(true) }, [])
+  if (!mounted) return null
+  const SpecialEventModeration = require('./SpecialEventModeration').default
+  return <SpecialEventModeration />
+}

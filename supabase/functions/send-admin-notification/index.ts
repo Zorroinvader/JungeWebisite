@@ -24,16 +24,20 @@ serve(async (req) => {
     console.log('✅ API Key found, length:', RESEND_API_KEY.length)
 
     // Parse request body
-    const { adminEmails, subject, message, htmlContent } = await req.json()
+    const { adminEmails, subject, message, htmlContent, recipients } = await req.json()
 
     console.log('📧 Request received:')
-    console.log('  - To:', adminEmails)
+    console.log('  - Admin emails:', adminEmails)
+    console.log('  - Recipients:', recipients)
     console.log('  - Subject:', subject)
     console.log('  - Has HTML:', !!htmlContent)
 
+    // Determine recipients - prefer recipients parameter, fallback to adminEmails
+    const emailRecipients = recipients || adminEmails
+
     // Validate input
-    if (!adminEmails || !Array.isArray(adminEmails) || adminEmails.length === 0) {
-      throw new Error('No admin emails provided')
+    if (!emailRecipients || !Array.isArray(emailRecipients) || emailRecipients.length === 0) {
+      throw new Error('No recipient emails provided')
     }
 
     // Send email using Resend API
@@ -41,7 +45,7 @@ serve(async (req) => {
     
     const emailPayload = {
       from: 'Event Management <onboarding@resend.dev>',
-      to: adminEmails,
+      to: emailRecipients,
       subject: subject,
       html: htmlContent || message,
       text: message,

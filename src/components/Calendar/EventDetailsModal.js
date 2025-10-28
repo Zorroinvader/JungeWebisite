@@ -1,12 +1,16 @@
 import React, { useState } from 'react'
-import { X, MapPin, Clock, Users, FileText, Calendar, Lock, Edit } from 'lucide-react'
+import { X, MapPin, Clock, Users, FileText, Calendar, Lock, Edit, Trash2 } from 'lucide-react'
 import moment from 'moment'
 import { useAuth } from '../../contexts/AuthContext'
 import QuickEventEditModal from './QuickEventEditModal'
+import { eventsAPI, eventRequestsAPI } from '../../services/httpApi'
 
 const EventDetailsModal = ({ event, onClose, onEventUpdated }) => {
   const { isAdmin } = useAuth()
   const [showQuickEdit, setShowQuickEdit] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteMessage, setDeleteMessage] = useState('')
   
   if (!event) return null
 
@@ -15,6 +19,7 @@ const EventDetailsModal = ({ event, onClose, onEventUpdated }) => {
   console.log('EventDetailsModal - isPrivate:', event.isPrivate)
   console.log('EventDetailsModal - is_private:', event.is_private)
   console.log('EventDetailsModal - isAdmin:', isAdmin())
+  console.log('EventDetailsModal - Admin check:', isAdmin())
 
   const formatDate = (dateString) => {
     return moment(dateString).format('dddd, DD. MMMM YYYY [um] HH:mm')
@@ -42,6 +47,82 @@ const EventDetailsModal = ({ event, onClose, onEventUpdated }) => {
   const isPrivate = event.isPrivate || event.is_private || false
   const isBlocked = event.isBlocked || (isPrivate && !isAdmin())
   const isRequest = event.isRequest || false
+  
+  // Check if event ID starts with "request-" (it's a request)
+  const isRequestById = typeof event.id === 'string' && event.id.startsWith('request-')
+  
+  // Check if it's a temporary blocker (temp-blocked-XXX)
+  const isTemporaryBlocker = typeof event.id === 'string' && event.id.startsWith('temp-blocked-')
+  
+  const isAcceptedRequest = event.resource?.isRequest || event.resource?.status === 'pending' || false
+  
+  // Check if this event has a linked request ID
+  const hasLinkedRequest = event.resource?.request_id || event.request_id || false
+  
+  console.log('Event details:', {
+    id: event.id,
+    isRequest,
+    isRequestById,
+    isTemporaryBlocker,
+    isAcceptedRequest,
+    hasLinkedRequest,
+    resource: event.resource
+  })
+
+  // Handle delete event
+  const handleDelete = async () => {
+    setDeleting(true)
+    
+    // Close modal immediately for better UX
+    setShowDeleteConfirm(false)
+    onClose()
+    
+    try {
+      console.log('🗑️ Deleting event:', event.id, 'Is request:', isRequest, 'Is request by ID:', isRequestById, 'Is temporary blocker:', isTemporaryBlocker, 'Has linked request:', hasLinkedRequest)
+      
+      // Extract actual request ID based on event ID format
+      let actualRequestId = event.id
+      if (isRequestById) {
+        actualRequestId = event.id.replace('request-', '')
+      } else if (isTemporaryBlocker) {
+        actualRequestId = event.id.replace('temp-blocked-', '')
+      }
+      
+      if (isTemporaryBlocker || isRequest || isRequestById || isAcceptedRequest) {
+        // This is a temporary blocker or event request - decline it
+        console.log('Declining request/blocker:', actualRequestId)
+        await eventRequestsAPI.rejectRequest(actualRequestId, 'Vom Administrator abgelehnt')
+        setDeleteMessage('Event-Anfrage wurde abgelehnt')
+      } else if (hasLinkedRequest) {
+        // This event was created from a request - delete both the event and the request
+        console.log('Deleting event with linked request:', event.id, 'Request ID:', hasLinkedRequest)
+        await eventsAPI.delete(event.id)
+        await eventRequestsAPI.rejectRequest(hasLinkedRequest, 'Vom Administrator gelöscht')
+        setDeleteMessage('Event und Anfrage wurden gelöscht')
+      } else {
+        // Regular event - delete it
+        console.log('Deleting regular event:', event.id)
+        await eventsAPI.delete(event.id)
+        setDeleteMessage('Event wurde gelöscht')
+      }
+      
+      // Show success message briefly
+      setTimeout(() => setDeleteMessage(''), 3000)
+      
+      // Refresh calendar after successful deletion
+      if (onEventUpdated) {
+        onEventUpdated()
+      }
+    } catch (err) {
+      console.error('Error deleting event:', err)
+      setDeleteMessage('Fehler: ' + err.message)
+      setTimeout(() => setDeleteMessage(''), 5000)
+      // Reopen modal if there was an error
+      setShowDeleteConfirm(true)
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -195,13 +276,28 @@ const EventDetailsModal = ({ event, onClose, onEventUpdated }) => {
           {/* Action Buttons */}
           <div className="flex justify-between pt-6 border-t border-gray-200 mt-6">
             {isAdmin() && (
-              <button
-                onClick={() => setShowQuickEdit(true)}
-                className="px-4 py-2 text-sm font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg transition-colors flex items-center"
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Zeit ändern
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowQuickEdit(true)}
+                  className="px-4 py-2 text-sm font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg transition-colors flex items-center"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Event bearbeiten
+                </button>
+                <button
+                  onClick={() => {
+                    console.log('🗑️ Delete button clicked');
+                    console.log('Is admin:', isAdmin());
+                    console.log('Is request:', isRequest);
+                    setShowDeleteConfirm(true);
+                  }}
+                  disabled={deleting}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex items-center disabled:opacity-50"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  {(isTemporaryBlocker || isRequest || isRequestById || isAcceptedRequest) ? 'Ablehnen' : hasLinkedRequest ? 'Event & Anfrage löschen' : 'Löschen'}
+                </button>
+              </div>
             )}
             <button
               onClick={onClose}
@@ -225,6 +321,62 @@ const EventDetailsModal = ({ event, onClose, onEventUpdated }) => {
             onClose();
           }}
         />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              {(isTemporaryBlocker || isRequest || isRequestById || isAcceptedRequest) ? 'Event-Anfrage ablehnen?' : hasLinkedRequest ? 'Event und Anfrage löschen?' : 'Event löschen?'}
+            </h3>
+            <p className="text-gray-600 mb-6">
+              {(isTemporaryBlocker || isRequest || isRequestById || isAcceptedRequest)
+                ? 'Möchten Sie diese Event-Anfrage wirklich ablehnen? Die Anfrage wird als abgelehnt markiert und der Block wird entfernt.'
+                : hasLinkedRequest
+                ? 'Möchten Sie dieses Event und die zugehörige Anfrage wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.'
+                : 'Möchten Sie dieses Event wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.'}
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md disabled:opacity-50 flex items-center"
+              >
+                {deleting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Wird gelöscht...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    {(isTemporaryBlocker || isRequest || isRequestById || isAcceptedRequest) ? 'Anfrage ablehnen' : hasLinkedRequest ? 'Event & Anfrage löschen' : 'Event löschen'}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success/Error Toast */}
+      {deleteMessage && (
+        <div className="fixed top-4 right-4 bg-white border border-gray-300 rounded-lg shadow-lg p-4 z-[70] animate-slide-in">
+          <div className="flex items-center">
+            <div className={`flex-shrink-0 ${deleteMessage.includes('Fehler') ? 'text-red-600' : 'text-green-600'}`}>
+              {deleteMessage.includes('Fehler') ? '❌' : '✅'}
+            </div>
+            <p className="ml-3 text-sm font-medium text-gray-900">{deleteMessage}</p>
+          </div>
+        </div>
       )}
     </div>
   )
