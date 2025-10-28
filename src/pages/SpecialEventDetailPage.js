@@ -11,8 +11,8 @@ import {
   getPublicImageUrl,
   getUserUploadForEvent,
   deleteUserUpload
+  
 } from '../services/specialEvents'
-
 const SpecialEventDetailPage = () => {
   const { user, isAdmin } = useAuth()
   const { slug } = useParams()
