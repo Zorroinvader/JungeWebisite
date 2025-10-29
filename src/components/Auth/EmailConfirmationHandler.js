@@ -26,32 +26,36 @@ const EmailConfirmationHandler = () => {
 
       if (token && type === 'signup') {
         try {
-          console.log('Attempting to confirm email with token...');
+          console.log('Getting session from Supabase (auto-handles email confirmation)...');
           
-          // Exchange the token for a session - use the full token, not just token_hash
-          const { data, error: confirmError } = await supabase.auth.verifyOtp({
-            token: token,
-            type: 'signup'
-          });
+          // Supabase automatically handles the token from the URL
+          // Just get the session which will be created from the token
+          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-          if (confirmError) {
-            console.error('Error verifying OTP:', confirmError);
-            setError(confirmError.message);
+          if (sessionError) {
+            console.error('Error getting session:', sessionError);
+            setError(sessionError.message);
             setChecking(false);
             return;
           }
 
-          console.log('Email confirmed successfully:', data);
-          setConfirmed(true);
-          setChecking(false);
-          
-          // Clean up the URL
-          window.history.replaceState({}, document.title, window.location.pathname);
-          
-          // Redirect to home page after 1 second
-          setTimeout(() => {
-            navigate('/');
-          }, 1000);
+          if (session?.user) {
+            console.log('Email confirmed successfully, user:', session.user.email);
+            setConfirmed(true);
+            setChecking(false);
+            
+            // Clean up the URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+            
+            // Redirect to home page after 1 second
+            setTimeout(() => {
+              navigate('/');
+            }, 1000);
+          } else {
+            console.log('No session found after confirmation');
+            setError('E-Mail-Bestätigung fehlgeschlagen. Bitte versuchen Sie sich anzumelden.');
+            setChecking(false);
+          }
         } catch (err) {
           console.error('Error in email confirmation:', err);
           setError(err.message);
