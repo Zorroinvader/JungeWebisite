@@ -27,11 +27,6 @@ export const getAdminSettings = () => {
 
 // Resolve the correct public base URL for links in emails (prod-safe)
 const getBaseUrl = () => {
-  try {
-    if (typeof window !== 'undefined' && window.location?.origin) {
-      return window.location.origin
-    }
-  } catch (_) {}
   // Fallback to production domain if not running in browser
   return 'https://jungengesellschaft-website.vercel.app'
 }
@@ -260,7 +255,7 @@ export const sendAdminNotification = async (eventData, type = 'initial_request')
                 `Kontakt: ${eventData.requester_email}\n` +
                 `Zeitraum: ${eventData.start_date ? new Date(eventData.start_date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''}${eventData.end_date && eventData.end_date !== eventData.start_date ? ' - ' + new Date(eventData.end_date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''}\n` +
                 `Kategorie: ${eventData.event_type}\n\n` +
-                `Zum Admin-Panel: http://localhost:3000/admin\n\n` +
+                `Zum Admin-Panel: http://https://junge-webisite-mvn3-a72dxa2b8-jws-projects-4bdc346f.vercel.app//admin\n\n` +
                 `Mit freundlichen Grüßen\n` +
                 `Ihr Event-Management-System\n\n` +
                 `Junge Gesellschaft Pferdestall Wedes Wedel\n` +
@@ -282,7 +277,7 @@ export const sendAdminNotification = async (eventData, type = 'initial_request')
                 `STATUS\n` +
                 `${'-'.repeat(50)}\n` +
                 `Mietvertrag hochgeladen: Ja\n\n` +
-                `Zum Admin-Panel: http://localhost:3000/admin\n\n` +
+                `Zum Admin-Panel: http://https://junge-webisite-mvn3-a72dxa2b8-jws-projects-4bdc346f.vercel.app//admin\n\n` +
                 `Mit freundlichen Grüßen\n` +
                 `Ihr Event-Management-System\n\n` +
                 `Junge Gesellschaft Pferdestall Wedes Wedel\n` +
