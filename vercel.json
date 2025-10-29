@@ -10,8 +10,21 @@
     }
   ],
   "routes": [
+    { "handle": "filesystem" },
+    {
+      "src": "/assets/(.*)",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable"
+      }
+    },
     {
       "src": "/static/(.*)",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable"
+      }
+    },
+    {
+      "src": "/(.*\\.(jpg|jpeg|png|gif|svg|ico|webp|avif|pdf))",
       "headers": {
         "cache-control": "public, max-age=31536000, immutable"
       }
