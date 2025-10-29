@@ -43,13 +43,18 @@ const EmailConfirmationHandler = () => {
 
           console.log('Email confirmed successfully:', data);
           setConfirmed(true);
+          setChecking(false);
           
           // Clean up the URL
           window.history.replaceState({}, document.title, window.location.pathname);
+          
+          // Redirect to home page after 1 second
+          setTimeout(() => {
+            navigate('/');
+          }, 1000);
         } catch (err) {
           console.error('Error in email confirmation:', err);
           setError(err.message);
-        } finally {
           setChecking(false);
         }
       } else {
@@ -60,7 +65,7 @@ const EmailConfirmationHandler = () => {
     };
 
     handleEmailConfirmation();
-  }, []);
+  }, [navigate]);
 
   if (checking) {
     return (
@@ -127,15 +132,8 @@ const EmailConfirmationHandler = () => {
           Willkommen bei Junge Gesellschaft!
         </p>
         <p className={`text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mb-6`}>
-          Ihr Konto wurde erfolgreich aktiviert. Sie können sich jetzt anmelden.
+          Sie werden zur Startseite weitergeleitet...
         </p>
-        
-        <button
-          onClick={() => navigate('/')}
-          className={`w-full px-6 py-3 bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} text-white rounded-lg hover:opacity-90 transition-opacity font-semibold`}
-        >
-          Zur Startseite
-        </button>
       </div>
     </div>
   );
