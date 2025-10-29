@@ -127,21 +127,21 @@ const EmailConfirmationHandler = () => {
           Willkommen bei Junge Gesellschaft!
         </p>
         <p className={`text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mb-6`}>
-          Sie sind jetzt angemeldet und können Event-Anfragen stellen.
+          Ihr Konto wurde erfolgreich aktiviert. Bitte melden Sie sich an, um fortzufahren.
         </p>
         
         <div className="flex flex-col gap-3">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/login')}
             className={`w-full px-6 py-3 bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} text-white rounded-lg hover:opacity-90 transition-opacity font-semibold`}
           >
-            Zur Startseite
+            Zur Anmeldung
           </button>
           <button
-            onClick={() => navigate('/profile')}
+            onClick={() => navigate('/')}
             className={`w-full px-6 py-3 border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} rounded-lg hover:bg-gray-50 ${isDarkMode ? 'dark:hover:bg-[#1a1a1a]' : ''} transition-colors font-semibold`}
           >
-            Zu meinem Profil
+            Zur Startseite
           </button>
         </div>
       </div>
