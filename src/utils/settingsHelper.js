@@ -25,6 +25,17 @@ export const getAdminSettings = () => {
   }
 }
 
+// Resolve the correct public base URL for links in emails (prod-safe)
+const getBaseUrl = () => {
+  try {
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      return window.location.origin
+    }
+  } catch (_) {}
+  // Fallback to production domain if not running in browser
+  return 'https://jungengesellschaft-website.vercel.app'
+}
+
 /**
  * Get the list of admin emails for notifications
  * @returns {Array<string>} Array of admin email addresses
@@ -121,7 +132,7 @@ export const sendUserNotification = async (userEmail, eventData, type) => {
                 `Zeitraum reserviert: Der gewünschte Zeitraum ist vorläufig für Sie reserviert\n` +
                 `In Bearbeitung: Ein Administrator prüft Ihre Anfrage\n\n` +
                 `Sie erhalten eine weitere E-Mail, sobald Ihre Anfrage bearbeitet wurde.\n\n` +
-                `Status verfolgen: http://localhost:3000/event-tracking\n\n` +
+                `Status verfolgen: ${getBaseUrl()}/event-tracking\n\n` +
                 `Mit freundlichen Grüßen\n` +
                 `Ihr Event-Management-Team\n\n` +
                 `Junge Gesellschaft Pferdestall Wedes Wedel\n` +
@@ -142,7 +153,7 @@ export const sendUserNotification = async (userEmail, eventData, type) => {
                 `1. Genaue Start- und Endzeiten\n` +
                 `2. Gewünschte Schlüsselübergabe- und Rückgabezeiten\n` +
                 `3. Signierter Mietvertrag (als PDF)\n\n` +
-                `Details ergänzen: http://localhost:3000/event-tracking\n\n` +
+                `Details ergänzen: ${getBaseUrl()}/event-tracking\n\n` +
                 `Mit freundlichen Grüßen\n` +
                 `Ihr Event-Management-Team\n\n` +
                 `Junge Gesellschaft Pferdestall Wedes Wedel\n` +
@@ -162,7 +173,7 @@ export const sendUserNotification = async (userEmail, eventData, type) => {
                 `${'-'.repeat(50)}\n` +
                 `Ihr Event ist jetzt im Kalender eingetragen und reserviert.\n` +
                 `Alle Details wurden bestätigt.\n\n` +
-                `Kalender ansehen: http://localhost:3000/\n\n` +
+                `Kalender ansehen: ${getBaseUrl()}/\n\n` +
                 `Wir wünschen Ihnen eine erfolgreiche Veranstaltung!\n\n` +
                 `Mit freundlichen Grüßen\n` +
                 `Ihr Event-Management-Team\n\n` +
@@ -377,7 +388,7 @@ export const sendAdminNotification = async (eventData, type = 'initial_request')
  * Generate HTML email template for user notifications
  */
 export const generateUserEmailHTML = (subject, message, eventData, type) => {
-  const buttonUrl = type === 'initial_request_accepted' ? 'http://localhost:3000/event-tracking' : 'http://localhost:3000/'
+  const buttonUrl = type === 'initial_request_accepted' ? `${getBaseUrl()}/event-tracking` : `${getBaseUrl()}/`
   const buttonText = type === 'initial_request_accepted' ? 'Details ergänzen' : type === 'final_approval' ? 'Kalender ansehen' : 'Status verfolgen'
   
   // Format dates nicely
@@ -422,7 +433,7 @@ export const generateUserEmailHTML = (subject, message, eventData, type) => {
 <body>
   <div class="email-wrapper">
     <div class="header">
-      <img src="http://localhost:3000/assets/Wappen-Junge-Gesellschaft-Pferdestall-Wedes-Wedel.png" alt="Junge Gesellschaft" class="logo" />
+      <img src="${getBaseUrl()}/assets/Wappen-Junge-Gesellschaft-Pferdestall-Wedes-Wedel.png" alt="Junge Gesellschaft" class="logo" />
       <h1 class="header-title">Junge Gesellschaft Pferdestall</h1>
     </div>
     
@@ -485,8 +496,8 @@ export const generateUserEmailHTML = (subject, message, eventData, type) => {
       <p style="margin: 0 0 10px 0; font-weight: 600;">Junge Gesellschaft Pferdestall Wedes Wedel</p>
       <p style="margin: 0; color: #A58C81;">Event-Anfragen: kontakt@junge-gesellschaft-wedel.de</p>
       <div class="footer-links">
-        <a href="http://localhost:3000/">Startseite</a> | 
-        <a href="http://localhost:3000/event-tracking">Status verfolgen</a>
+        <a href="${getBaseUrl()}/">Startseite</a> | 
+        <a href="${getBaseUrl()}/event-tracking">Status verfolgen</a>
       </div>
       <p style="margin: 15px 0 0 0; color: #A58C81; font-size: 11px;">Diese E-Mail wurde automatisch generiert.</p>
     </div>
@@ -547,7 +558,7 @@ export const generateEmailHTML = (subject, message, eventData, type) => {
 <body>
   <div class="email-wrapper">
     <div class="header">
-      <img src="http://localhost:3000/assets/Wappen-Junge-Gesellschaft-Pferdestall-Wedes-Wedel.png" alt="Junge Gesellschaft" class="logo" />
+      <img src="${getBaseUrl()}/assets/Wappen-Junge-Gesellschaft-Pferdestall-Wedes-Wedel.png" alt="Junge Gesellschaft" class="logo" />
       <h1 class="header-title">Junge Gesellschaft Pferdestall</h1>
     </div>
     
@@ -575,7 +586,7 @@ export const generateEmailHTML = (subject, message, eventData, type) => {
         ${type === 'detailed_info_submitted' ? '<div class="status-badge">Mietvertrag hochgeladen</div>' : ''}
         
         <center>
-          <a href="http://localhost:3000/admin" class="cta-button">Zum Admin-Panel</a>
+          <a href="${getBaseUrl()}/admin" class="cta-button">Zum Admin-Panel</a>
         </center>
         
         <p style="margin-top: 30px; color: #A58C81; font-size: 14px;">
@@ -593,8 +604,8 @@ export const generateEmailHTML = (subject, message, eventData, type) => {
       <p style="margin: 0 0 10px 0; font-weight: 600;">Junge Gesellschaft Pferdestall Wedes Wedel</p>
       <p style="margin: 0; color: #A58C81;">Event-Anfragen: kontakt@junge-gesellschaft-wedel.de</p>
       <div class="footer-links">
-        <a href="http://localhost:3000/">Startseite</a> | 
-        <a href="http://localhost:3000/admin">Admin-Panel</a>
+        <a href="${getBaseUrl()}/">Startseite</a> | 
+        <a href="${getBaseUrl()}/admin">Admin-Panel</a>
       </div>
       <p style="margin: 15px 0 0 0; color: #A58C81; font-size: 11px;">Diese E-Mail wurde automatisch generiert.</p>
     </div>
