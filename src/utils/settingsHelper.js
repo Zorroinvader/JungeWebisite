@@ -46,8 +46,8 @@ export const getAdminNotificationEmails = () => {
   
   // If no emails configured, use admin@admin.com as default
   if (emails.length === 0) {
-    console.warn('No admin emails configured, using default: admin@admin.com')
-    return ['admin@admin.com']
+    console.warn('No admin emails configured, using default: zorro.invader@gmail.com')
+    return ['zorro.invader@gmail.com', 'jungegesellschaft@wedelheine.de']
   }
   
   return emails
