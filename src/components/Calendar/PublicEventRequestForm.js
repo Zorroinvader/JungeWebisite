@@ -21,6 +21,8 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [adminEmailFailed, setAdminEmailFailed] = useState(false);
+  const [userEmailFailed, setUserEmailFailed] = useState(false);
 
   // Helper function to format date in local timezone (like your old code)
   const formatDateLocal = (date) => {
@@ -104,6 +106,8 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
       });
       setError('');
       setSuccess(false);
+      setAdminEmailFailed(false);
+      setUserEmailFailed(false);
     }
   }, [isOpen]);
 
@@ -198,6 +202,7 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
           }, 'initial_request');
         } catch (notifError) {
           console.warn('Failed to send admin notification:', notifError);
+          setAdminEmailFailed(true);
           // Don't fail the whole request if notification fails
         }
       }
@@ -215,6 +220,7 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
         }, 'initial_request_received');
       } catch (notifError) {
         console.warn('Failed to send user confirmation:', notifError);
+        setUserEmailFailed(true);
         // Don't fail the whole request if notification fails
       }
 
@@ -236,6 +242,8 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
           additional_notes: ''
         });
         setSuccess(false);
+        setAdminEmailFailed(false);
+        setUserEmailFailed(false);
       }, 2000);
 
     } catch (err) {
@@ -311,6 +319,32 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
                   </li>
                 </ul>
               </div>
+
+              {(adminEmailFailed || userEmailFailed) && (
+                <div className={`rounded-lg p-4 mb-6 border ${isDarkMode ? 'dark:border-red-800 dark:bg-red-900/20' : 'border-red-200 bg-red-50'}`}>
+                  <div className="flex items-start">
+                    <Mail className={`h-5 w-5 mt-0.5 mr-3 ${isDarkMode ? 'dark:text-red-400' : 'text-red-600'}`} />
+                    <div>
+                      <p className={`font-semibold mb-1 ${isDarkMode ? 'dark:text-red-300' : 'text-red-700'}`}>
+                        Hinweis: E-Mail-Versand teilweise fehlgeschlagen
+                      </p>
+                      {adminEmailFailed && (
+                        <p className={`text-sm mb-1 ${isDarkMode ? 'dark:text-red-200' : 'text-red-600'}`}>
+                          Die Benachrichtigung an die Administratoren konnte nicht gesendet werden. Ihre Anfrage wurde dennoch gespeichert.
+                        </p>
+                      )}
+                      {userEmailFailed && (
+                        <p className={`text-sm ${isDarkMode ? 'dark:text-red-200' : 'text-red-600'}`}>
+                          Die Bestätigungs-E-Mail an Sie konnte nicht zugestellt werden.
+                        </p>
+                      )}
+                      <p className={`text-xs mt-2 ${isDarkMode ? 'dark:text-red-200/80' : 'text-red-600/80'}`}>
+                        Sie können den Status jederzeit im Bereich "Status verfolgen" einsehen. Die Administratoren sehen Ihre Anfrage trotzdem im System.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className={`border-l-4 border-[#6054d9] pl-4 py-3 mb-6`}>
                 <h4 className={`font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} mb-2`}>

@@ -92,7 +92,7 @@ export const sendUserNotification = async (userEmail, eventData, type = 'initial
                 `In Bearbeitung: Ein Administrator prüft Ihre Anfrage\n\n` +
                 `Sie erhalten eine weitere E-Mail, sobald Ihre Anfrage bearbeitet wurde.\n\n` +
                 `Mit freundlichen Grüßen\n` +
-                `Ihr Event-Management-Team`;
+                `Junge Gesellschaft Wedes-Wedel`;
       break;
 
     case 'accepted':
@@ -106,7 +106,7 @@ export const sendUserNotification = async (userEmail, eventData, type = 'initial
                 `Ende: ${eventData.end_datetime ? new Date(eventData.end_datetime).toLocaleString('de-DE') : eventData.end_date}\n\n` +
                 `Ihr Event ist jetzt im Kalender eingetragen.\n\n` +
                 `Mit freundlichen Grüßen\n` +
-                `Ihr Event-Management-Team`;
+                `Junge Gesellschaft Wedes-Wedel`;
       break;
 
     case 'rejected':
@@ -117,7 +117,7 @@ export const sendUserNotification = async (userEmail, eventData, type = 'initial
                 `Zeitraum: ${eventData.start_date ? new Date(eventData.start_date).toLocaleDateString('de-DE') : ''}\n\n` +
                 `Für Rückfragen kontaktieren Sie uns bitte.\n\n` +
                 `Mit freundlichen Grüßen\n` +
-                `Ihr Event-Management-Team`;
+                `Junge Gesellschaft Wedes-Wedel`;
       break;
 
     default:
@@ -165,7 +165,7 @@ export const sendAdminNotificationEmail = async (adminEmails, eventData, type = 
                 `Kategorie: ${eventData.event_type || 'N/A'}\n\n` +
                 `Zum Admin-Panel: ${window.location.origin}/admin\n\n` +
                 `Mit freundlichen Grüßen\n` +
-                `Ihr Event-Management-System`;
+                `Das System :D`;
       break;
 
     default:
@@ -196,7 +196,7 @@ export const sendTestEmail = async (testEmail) => {
                   `dies ist eine Test-E-Mail.\n\n` +
                   `Wenn Sie diese E-Mail erhalten, funktioniert Ihr E-Mail-System korrekt.\n\n` +
                   `Mit freundlichen Grüßen\n` +
-                  `Ihr Event-Management-System`;
+                  `Das System :D`;
   
   const htmlContent = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
