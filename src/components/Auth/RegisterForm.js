@@ -20,7 +20,6 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
-  const [cooldownSeconds, setCooldownSeconds] = useState(0)
 
   // Note: Auth state change listener removed - we handle redirect directly after signup
 
@@ -103,37 +102,9 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
         if (error) {
           console.log('SignUp error:', error)
           
-          // Handle rate limiting specifically
-          if (error.message && (error.message.includes('rate limit') || error.message.includes('too many requests') || error.message.includes('429'))) {
-            setError('Zu viele Anfragen. Bitte warten Sie 60 Sekunden und versuchen Sie es erneut. Sie haben möglicherweise bereits ein Konto mit dieser E-Mail erstellt - überprüfen Sie Ihre E-Mails.')
-            
-            // Start cooldown period
-            setCooldownSeconds(60)
-            let seconds = 60
-            const cooldownInterval = setInterval(() => {
-              seconds--
-              setCooldownSeconds(seconds)
-              if (seconds <= 0) {
-                clearInterval(cooldownInterval)
-              }
-            }, 1000)
-          } else if (error.message && error.message.includes('Error sending confirmation email')) {
-            // User might already exist in auth but without a profile
-            console.log('Email send error - attempting to handle orphaned user')
-            
-            // Try to check and create profile for orphaned user
-            try {
-              const profileCreated = await profilesAPI.checkAndCreateProfileForUser(formData.email)
-              
-              if (profileCreated) {
-                setError('Ihr Konto existiert bereits, aber es fehlte ein Profil. Bitte versuchen Sie sich anzumelden. Falls es weiterhin nicht funktioniert, kontaktieren Sie bitte den Administrator.')
-              } else {
-                setError('Es gab ein Problem beim Senden der Bestätigungs-E-Mail. Bitte versuchen Sie sich anzumelden oder kontaktieren Sie den Administrator.')
-              }
-            } catch (profileError) {
-              console.error('Error handling orphaned user:', profileError)
-              setError('Es gab ein Problem beim Senden der Bestätigungs-E-Mail. Bitte versuchen Sie sich anzumelden oder kontaktieren Sie den Administrator.')
-            }
+          // Handle email sending errors
+          if (error.message && error.message.includes('Error sending confirmation email')) {
+            setError('Es gab ein Problem beim Senden der Bestätigungs-E-Mail. Bitte versuchen Sie sich anzumelden, um zu überprüfen, ob Ihr Konto existiert. Falls das Problem weiterhin besteht, kontaktieren Sie bitte den Administrator.')
           } else {
             setError(error.message)
           }
@@ -152,36 +123,9 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
         // Admin panel error handling
         setError(`Fehler beim Erstellen des Benutzers: ${err.message}`)
       } else {
-        // Handle rate limiting in catch block as well
-        if (err.message && (err.message.includes('rate limit') || err.message.includes('too many requests') || err.message.includes('429'))) {
-          setError('Zu viele Anfragen. Bitte warten Sie 60 Sekunden und versuchen Sie es erneut. Sie haben möglicherweise bereits ein Konto mit dieser E-Mail erstellt - überprüfen Sie Ihre E-Mails.')
-          
-          // Start cooldown period
-          setCooldownSeconds(60)
-          let seconds = 60
-          const cooldownInterval = setInterval(() => {
-            seconds--
-            setCooldownSeconds(seconds)
-            if (seconds <= 0) {
-              clearInterval(cooldownInterval)
-            }
-          }, 1000)
-        } else if (err.message && err.message.includes('Error sending confirmation email')) {
-          // User might already exist in auth but without a profile
-          console.log('Email send error in catch block - attempting to handle orphaned user')
-          
-          try {
-            const profileCreated = await profilesAPI.checkAndCreateProfileForUser(formData.email)
-            
-            if (profileCreated) {
-              setError('Ihr Konto existiert bereits, aber es fehlte ein Profil. Bitte versuchen Sie sich anzumelden. Falls es weiterhin nicht funktioniert, kontaktieren Sie bitte den Administrator.')
-            } else {
-              setError('Es gab ein Problem beim Senden der Bestätigungs-E-Mail. Bitte versuchen Sie sich anzumelden oder kontaktieren Sie den Administrator.')
-            }
-          } catch (profileError) {
-            console.error('Error handling orphaned user:', profileError)
-            setError('Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.')
-          }
+        // Handle email sending errors
+        if (err.message && err.message.includes('Error sending confirmation email')) {
+          setError('Es gab ein Problem beim Senden der Bestätigungs-E-Mail. Bitte versuchen Sie sich anzumelden, um zu überprüfen, ob Ihr Konto existiert. Falls das Problem weiterhin besteht, kontaktieren Sie bitte den Administrator.')
         } else {
           setError('Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.')
         }
@@ -406,7 +350,7 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
           <div className="space-y-4">
             <button
               type="submit"
-              disabled={isSubmitting || cooldownSeconds > 0}
+              disabled={isSubmitting}
               className="w-full flex justify-center py-3 px-4 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity bg-[#2E07D4] hover:bg-[#2506B8]"
             >
               {isSubmitting ? (
@@ -417,8 +361,6 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
                   </svg>
                   Konto wird erstellt & E-Mail wird gesendet...
                 </span>
-              ) : cooldownSeconds > 0 ? (
-                `Bitte warten Sie ${cooldownSeconds} Sekunden...`
               ) : 'Konto erstellen'}
             </button>
 
@@ -618,7 +560,7 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
               <div className="space-y-4">
                 <button
                   type="submit"
-                  disabled={isSubmitting || cooldownSeconds > 0}
+                  disabled={isSubmitting}
                   onClick={() => console.log('Register button clicked!')}
                   className="w-full flex justify-center py-3 px-4 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity bg-[#2E07D4] hover:bg-[#2506B8]"
                 >
@@ -630,8 +572,6 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
                       </svg>
                       Konto wird erstellt & E-Mail wird gesendet...
                     </span>
-                  ) : cooldownSeconds > 0 ? (
-                    `Bitte warten Sie ${cooldownSeconds} Sekunden...`
                   ) : 'Konto erstellen'}
                 </button>
 

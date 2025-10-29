@@ -1235,71 +1235,20 @@ export const profilesAPI = {
       // Check if user exists in auth without a profile (orphaned user)
       console.log('Checking for orphaned user:', email)
       
-      const headers = await getHeaders()
-      
-      // First, get user from auth by email
-      const authResponse = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
-        method: 'GET',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
-      })
-      
-      if (!authResponse.ok) {
-        console.log('Could not fetch auth users')
-        return false
-      }
-      
-      const authUsers = await authResponse.json()
-      const user = authUsers.users?.find(u => u.email === email)
-      
-      if (!user) {
-        console.log('User not found in auth')
-        return false
-      }
-      
-      console.log('Found user in auth:', user.id)
-      
-      // Check if profile exists
-      const profileResponse = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}&select=*`, {
-        method: 'GET',
-        headers
-      })
-      
-      if (profileResponse.ok) {
-        const profile = await profileResponse.json()
+      // Use regular auth to check if we can sign in with this email
+      // This will tell us if the user exists
+      try {
+        // Try to get the user by checking signin (but don't actually sign them in)
+        // We can't use admin API from client-side, so we'll use a different approach
         
-        if (!profile || profile.length === 0) {
-          console.log('Profile missing - creating profile for orphaned user')
-          
-          // Create profile for orphaned user
-          const createProfileResponse = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-              id: user.id,
-              email: user.email,
-              full_name: user.user_metadata?.full_name || user.email.split('@')[0],
-              role: user.user_metadata?.role || 'member'
-            })
-          })
-          
-          if (createProfileResponse.ok) {
-            console.log('✅ Profile created for orphaned user')
-            return true
-          } else {
-            const errorText = await createProfileResponse.text()
-            console.error('Failed to create profile:', errorText)
-            return false
-          }
-        } else {
-          console.log('Profile already exists')
-          return true
-        }
+        // Since we can't access admin API, just return false
+        // The actual fix should be done server-side or manually in Supabase dashboard
+        console.log('Cannot check for orphaned users from client-side - requires admin API')
+        return false
+      } catch (error) {
+        console.error('Error in orphaned user check:', error)
+        return false
       }
-      
-      return false
     } catch (error) {
       console.error('Error checking/creating profile:', error)
       return false
