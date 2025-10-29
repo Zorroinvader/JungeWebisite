@@ -87,13 +87,21 @@ export async function uploadEntry({ event, file, title, description, contact }) 
 export async function castVote({ eventId, entryId }) {
   const voter_anon_token = getOrCreateAnonToken()
 
-  // Upsert: one vote per anon token per event; change vote by updating entry_id
+  // Check if user already voted for this specific entry
+  const { data: existing } = await supabase
+    .from('special_event_votes')
+    .select('*')
+    .eq('entry_id', entryId)
+    .eq('voter_anon_token', voter_anon_token)
+    .single()
+
+  // If already voted for this entry, do nothing
+  if (existing) return existing
+
+  // Insert new vote
   const { data, error } = await supabase
     .from('special_event_votes')
-    .upsert(
-      { event_id: eventId, entry_id: entryId, voter_anon_token },
-      { onConflict: 'event_id,voter_anon_token' }
-    )
+    .insert({ event_id: eventId, entry_id: entryId, voter_anon_token })
     .select('*')
     .single()
 
@@ -101,16 +109,46 @@ export async function castVote({ eventId, entryId }) {
   return data
 }
 
-export async function revokeVote({ eventId }) {
+export async function revokeVote({ eventId, entryId }) {
   const voter_anon_token = localStorage.getItem('se_voter_anon_token')
   if (!voter_anon_token) return
-  // Delete vote by matching anon token + event
-  const { error } = await supabase
+  
+  // Use the security definer function to delete the vote
+  // This bypasses RLS and ensures only votes with matching token are deleted
+  const { error } = await supabase.rpc('delete_vote_by_token', {
+    entry_id_param: entryId,
+    token_param: voter_anon_token
+  })
+
+  if (error) {
+    console.error('Error revoking vote:', error)
+    throw error
+  }
+}
+
+export async function getUserVoteForEntry(entryId) {
+  const voter_anon_token = localStorage.getItem('se_voter_anon_token')
+  if (!voter_anon_token) return null
+  
+  const { data, error } = await supabase
     .from('special_event_votes')
-    .delete()
-    .match({ event_id: eventId, voter_anon_token })
+    .select('*')
+    .eq('entry_id', entryId)
+    .eq('voter_anon_token', voter_anon_token)
+    .single()
+
+  if (error && error.code !== 'PGRST116') throw error // PGRST116 = no rows found
+  return data || null
+}
+
+export async function getVoteCountForEntry(entryId) {
+  const { count, error } = await supabase
+    .from('special_event_votes')
+    .select('*', { count: 'exact', head: true })
+    .eq('entry_id', entryId)
 
   if (error) throw error
+  return count || 0
 }
 
 export async function listPendingEntries(eventId) {
@@ -182,6 +220,17 @@ export async function deleteUserUpload(entryId, imagePath) {
     .from(BUCKET)
     .remove([imagePath])
   if (storageError) throw storageError
+}
+
+export async function getVoteStatsForEvent(eventId) {
+  const { data, error } = await supabase
+    .from('special_event_vote_stats')
+    .select('*')
+    .eq('event_id', eventId)
+    .order('vote_count', { ascending: false })
+
+  if (error) throw error
+  return data || []
 }
 
 

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { X, CheckCircle, Mail } from 'lucide-react';
 import { eventRequestsAPI, profileAPI } from '../../services/httpApi';
+import { useAuth } from '../../contexts/AuthContext';
 import { useDarkMode } from '../../contexts/DarkModeContext';
 import { sendAdminNotification, sendUserNotification, areNotificationsEnabled } from '../../utils/settingsHelper';
 
 const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, userData }) => {
+  const { user } = useAuth();
   const { isDarkMode } = useDarkMode();
   
   const [formData, setFormData] = useState({
@@ -21,8 +23,7 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [adminEmailFailed, setAdminEmailFailed] = useState(false);
-  const [userEmailFailed, setUserEmailFailed] = useState(false);
+  const [submissionResult, setSubmissionResult] = useState(null);
 
   // Helper function to format date in local timezone (like your old code)
   const formatDateLocal = (date) => {
@@ -106,8 +107,7 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
       });
       setError('');
       setSuccess(false);
-      setAdminEmailFailed(false);
-      setUserEmailFailed(false);
+      setSubmissionResult(null);
     }
   }, [isOpen]);
 
@@ -184,12 +184,15 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
         initial_notes: formData.additional_notes || '', // New field
         status: 'pending',
         request_stage: 'initial', // New field for 3-step workflow
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        // Add user ID for logged-in users
+        requested_by: user?.id || null,
+        created_by: user?.id || null
       };
 
       const result = await eventRequestsAPI.createInitialRequest(requestData);
 
-      // Send notification to admins about new initial request
+      // Send notification to admins about new initial request (silently fail if errors occur)
       if (areNotificationsEnabled()) {
         try {
           await sendAdminNotification({
@@ -201,13 +204,12 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
             event_type: formData.event_type
           }, 'initial_request');
         } catch (notifError) {
-          console.warn('Failed to send admin notification:', notifError);
-          setAdminEmailFailed(true);
-          // Don't fail the whole request if notification fails
+          // Silently log the error but don't show it to the user
+          console.error('Admin notification failed (logged for debugging):', notifError);
         }
       }
 
-      // Send confirmation email to the user (requester)
+      // Send confirmation email to the user (requester) (silently fail if errors occur)
       try {
         await sendUserNotification(formData.requester_email, {
           title: formData.title,
@@ -219,32 +221,14 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
           event_type: formData.event_type
         }, 'initial_request_received');
       } catch (notifError) {
-        console.warn('Failed to send user confirmation:', notifError);
-        setUserEmailFailed(true);
-        // Don't fail the whole request if notification fails
+        // Silently log the error but don't show it to the user
+        console.error('User notification failed (logged for debugging):', notifError);
       }
 
+      setSubmissionResult(result);
       setSuccess(true);
       
-      // Show success message and close after delay
-      setTimeout(() => {
-        if (onSuccess) onSuccess(result);
-        if (onClose) onClose();
-        // Reset form
-        setFormData({
-          title: '',
-          requester_name: '',
-          requester_email: '',
-          requester_phone: '',
-          start_date: '',
-          end_date: '',
-          event_type: 'Privates Event',
-          additional_notes: ''
-        });
-        setSuccess(false);
-        setAdminEmailFailed(false);
-        setUserEmailFailed(false);
-      }, 2000);
+      // Don't auto-close - let user close manually when ready
 
     } catch (err) {
       console.error('Error submitting request:', err);
@@ -285,7 +269,34 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
           )}
 
           {success && (
-            <div className={`rounded-lg p-6 bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''}`}>
+            <div className={`rounded-lg p-6 bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} relative`}>
+              {/* Close button */}
+              <button
+                onClick={() => {
+                  if (onSuccess && submissionResult) onSuccess(submissionResult);
+                  if (onClose) onClose();
+                  // Reset form
+                  setFormData({
+                    title: '',
+                    requester_name: '',
+                    requester_email: '',
+                    requester_phone: '',
+                    start_date: '',
+                    end_date: '',
+                    event_type: 'Privates Event',
+                    additional_notes: ''
+                  });
+                  setSuccess(false);
+                  setError('');
+                  setSubmissionResult(null);
+                }}
+                className={`absolute top-4 right-4 p-2 hover:opacity-70 transition-opacity rounded-lg text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}
+                aria-label="Schließen"
+                title="Schließen"
+              >
+                <X size={24} />
+              </button>
+              
               <div className="text-center mb-6">
                 <CheckCircle className={`h-16 w-16 mx-auto text-green-500 mb-4`} />
                 <h3 className={`text-2xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} mb-2`}>
@@ -319,32 +330,6 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
                   </li>
                 </ul>
               </div>
-
-              {(adminEmailFailed || userEmailFailed) && (
-                <div className={`rounded-lg p-4 mb-6 border ${isDarkMode ? 'dark:border-red-800 dark:bg-red-900/20' : 'border-red-200 bg-red-50'}`}>
-                  <div className="flex items-start">
-                    <Mail className={`h-5 w-5 mt-0.5 mr-3 ${isDarkMode ? 'dark:text-red-400' : 'text-red-600'}`} />
-                    <div>
-                      <p className={`font-semibold mb-1 ${isDarkMode ? 'dark:text-red-300' : 'text-red-700'}`}>
-                        Hinweis: E-Mail-Versand teilweise fehlgeschlagen
-                      </p>
-                      {adminEmailFailed && (
-                        <p className={`text-sm mb-1 ${isDarkMode ? 'dark:text-red-200' : 'text-red-600'}`}>
-                          Die Benachrichtigung an die Administratoren konnte nicht gesendet werden. Ihre Anfrage wurde dennoch gespeichert.
-                        </p>
-                      )}
-                      {userEmailFailed && (
-                        <p className={`text-sm ${isDarkMode ? 'dark:text-red-200' : 'text-red-600'}`}>
-                          Die Bestätigungs-E-Mail an Sie konnte nicht zugestellt werden.
-                        </p>
-                      )}
-                      <p className={`text-xs mt-2 ${isDarkMode ? 'dark:text-red-200/80' : 'text-red-600/80'}`}>
-                        Sie können den Status jederzeit im Bereich "Status verfolgen" einsehen. Die Administratoren sehen Ihre Anfrage trotzdem im System.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               <div className={`border-l-4 border-[#6054d9] pl-4 py-3 mb-6`}>
                 <h4 className={`font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} mb-2`}>

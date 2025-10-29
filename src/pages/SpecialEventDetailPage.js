@@ -10,7 +10,8 @@ import {
   revokeVote,
   getPublicImageUrl,
   getUserUploadForEvent,
-  deleteUserUpload
+  deleteUserUpload,
+  getUserVoteForEntry
 } from '../services/specialEvents'
 
 const SpecialEventDetailPage = () => {
@@ -35,6 +36,7 @@ const SpecialEventDetailPage = () => {
   const [showMoveLikeConfirm, setShowMoveLikeConfirm] = useState(false)
   const [pendingLikeEntryId, setPendingLikeEntryId] = useState('')
   const [previewUrl, setPreviewUrl] = useState('')
+  const [userLikes, setUserLikes] = useState({}) // {entryId: true/false}
 
   const voterToken = useMemo(() => localStorage.getItem('se_voter_anon_token') || '', [])
 
@@ -54,9 +56,15 @@ const SpecialEventDetailPage = () => {
         const list = await listApprovedEntries(ev.id)
         if (!isMounted) return
         setEntries(list)
-        // Load saved vote
-        const savedVote = localStorage.getItem(`se_vote_${ev.id}`) || ''
-        setCurrentVoteEntryId(savedVote)
+        
+        // Load user likes for all entries
+        const likesMap = {}
+        for (const entry of list) {
+          const vote = await getUserVoteForEntry(entry.id)
+          likesMap[entry.id] = !!vote
+        }
+        setUserLikes(likesMap)
+        setCurrentVoteEntryId('') // No longer needed for event-wide voting
       } catch (e) {
         if (!isMounted) return
         setError(e.message || String(e))
@@ -100,17 +108,11 @@ const SpecialEventDetailPage = () => {
 
   async function handleVote(entryId) {
     if (!event) return
-    if (currentVoteEntryId && currentVoteEntryId !== entryId) {
-      setPendingLikeEntryId(entryId)
-      setShowMoveLikeConfirm(true)
-      return
-    }
     setVoting(true)
     try {
       await castVote({ eventId: event.id, entryId })
-      localStorage.setItem(`se_vote_${event.id}`, entryId)
-      setCurrentVoteEntryId(entryId)
-      setNotification({ type: 'success', text: 'Dein Like wurde gezählt. Du kannst es jederzeit zurückziehen oder auf ein anderes Bild verschieben.' })
+      setUserLikes(prev => ({ ...prev, [entryId]: true }))
+      setNotification({ type: 'success', text: 'Dein Like wurde gezählt.' })
     } catch (err) {
       setNotification({ type: 'error', text: err.message || String(err) })
     } finally {
@@ -118,13 +120,12 @@ const SpecialEventDetailPage = () => {
     }
   }
 
-  async function handleRevokeVote() {
-    if (!event) return
+  async function handleRevokeVote(entryId) {
+    if (!event || !entryId) return
     setVoting(true)
     try {
-      await revokeVote({ eventId: event.id })
-      localStorage.removeItem(`se_vote_${event.id}`)
-      setCurrentVoteEntryId('')
+      await revokeVote({ eventId: event.id, entryId })
+      setUserLikes(prev => ({ ...prev, [entryId]: false }))
       setNotification({ type: 'info', text: 'Dein Like wurde zurückgezogen.' })
     } catch (err) {
       setNotification({ type: 'error', text: err.message || String(err) })
@@ -148,17 +149,7 @@ const SpecialEventDetailPage = () => {
     }
   }
 
-  async function confirmMoveLike() {
-    if (!event || !pendingLikeEntryId) return
-    setShowMoveLikeConfirm(false)
-    await handleVote(pendingLikeEntryId)
-    setPendingLikeEntryId('')
-  }
-
-  function cancelMoveLike() {
-    setShowMoveLikeConfirm(false)
-    setPendingLikeEntryId('')
-  }
+  // Remove move like confirm functionality as users can like multiple photos now
 
   async function handleAdminDelete(entryId, imagePath) {
     if (!isAdmin()) return
@@ -201,15 +192,6 @@ const SpecialEventDetailPage = () => {
         {!alreadyUploaded && (
           <>
             <h2 className="text-2xl font-semibold text-[#252422] dark:text-[#F4F1E8] mb-4 text-center ">Galerie</h2>
-            {showMoveLikeConfirm && (
-              <div className="mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
-                <p className="text-sm text-amber-800 dark:text-amber-200">Du hast bereits ein Like vergeben. Deine Stimme wird auf dieses Bild verschoben. Fortfahren?</p>
-                <div className="mt-2 flex gap-2">
-                  <button onClick={confirmMoveLike} className="px-3 py-1.5 text-sm font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-md">Ja, verschieben</button>
-                  <button onClick={cancelMoveLike} className="px-3 py-1.5 text-sm font-medium border border-[#A58C81] text-[#252422] dark:text-[#F4F1E8] rounded-md">Abbrechen</button>
-                </div>
-              </div>
-            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-8">
               {entries.map(en => (
                 <div key={en.id} className="border-2 border-[#A58C81] dark:border-[#EBE9E9] rounded-xl overflow-hidden bg-white dark:bg-[#2a2a2a]">
@@ -223,11 +205,14 @@ const SpecialEventDetailPage = () => {
                       </button>
                     )}
                     <div className="mt-3 flex items-center gap-2">
-                      <button onClick={() => handleVote(en.id)} disabled={voting} className="px-3 py-1.5 rounded-md bg-[#A58C81] text-white text-sm font-semibold disabled:opacity-60">Like</button>
-                      <button onClick={handleRevokeVote} disabled={voting} className="px-3 py-1.5 rounded-md border-2 border-[#A58C81] text-[#252422] dark:text-[#F4F1E8] text-sm font-semibold disabled:opacity-60">Like zurückziehen</button>
+                      {userLikes[en.id] ? (
+                        <button onClick={() => handleRevokeVote(en.id)} disabled={voting} className="px-3 py-1.5 rounded-md border-2 border-[#A58C81] text-[#252422] dark:text-[#F4F1E8] text-sm font-semibold disabled:opacity-60">Like zurückziehen</button>
+                      ) : (
+                        <button onClick={() => handleVote(en.id)} disabled={voting} className="px-3 py-1.5 rounded-md bg-[#A58C81] text-white text-sm font-semibold disabled:opacity-60">Like</button>
+                      )}
                     </div>
-                    {voterToken && (
-                      <div className="mt-2 text-xs text-[#A58C81] dark:text-[#EBE9E9]"> Diesen Beitrag hast du {currentVoteEntryId === en.id ? 'gevoted' : 'noch nicht gevoted'}</div>
+                    {voterToken && userLikes[en.id] && (
+                      <div className="mt-2 text-xs text-green-600 dark:text-green-400">✓ Du hast dieses Foto geliked</div>
                     )}
                   </div>
                 </div>
@@ -344,15 +329,6 @@ const SpecialEventDetailPage = () => {
         {alreadyUploaded && (
           <>
             <h2 className="text-2xl font-semibold text-[#252422] dark:text-[#F4F1E8] mb-4">Galerie</h2>
-            {showMoveLikeConfirm && (
-              <div className="mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
-                <p className="text-sm text-amber-800 dark:text-amber-200">Du hast bereits ein Like vergeben. Deine Stimme wird auf dieses Bild verschoben. Fortfahren?</p>
-                <div className="mt-2 flex gap-2">
-                  <button onClick={confirmMoveLike} className="px-3 py-1.5 text-sm font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-md">Ja, verschieben</button>
-                  <button onClick={cancelMoveLike} className="px-3 py-1.5 text-sm font-medium border border-[#A58C81] text-[#252422] dark:text-[#F4F1E8] rounded-md">Abbrechen</button>
-                </div>
-              </div>
-            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
               {entries.map(en => (
                 <div key={en.id} className="border-2 border-[#A58C81] dark:border-[#EBE9E9] rounded-xl overflow-hidden bg-white dark:bg-[#2a2a2a]">
@@ -366,11 +342,14 @@ const SpecialEventDetailPage = () => {
                       </button>
                     )}
                     <div className="mt-3 flex items-center gap-2">
-                      <button onClick={() => handleVote(en.id)} disabled={voting} className="px-3 py-1.5 rounded-md bg-[#A58C81] text-white text-sm font-semibold disabled:opacity-60">Like</button>
-                      <button onClick={handleRevokeVote} disabled={voting} className="px-3 py-1.5 rounded-md border-2 border-[#A58C81] text-[#252422] dark:text-[#F4F1E8] text-sm font-semibold disabled:opacity-60">Like zurückziehen</button>
+                      {userLikes[en.id] ? (
+                        <button onClick={() => handleRevokeVote(en.id)} disabled={voting} className="px-3 py-1.5 rounded-md border-2 border-[#A58C81] text-[#252422] dark:text-[#F4F1E8] text-sm font-semibold disabled:opacity-60">Like zurückziehen</button>
+                      ) : (
+                        <button onClick={() => handleVote(en.id)} disabled={voting} className="px-3 py-1.5 rounded-md bg-[#A58C81] text-white text-sm font-semibold disabled:opacity-60">Like</button>
+                      )}
                     </div>
-                    {voterToken && (
-                      <div className="mt-2 text-xs text-[#A58C81] dark:text-[#EBE9E9]"> Diesen Beitrag hast du {currentVoteEntryId === en.id ? 'gevoted' : 'noch nicht gevoted'}</div>
+                    {voterToken && userLikes[en.id] && (
+                      <div className="mt-2 text-xs text-green-600 dark:text-green-400">✓ Du hast dieses Foto geliked</div>
                     )}
                   </div>
                 </div>

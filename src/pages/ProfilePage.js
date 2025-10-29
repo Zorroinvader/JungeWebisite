@@ -12,6 +12,52 @@ const ProfilePage = () => {
   const [isLoadingRequests, setIsLoadingRequests] = useState(false)
   const [profileError, setProfileError] = useState(null)
 
+  const loadEventRequests = useCallback(async () => {
+    if (isLoadingRequests || !user?.id) {
+      return
+    }
+    setIsLoadingRequests(true)
+    try {
+      const data = await eventRequestsAPI.getByUser(user.id)
+      if (data) {
+        setLoading(false)
+      }
+    } catch (err) {
+      console.error('Error loading event requests:', err)
+      setLoading(false)
+    } finally {
+      setIsLoadingRequests(false)
+    }
+  }, [isLoadingRequests, user?.id])
+
+  useEffect(() => {
+    if (!user?.id) return // Don't load if no user
+    
+    loadEventRequests()
+    
+    // Set up periodic refresh every 60 seconds
+    const refreshInterval = setInterval(() => { loadEventRequests() }, 60000)
+    
+    // Listen for new event request creation
+    const handleEventRequestCreated = (data) => {
+      loadEventRequests()
+    }
+    
+    eventBus.on('eventRequestCreated', handleEventRequestCreated)
+    
+    // Safety timeout to prevent infinite loading
+    const safetyTimeout = setTimeout(() => {
+      setLoading(false)
+      setIsLoadingRequests(false)
+    }, 5000) // 5 second timeout
+    
+    return () => {
+      clearInterval(refreshInterval)
+      clearTimeout(safetyTimeout)
+      eventBus.off('eventRequestCreated', handleEventRequestCreated)
+    }
+  }, [user?.id, loadEventRequests])
+
   // Show loading if auth is still loading
   if (authLoading) {
     return (
@@ -42,53 +88,6 @@ const ProfilePage = () => {
       </div>
     )
   }
-
-  const loadEventRequests = useCallback(async () => {
-    if (isLoadingRequests || !user?.id) {
-      return
-    }
-    setIsLoadingRequests(true)
-    try {
-      const data = await eventRequestsAPI.getByUser(user.id)
-      if (data) {
-        setLoading(false)
-      }
-    } catch (err) {
-      console.error('Error loading event requests:', err)
-      setLoading(false)
-    } finally {
-      setIsLoadingRequests(false)
-    }
-  }, [isLoadingRequests, user?.id])
-
-  useEffect(() => {
-    loadEventRequests()
-    
-    // Set up periodic refresh every 60 seconds
-    const refreshInterval = setInterval(() => { loadEventRequests() }, 60000)
-    
-    // Listen for new event request creation
-    const handleEventRequestCreated = (data) => {
-      loadEventRequests()
-    }
-    
-    eventBus.on('eventRequestCreated', handleEventRequestCreated)
-    
-    // Safety timeout to prevent infinite loading
-    const safetyTimeout = setTimeout(() => {
-      setLoading(false)
-      setIsLoadingRequests(false)
-    }, 5000) // 5 second timeout
-    
-    return () => {
-      clearInterval(refreshInterval)
-      clearTimeout(safetyTimeout)
-      eventBus.off('eventRequestCreated', handleEventRequestCreated)
-    }
-  }, [user?.id, loadEventRequests])
-
-  // loadEventRequests is memoized above
-
 
   return (
     <div className="min-h-screen bg-[#F4F1E8] dark:bg-[#252422]">
