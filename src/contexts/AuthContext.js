@@ -93,7 +93,13 @@ export const AuthProvider = ({ children }) => {
         }
       })
 
-      if (error) throw error
+      if (error) {
+        // If user already exists, try to handle it gracefully
+        if (error.message && error.message.includes('already registered')) {
+          console.log('User already exists - may need profile creation')
+        }
+        throw error
+      }
 
       // Profile will be created automatically by the database trigger
       return { data, error: null }

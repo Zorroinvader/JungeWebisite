@@ -1230,6 +1230,82 @@ export const profilesAPI = {
     }
   },
 
+  async checkAndCreateProfileForUser(email) {
+    try {
+      // Check if user exists in auth without a profile (orphaned user)
+      console.log('Checking for orphaned user:', email)
+      
+      const headers = await getHeaders()
+      
+      // First, get user from auth by email
+      const authResponse = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+        method: 'GET',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      })
+      
+      if (!authResponse.ok) {
+        console.log('Could not fetch auth users')
+        return false
+      }
+      
+      const authUsers = await authResponse.json()
+      const user = authUsers.users?.find(u => u.email === email)
+      
+      if (!user) {
+        console.log('User not found in auth')
+        return false
+      }
+      
+      console.log('Found user in auth:', user.id)
+      
+      // Check if profile exists
+      const profileResponse = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}&select=*`, {
+        method: 'GET',
+        headers
+      })
+      
+      if (profileResponse.ok) {
+        const profile = await profileResponse.json()
+        
+        if (!profile || profile.length === 0) {
+          console.log('Profile missing - creating profile for orphaned user')
+          
+          // Create profile for orphaned user
+          const createProfileResponse = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              id: user.id,
+              email: user.email,
+              full_name: user.user_metadata?.full_name || user.email.split('@')[0],
+              role: user.user_metadata?.role || 'member'
+            })
+          })
+          
+          if (createProfileResponse.ok) {
+            console.log('✅ Profile created for orphaned user')
+            return true
+          } else {
+            const errorText = await createProfileResponse.text()
+            console.error('Failed to create profile:', errorText)
+            return false
+          }
+        } else {
+          console.log('Profile already exists')
+          return true
+        }
+      }
+      
+      return false
+    } catch (error) {
+      console.error('Error checking/creating profile:', error)
+      return false
+    }
+  },
+
   async createUser(userData) {
     try {
       // Use Supabase admin API to create user with auto-confirmation

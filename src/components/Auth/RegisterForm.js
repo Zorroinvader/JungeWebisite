@@ -117,6 +117,23 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
                 clearInterval(cooldownInterval)
               }
             }, 1000)
+          } else if (error.message && error.message.includes('Error sending confirmation email')) {
+            // User might already exist in auth but without a profile
+            console.log('Email send error - attempting to handle orphaned user')
+            
+            // Try to check and create profile for orphaned user
+            try {
+              const profileCreated = await profilesAPI.checkAndCreateProfileForUser(formData.email)
+              
+              if (profileCreated) {
+                setError('Ihr Konto existiert bereits, aber es fehlte ein Profil. Bitte versuchen Sie sich anzumelden. Falls es weiterhin nicht funktioniert, kontaktieren Sie bitte den Administrator.')
+              } else {
+                setError('Es gab ein Problem beim Senden der Bestätigungs-E-Mail. Bitte versuchen Sie sich anzumelden oder kontaktieren Sie den Administrator.')
+              }
+            } catch (profileError) {
+              console.error('Error handling orphaned user:', profileError)
+              setError('Es gab ein Problem beim Senden der Bestätigungs-E-Mail. Bitte versuchen Sie sich anzumelden oder kontaktieren Sie den Administrator.')
+            }
           } else {
             setError(error.message)
           }
@@ -149,6 +166,22 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
               clearInterval(cooldownInterval)
             }
           }, 1000)
+        } else if (err.message && err.message.includes('Error sending confirmation email')) {
+          // User might already exist in auth but without a profile
+          console.log('Email send error in catch block - attempting to handle orphaned user')
+          
+          try {
+            const profileCreated = await profilesAPI.checkAndCreateProfileForUser(formData.email)
+            
+            if (profileCreated) {
+              setError('Ihr Konto existiert bereits, aber es fehlte ein Profil. Bitte versuchen Sie sich anzumelden. Falls es weiterhin nicht funktioniert, kontaktieren Sie bitte den Administrator.')
+            } else {
+              setError('Es gab ein Problem beim Senden der Bestätigungs-E-Mail. Bitte versuchen Sie sich anzumelden oder kontaktieren Sie den Administrator.')
+            }
+          } catch (profileError) {
+            console.error('Error handling orphaned user:', profileError)
+            setError('Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.')
+          }
         } else {
           setError('Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.')
         }
