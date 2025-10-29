@@ -127,23 +127,15 @@ const EmailConfirmationHandler = () => {
           Willkommen bei Junge Gesellschaft!
         </p>
         <p className={`text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mb-6`}>
-          Ihr Konto wurde erfolgreich aktiviert. Bitte melden Sie sich an, um fortzufahren.
+          Ihr Konto wurde erfolgreich aktiviert. Sie können sich jetzt anmelden.
         </p>
         
-        <div className="flex flex-col gap-3">
-          <button
-            onClick={() => navigate('/login')}
-            className={`w-full px-6 py-3 bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} text-white rounded-lg hover:opacity-90 transition-opacity font-semibold`}
-          >
-            Zur Anmeldung
-          </button>
-          <button
-            onClick={() => navigate('/')}
-            className={`w-full px-6 py-3 border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} rounded-lg hover:bg-gray-50 ${isDarkMode ? 'dark:hover:bg-[#1a1a1a]' : ''} transition-colors font-semibold`}
-          >
-            Zur Startseite
-          </button>
-        </div>
+        <button
+          onClick={() => navigate('/')}
+          className={`w-full px-6 py-3 bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} text-white rounded-lg hover:opacity-90 transition-opacity font-semibold`}
+        >
+          Zur Startseite
+        </button>
       </div>
     </div>
   );
