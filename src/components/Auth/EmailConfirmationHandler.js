@@ -28,9 +28,9 @@ const EmailConfirmationHandler = () => {
         try {
           console.log('Attempting to confirm email with token...');
           
-          // Exchange the token for a session
+          // Exchange the token for a session - use the full token, not just token_hash
           const { data, error: confirmError } = await supabase.auth.verifyOtp({
-            token_hash: token,
+            token: token,
             type: 'signup'
           });
 
