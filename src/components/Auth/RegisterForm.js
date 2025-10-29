@@ -20,6 +20,7 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [cooldownSeconds, setCooldownSeconds] = useState(0)
 
   // Note: Auth state change listener removed - we handle redirect directly after signup
 
@@ -101,7 +102,24 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
         
         if (error) {
           console.log('SignUp error:', error)
-          setError(error.message)
+          
+          // Handle rate limiting specifically
+          if (error.message && (error.message.includes('rate limit') || error.message.includes('too many requests') || error.message.includes('429'))) {
+            setError('Zu viele Anfragen. Bitte warten Sie 60 Sekunden und versuchen Sie es erneut. Sie haben möglicherweise bereits ein Konto mit dieser E-Mail erstellt - überprüfen Sie Ihre E-Mails.')
+            
+            // Start cooldown period
+            setCooldownSeconds(60)
+            let seconds = 60
+            const cooldownInterval = setInterval(() => {
+              seconds--
+              setCooldownSeconds(seconds)
+              if (seconds <= 0) {
+                clearInterval(cooldownInterval)
+              }
+            }, 1000)
+          } else {
+            setError(error.message)
+          }
         } else {
           console.log('SignUp successful')
           setSuccess(true)
@@ -117,8 +135,23 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
         // Admin panel error handling
         setError(`Fehler beim Erstellen des Benutzers: ${err.message}`)
       } else {
-        // Public registration error handling
-        setError('Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.')
+        // Handle rate limiting in catch block as well
+        if (err.message && (err.message.includes('rate limit') || err.message.includes('too many requests') || err.message.includes('429'))) {
+          setError('Zu viele Anfragen. Bitte warten Sie 60 Sekunden und versuchen Sie es erneut. Sie haben möglicherweise bereits ein Konto mit dieser E-Mail erstellt - überprüfen Sie Ihre E-Mails.')
+          
+          // Start cooldown period
+          setCooldownSeconds(60)
+          let seconds = 60
+          const cooldownInterval = setInterval(() => {
+            seconds--
+            setCooldownSeconds(seconds)
+            if (seconds <= 0) {
+              clearInterval(cooldownInterval)
+            }
+          }, 1000)
+        } else {
+          setError('Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.')
+        }
       }
     } finally {
       setIsSubmitting(false)
@@ -340,7 +373,7 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
           <div className="space-y-4">
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || cooldownSeconds > 0}
               className="w-full flex justify-center py-3 px-4 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity bg-[#2E07D4] hover:bg-[#2506B8]"
             >
               {isSubmitting ? (
@@ -351,6 +384,8 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
                   </svg>
                   Konto wird erstellt & E-Mail wird gesendet...
                 </span>
+              ) : cooldownSeconds > 0 ? (
+                `Bitte warten Sie ${cooldownSeconds} Sekunden...`
               ) : 'Konto erstellen'}
             </button>
 
@@ -550,7 +585,7 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
               <div className="space-y-4">
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || cooldownSeconds > 0}
                   onClick={() => console.log('Register button clicked!')}
                   className="w-full flex justify-center py-3 px-4 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity bg-[#2E07D4] hover:bg-[#2506B8]"
                 >
@@ -562,6 +597,8 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
                       </svg>
                       Konto wird erstellt & E-Mail wird gesendet...
                     </span>
+                  ) : cooldownSeconds > 0 ? (
+                    `Bitte warten Sie ${cooldownSeconds} Sekunden...`
                   ) : 'Konto erstellen'}
                 </button>
 
