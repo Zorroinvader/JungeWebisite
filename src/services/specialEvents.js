@@ -2,15 +2,62 @@ import { supabase } from '../lib/supabase'
 
 const BUCKET = 'special-event-images'
 
-export async function getActiveSpecialEvents() {
+// Simple session cache to speed up mobile loads
+const CACHE_KEY = 'special_events_active_cache_v1'
+const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
+function readCache() {
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || !parsed.expiresAt || Date.now() > parsed.expiresAt) return null
+    return parsed.data || null
+  } catch {
+    return null
+  }
+}
+
+function writeCache(data, ttlMs = CACHE_TTL_MS) {
+  try {
+    const payload = { data, expiresAt: Date.now() + ttlMs }
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify(payload))
+  } catch {
+    // ignore storage errors
+  }
+}
+
+export async function getActiveSpecialEvents({ useCache = true } = {}) {
+  if (useCache) {
+    const cached = readCache()
+    if (cached) return cached
+  }
+
+  // Fetch minimal fields needed for UI
   const { data, error } = await supabase
     .from('special_events')
-    .select('*')
+    .select('id, title, slug, description, starts_at, is_active')
     .eq('is_active', true)
     .order('starts_at', { ascending: false })
 
   if (error) throw error
-  return data || []
+  const list = data || []
+  writeCache(list)
+  return list
+}
+
+export async function prefetchActiveSpecialEvents() {
+  try {
+    // Use network, refresh cache but don't throw
+    const { data, error } = await supabase
+      .from('special_events')
+      .select('id, title, slug, description, starts_at, is_active')
+      .eq('is_active', true)
+      .order('starts_at', { ascending: false })
+    if (!error) writeCache(data || [])
+  } catch {
+    // ignore
+  }
 }
 
 export async function getSpecialEventBySlug(slug) {

@@ -17,6 +17,7 @@ import AdminPanelClean from './components/Admin/AdminPanelClean'
 import SpecialEventsPage from './pages/SpecialEventsPage'
 import SpecialEventDetailPage from './pages/SpecialEventDetailPage'
 import './index.css'
+import { prefetchActiveSpecialEvents } from './services/specialEvents'
 
 // Protected Route Component
 const ProtectedRoute = ({ children, requireAuth = true, requireAdmin = false }) => {
@@ -62,6 +63,11 @@ const ProtectedRoute = ({ children, requireAuth = true, requireAdmin = false }) 
 
 // Main App Component
 const AppContent = () => {
+  React.useEffect(() => {
+    // Prefetch special events early to speed up banner and CTA
+    prefetchActiveSpecialEvents()
+  }, [])
+
   // Check if URL has email confirmation
   const urlParams = new URLSearchParams(window.location.search);
   const hasConfirmation = urlParams.has('token') || 

@@ -6,6 +6,7 @@ import { Calendar, Users, FileText, Search } from 'lucide-react'
 import SimpleMonthCalendar from '../components/Calendar/SimpleMonthCalendar'
 import TypewriterText from '../components/UI/TypewriterText'
 import NextEventInfo from '../components/UI/NextEventInfo'
+import { getActiveSpecialEvents } from '../services/specialEvents'
 import PublicEventRequestForm from '../components/Calendar/PublicEventRequestForm'
 import GuestOrRegisterModal from '../components/Calendar/GuestOrRegisterModal'
 
@@ -17,6 +18,7 @@ const HomePage = () => {
   const [showPublicRequestForm, setShowPublicRequestForm] = useState(false)
   const [showGuestOrRegister, setShowGuestOrRegister] = useState(false)
   const [selectedDate, setSelectedDate] = useState(null)
+  const [specialEvents, setSpecialEvents] = useState([])
 
   const handleFirstTextComplete = () => {
     setShowSubtitle(true)
@@ -66,6 +68,15 @@ const HomePage = () => {
     }
   }, [user])
 
+  // Load active special events (cached) for CTA target
+  useEffect(() => {
+    let mounted = true
+    getActiveSpecialEvents({ useCache: true })
+      .then(list => { if (mounted) setSpecialEvents(list || []) })
+      .catch(() => {})
+    return () => { mounted = false }
+  }, [])
+
   return (
     <div className="min-h-screen">
 
@@ -112,6 +123,16 @@ const HomePage = () => {
                   <NextEventInfo />
                 </div>
               </div>
+            </div>
+
+            {/* Mobile Special Events CTA: always visible on home */}
+            <div className="mt-4 md:hidden">
+              <Link
+                to={specialEvents?.[0]?.slug ? `/special-events/${specialEvents[0].slug}` : '/special-events'}
+                className="inline-flex items-center justify-center px-4 py-3 text-base font-semibold text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg shadow-md w-full"
+              >
+                Special Events ansehen
+              </Link>
             </div>
           </div>
         </div>
