@@ -30,8 +30,9 @@ function writeCache(data, ttlMs = CACHE_TTL_MS) {
 }
 
 export async function getActiveSpecialEvents({ useCache = true } = {}) {
-  console.log('[SE] getActiveSpecialEvents called. useCache=', useCache)
-  if (useCache) {
+  const nocache = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('nocache')
+  console.log('[SE] getActiveSpecialEvents called. useCache=', useCache, 'nocache=', nocache)
+  if (useCache && !nocache) {
     const cached = readCache()
     if (cached) return cached
   }
@@ -67,7 +68,7 @@ export async function getActiveSpecialEvents({ useCache = true } = {}) {
       if (err2) console.warn('[SE] retry without order error:', err2.message)
       if (!err2 && data2 && data2.length > 0) list = data2
     }
-    writeCache(list)
+    if (!nocache) writeCache(list)
     return list
   } catch (e) {
     console.warn('[SE] client getActiveSpecialEvents failed:', e?.message)
@@ -99,7 +100,7 @@ export async function getActiveSpecialEvents({ useCache = true } = {}) {
           const json = await resp.json()
           const list = Array.isArray(json) ? json : []
           console.log('[SE] REST getActiveSpecialEvents result count=', list.length)
-          writeCache(list)
+          if (!nocache) writeCache(list)
           return list
         }
       }
@@ -125,11 +126,12 @@ export async function prefetchActiveSpecialEvents() {
 }
 
 export async function getSpecialEventBySlug(slug) {
-  console.log('[SE] getSpecialEventBySlug:', slug)
+  const nocache = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('nocache')
+  console.log('[SE] getSpecialEventBySlug:', slug, 'nocache=', nocache)
   // Try detail cache first
   try {
     const cached = sessionStorage.getItem(DETAIL_CACHE_PREFIX + slug)
-    if (cached) {
+    if (cached && !nocache) {
       const parsed = JSON.parse(cached)
       if (parsed && parsed.expiresAt && Date.now() < parsed.expiresAt) {
         console.log('[SE] detail cache hit for slug', slug)
@@ -150,7 +152,7 @@ export async function getSpecialEventBySlug(slug) {
   }
   console.log('[SE] getSpecialEventBySlug found?', !!data)
   try {
-    sessionStorage.setItem(DETAIL_CACHE_PREFIX + slug, JSON.stringify({ data, expiresAt: Date.now() + CACHE_TTL_MS }))
+    if (!nocache) sessionStorage.setItem(DETAIL_CACHE_PREFIX + slug, JSON.stringify({ data, expiresAt: Date.now() + CACHE_TTL_MS }))
   } catch {}
   return data
 }
