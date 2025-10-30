@@ -210,15 +210,18 @@ export async function getFirstSpecialEventAny() {
 }
 
 export async function listApprovedEntries(eventId) {
-  console.log('[SE] listApprovedEntries for eventId=', eventId)
+  const nocache = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('nocache')
+  console.log('[SE] listApprovedEntries for eventId=', eventId, 'nocache=', nocache)
   // Cache per event to speed up mobile
   try {
-    const cached = sessionStorage.getItem(ENTRIES_CACHE_PREFIX + eventId)
-    if (cached) {
-      const parsed = JSON.parse(cached)
-      if (parsed && parsed.expiresAt && Date.now() < parsed.expiresAt) {
-        console.log('[SE] entries cache hit. count=', parsed.data?.length || 0)
-        return parsed.data || []
+    if (!nocache) {
+      const cached = sessionStorage.getItem(ENTRIES_CACHE_PREFIX + eventId)
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (parsed && parsed.expiresAt && Date.now() < parsed.expiresAt) {
+          console.log('[SE] entries cache hit. count=', parsed.data?.length || 0)
+          return parsed.data || []
+        }
       }
     }
   } catch {}
@@ -237,7 +240,7 @@ export async function listApprovedEntries(eventId) {
   const list = data || []
   console.log('[SE] listApprovedEntries fetched count=', list.length)
   try {
-    sessionStorage.setItem(ENTRIES_CACHE_PREFIX + eventId, JSON.stringify({ data: list, expiresAt: Date.now() + CACHE_TTL_MS }))
+    if (!nocache) sessionStorage.setItem(ENTRIES_CACHE_PREFIX + eventId, JSON.stringify({ data: list, expiresAt: Date.now() + CACHE_TTL_MS }))
   } catch {}
   return list
 }

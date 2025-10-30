@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState, useRef } from 'react'
 import { Upload, ImagePlus, Trash2 } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
@@ -37,6 +37,7 @@ const SpecialEventDetailPage = () => {
   const [pendingLikeEntryId, setPendingLikeEntryId] = useState('')
   const [previewUrl, setPreviewUrl] = useState('')
   const [userLikes, setUserLikes] = useState({}) // {entryId: true/false}
+  const fileInputRef = useRef(null)
 
   const voterToken = useMemo(() => localStorage.getItem('se_voter_anon_token') || '', [])
 
@@ -374,20 +375,27 @@ const SpecialEventDetailPage = () => {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-[#252422] dark:text-[#F4F1E8] mb-2">Bilddatei</label>
-                <div className="rounded-xl border-2 border-dashed border-[#A58C81]/50 hover:border-[#A58C81] transition-colors bg-[#F4F1E8]/40 dark:bg-[#1a1a1a] p-4 flex flex-col items-center justify-center text-center">
+                <div className="rounded-xl border-2 border-dashed border-[#A58C81]/50 hover:border-[#A58C81] transition-colors bg-[#F4F1E8]/40 dark:bg-[#1a1a1a] p-4 flex flex-col items-center justify-center text-center cursor-pointer"
+                     onClick={() => fileInputRef.current && fileInputRef.current.click()}>
                   {previewUrl ? (
                     <img src={previewUrl} alt="Vorschau" className="w-full h-40 object-cover rounded-lg border border-[#A58C81]/40" />
                   ) : (
                     <div className="flex flex-col items-center text-[#A58C81]">
                       <ImagePlus className="h-8 w-8 mb-2" />
-                      <p className="text-xs">Ziehe ein Bild hierher oder klicke zum Auswählen</p>
+                      <p className="text-xs">Tippe hier, um ein Foto aufzunehmen oder auszuwählen</p>
                     </div>
                   )}
                   <input
+                    ref={fileInputRef}
                     type="file"
                     accept="image/*"
+                    capture="environment"
                     onChange={e => {
                       const f = e.target.files?.[0] || null
+                      if (f && f.size > 5 * 1024 * 1024) {
+                        setNotification({ type: 'error', text: 'Bild ist größer als 5MB. Bitte kleineres Bild wählen.' })
+                        return
+                      }
                       setFile(f)
                       if (f) {
                         const url = URL.createObjectURL(f)
@@ -396,7 +404,7 @@ const SpecialEventDetailPage = () => {
                         setPreviewUrl('')
                       }
                     }}
-                    className="mt-3 w-full"
+                    className="sr-only"
                   />
                 </div>
                 <p className="mt-2 text-[11px] text-[#A58C81] dark:text-[#EBE9E9]">Max. 5 MB. Erlaubte Formate: JPG/PNG.</p>
