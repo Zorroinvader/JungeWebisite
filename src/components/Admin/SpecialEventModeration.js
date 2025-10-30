@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Trophy, Vote, TrendingUp, Users, RefreshCw } from 'lucide-react'
-import { getActiveSpecialEvents, listPendingEntries, listPendingEntriesREST, approveEntryREST, rejectEntryREST, getPublicImageUrl, listApprovedEntries, listApprovedEntriesREST, deleteUserUpload, getVoteStatsForEvent } from '../../services/specialEvents'
+import { getActiveSpecialEvents, listPendingEntries, approveEntry, rejectEntry, getPublicImageUrl, listApprovedEntries, deleteUserUpload, getVoteStatsForEvent } from '../../services/specialEvents'
 
 const SpecialEventModeration = () => {
   const [events, setEvents] = useState([])
@@ -20,8 +20,8 @@ const SpecialEventModeration = () => {
     if (!selectedEventId) return
     setLoading(true)
     Promise.all([
-      listPendingEntriesREST(selectedEventId),
-      listApprovedEntriesREST(selectedEventId),
+      listPendingEntries(selectedEventId),
+      listApprovedEntries(selectedEventId),
       getVoteStatsForEvent(selectedEventId)
     ])
       .then(([pendingData, approvedData, voteData]) => {
@@ -34,12 +34,12 @@ const SpecialEventModeration = () => {
   }, [selectedEventId])
 
   async function handleApprove(id) {
-    await approveEntryREST(id)
+    await approveEntry(id)
     setPending(p => p.filter(x => x.id !== id))
   }
 
   async function handleReject(id) {
-    await rejectEntryREST(id)
+    await rejectEntry(id)
     setPending(p => p.filter(x => x.id !== id))
   }
 
@@ -58,8 +58,8 @@ const SpecialEventModeration = () => {
     setLoading(true)
     try {
       const [pendingData, approvedData, voteData] = await Promise.all([
-        listPendingEntriesREST(selectedEventId),
-        listApprovedEntriesREST(selectedEventId),
+        listPendingEntries(selectedEventId),
+        listApprovedEntries(selectedEventId),
         getVoteStatsForEvent(selectedEventId)
       ])
       setPending(pendingData)
