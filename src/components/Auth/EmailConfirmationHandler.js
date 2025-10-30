@@ -14,6 +14,23 @@ const EmailConfirmationHandler = () => {
   const [error, setError] = useState(null);
   const redirectTimerRef = useRef(null);
 
+  // Navigate to login and force reload if already on /login
+  const goToLogin = () => {
+    try {
+      if (typeof window !== 'undefined') {
+        if (window.location.pathname === '/login') {
+          window.location.reload();
+        } else {
+          window.location.assign('/login');
+        }
+      } else {
+        navigate('/login', { replace: true });
+      }
+    } catch (e) {
+      navigate('/login', { replace: true });
+    }
+  };
+
   useEffect(() => {
     let timeoutId;
     
@@ -80,7 +97,7 @@ const EmailConfirmationHandler = () => {
               // Redirect to login page after 5 seconds (give user time to see success message)
               redirectTimerRef.current = setTimeout(() => {
                 console.log('🔄 Auto-redirecting to login after 5 seconds...');
-                navigate('/login');
+                goToLogin();
               }, 5000);
             } else {
               console.warn('Session set but no user found');
@@ -120,7 +137,7 @@ const EmailConfirmationHandler = () => {
             // Redirect to login page after 5 seconds (give user time to see success message)
             redirectTimerRef.current = setTimeout(() => {
               console.log('🔄 Auto-redirecting to login after 5 seconds...');
-              navigate('/login');
+              goToLogin();
             }, 5000);
             return;
           }
@@ -146,7 +163,7 @@ const EmailConfirmationHandler = () => {
             // Redirect to login page after 5 seconds (give user time to see success message)
             redirectTimerRef.current = setTimeout(() => {
               console.log('🔄 Auto-redirecting to login after 5 seconds...');
-              navigate('/login');
+              goToLogin();
             }, 5000);
             return;
           }
@@ -182,7 +199,7 @@ const EmailConfirmationHandler = () => {
           window.history.replaceState({}, document.title, window.location.pathname)
         }, 100)
         redirectTimerRef.current = setTimeout(() => {
-          navigate('/login')
+          goToLogin()
         }, 5000)
       }
     })
@@ -239,13 +256,13 @@ const EmailConfirmationHandler = () => {
           
           <div className="flex flex-col gap-3">
             <button
-              onClick={() => navigate('/login')}
+              onClick={() => goToLogin()}
               className={`w-full px-6 py-3 bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} text-white rounded-lg hover:opacity-90 transition-opacity font-semibold`}
             >
               Zur Anmeldung
             </button>
             <button
-              onClick={() => navigate('/')}
+              onClick={() => window.location.assign('/')}
               className={`w-full px-6 py-3 border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} rounded-lg hover:bg-gray-50 ${isDarkMode ? 'dark:hover:bg-[#1a1a1a]' : ''} transition-colors font-semibold`}
             >
               Zur Startseite
@@ -268,7 +285,7 @@ const EmailConfirmationHandler = () => {
             Bestätigung wird verarbeitet...
           </h2>
           <button
-            onClick={() => navigate('/login')}
+            onClick={() => goToLogin()}
             className={`w-full px-6 py-3 bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} text-white rounded-lg hover:opacity-90 transition-opacity font-semibold mt-4`}
           >
             Zur Anmeldung
@@ -304,7 +321,7 @@ const EmailConfirmationHandler = () => {
                 clearTimeout(redirectTimerRef.current);
                 redirectTimerRef.current = null;
               }
-              navigate('/login');
+              goToLogin();
             }}
             className={`w-full px-6 py-3 bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} text-white rounded-lg hover:opacity-90 transition-opacity font-semibold`}
           >
