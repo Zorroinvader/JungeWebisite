@@ -171,14 +171,30 @@ const EmailConfirmationHandler = () => {
       }
     };
 
-    // Set a timeout to prevent infinite loading (15 seconds max)
+    // Also react to auth state changes (covers cases without URL params)
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state change:', event)
+      if (event === 'SIGNED_IN' && session?.user) {
+        console.log('✅ SIGNED_IN detected via auth listener, showing success screen')
+        setConfirmed(true)
+        setChecking(false)
+        setTimeout(() => {
+          window.history.replaceState({}, document.title, window.location.pathname)
+        }, 100)
+        redirectTimerRef.current = setTimeout(() => {
+          navigate('/login')
+        }, 5000)
+      }
+    })
+
+    // Set a timeout to prevent infinite loading (shortened to 5 seconds)
     timeoutId = setTimeout(() => {
       if (checking) {
         console.warn('Email confirmation timeout');
         setError('Die Bestätigung dauert länger als erwartet. Bitte versuchen Sie sich anzumelden oder kontaktieren Sie den Administrator.');
         setChecking(false);
       }
-    }, 15000);
+    }, 5000);
 
     handleEmailConfirmation();
 
@@ -186,6 +202,7 @@ const EmailConfirmationHandler = () => {
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
       if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+      if (authListener?.subscription) authListener.subscription.unsubscribe()
     };
   }, [navigate, checking]);
 
