@@ -11,6 +11,7 @@ const SpecialEventModeration = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('pending') // 'pending', 'approved', or 'results'
+  const [actionState, setActionState] = useState({}) // { [entryId]: 'approving'|'rejecting' }
 
   useEffect(() => {
     getActiveSpecialEvents().then(setEvents).catch(err => setError(err.message || String(err)))
@@ -29,18 +30,37 @@ const SpecialEventModeration = () => {
         setApproved(approvedData)
         setVoteStats(voteData)
       })
-      .catch(err => setError(err.message || String(err)))
+      .catch(err => {
+        console.error('[Admin SE] Load failed:', err)
+        setError(`Fehler beim Laden der Daten. Details: ${err?.message || String(err)}`)
+      })
       .finally(() => setLoading(false))
   }, [selectedEventId])
 
   async function handleApprove(id) {
-    await approveEntry(id)
-    setPending(p => p.filter(x => x.id !== id))
+    try {
+      setActionState(s => ({ ...s, [id]: 'approving' }))
+      await approveEntry(id)
+      setPending(p => p.filter(x => x.id !== id))
+    } catch (err) {
+      console.error('[Admin SE] Approve failed:', err)
+      setError(`Freigeben fehlgeschlagen: ${err?.message || String(err)}`)
+    } finally {
+      setActionState(s => ({ ...s, [id]: undefined }))
+    }
   }
 
   async function handleReject(id) {
-    await rejectEntry(id)
-    setPending(p => p.filter(x => x.id !== id))
+    try {
+      setActionState(s => ({ ...s, [id]: 'rejecting' }))
+      await rejectEntry(id)
+      setPending(p => p.filter(x => x.id !== id))
+    } catch (err) {
+      console.error('[Admin SE] Reject failed:', err)
+      setError(`Ablehnen fehlgeschlagen: ${err?.message || String(err)}`)
+    } finally {
+      setActionState(s => ({ ...s, [id]: undefined }))
+    }
   }
 
   async function handleDeleteApproved(id, imagePath) {
@@ -79,7 +99,22 @@ const SpecialEventModeration = () => {
           <h2 className="text-2xl md:text-3xl font-bold text-[#252422] dark:text-[#F4F1E8] mb-6">Special Event Moderation</h2>
           {error && (
             <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg text-red-700 dark:text-red-300 text-sm">
-              {error}
+              <div className="font-semibold mb-1">Es ist ein Fehler aufgetreten</div>
+              <div className="mb-3">{error}</div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setError(null); refreshData() }}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#6054d9] hover:bg-[#4f44c7] text-white rounded-md"
+                >
+                  <RefreshCw className="h-4 w-4" /> Erneut versuchen
+                </button>
+                <button
+                  onClick={() => setError(null)}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 border-2 border-[#A58C81] text-[#252422] dark:text-[#F4F1E8] rounded-md hover:bg-gray-50 dark:hover:bg-[#1a1a1a]"
+                >
+                  Schließen
+                </button>
+              </div>
             </div>
           )}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -173,15 +208,17 @@ const SpecialEventModeration = () => {
                   <div className="flex flex-col sm:flex-row gap-2">
                     <button 
                       onClick={() => handleApprove(en.id)} 
-                      className="flex-1 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold transition-colors shadow-md"
+                      disabled={actionState[en.id] === 'approving'}
+                      className={`flex-1 px-4 py-2 rounded-lg text-white font-semibold transition-colors shadow-md ${actionState[en.id] === 'approving' ? 'bg-green-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
                     >
-                      Freigeben
+                      {actionState[en.id] === 'approving' ? 'Freigeben…' : 'Freigeben'}
                     </button>
                     <button 
                       onClick={() => handleReject(en.id)} 
-                      className="flex-1 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold transition-colors shadow-md"
+                      disabled={actionState[en.id] === 'rejecting'}
+                      className={`flex-1 px-4 py-2 rounded-lg text-white font-semibold transition-colors shadow-md ${actionState[en.id] === 'rejecting' ? 'bg-red-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}
                     >
-                      Ablehnen
+                      {actionState[en.id] === 'rejecting' ? 'Ablehnen…' : 'Ablehnen'}
                     </button>
                   </div>
                 </div>
