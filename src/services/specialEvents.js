@@ -157,6 +157,23 @@ export async function getSpecialEventBySlug(slug) {
   return data
 }
 
+export async function getSpecialEventBySlugREST(slug) {
+  try {
+    const url = process.env.REACT_APP_SUPABASE_URL
+    const key = process.env.REACT_APP_SUPABASE_ANON_KEY
+    if (!url || !key) return null
+    const resp = await fetch(`${url}/rest/v1/special_events?slug=eq.${encodeURIComponent(slug)}&select=id,title,slug,description,starts_at,is_active&limit=1`, {
+      headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+    })
+    if (!resp.ok) return null
+    const json = await resp.json()
+    return Array.isArray(json) && json.length > 0 ? json[0] : null
+  } catch (e) {
+    console.warn('[SE] getSpecialEventBySlugREST error:', e?.message)
+    return null
+  }
+}
+
 export async function getFirstSpecialEventAny() {
   console.log('[SE] getFirstSpecialEventAny called')
   // Attempt to fetch any single event regardless of is_active

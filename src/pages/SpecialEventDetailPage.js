@@ -59,9 +59,14 @@ const SpecialEventDetailPage = () => {
 
         let ev = null
         try {
-          ev = await getSpecialEventBySlug(slug)
+          // Try REST first (simplest path, anon-friendly)
+          const { getSpecialEventBySlugREST } = await import('../services/specialEvents')
+          ev = await getSpecialEventBySlugREST(slug)
+          if (!ev) {
+            ev = await getSpecialEventBySlug(slug)
+          }
         } catch (e) {
-          console.warn('[SE:Detail] getSpecialEventBySlug failed:', e?.message)
+          console.warn('[SE:Detail] slug fetch failed:', e?.message)
         }
         if (!ev) {
           // Fallback: load the first available event regardless of status
