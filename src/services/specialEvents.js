@@ -250,7 +250,7 @@ export async function listApprovedEntriesREST(eventId) {
     const url = process.env.REACT_APP_SUPABASE_URL
     const key = process.env.REACT_APP_SUPABASE_ANON_KEY
     if (!url || !key) return []
-    const resp = await fetch(`${url}/rest/v1/special_event_entries?event_id=eq.${encodeURIComponent(eventId)}&status=eq.approved&select=id,title,description,image_path,status,approved_at&order=approved_at.desc`, {
+    const resp = await fetch(`${url}/rest/v1/special_event_entries?event_id=eq.${encodeURIComponent(eventId)}&status=eq.approved&select=id,event_id,title,description,image_path,status,approved_at&order=approved_at.desc`, {
       headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
     })
     if (!resp.ok) return []
@@ -394,7 +394,7 @@ export async function listPendingEntriesREST(eventId) {
     const url = process.env.REACT_APP_SUPABASE_URL
     const key = process.env.REACT_APP_SUPABASE_ANON_KEY
     if (!url || !key) return []
-    const resp = await fetch(`${url}/rest/v1/special_event_entries?event_id=eq.${encodeURIComponent(eventId)}&status=eq.pending&select=id,title,description,image_path,submitter_contact,status,created_at&order=created_at.asc`, {
+    const resp = await fetch(`${url}/rest/v1/special_event_entries?event_id=eq.${encodeURIComponent(eventId)}&status=eq.pending&select=id,event_id,title,description,image_path,submitter_contact,status,created_at&order=created_at.asc`, {
       headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
     })
     if (!resp.ok) return []

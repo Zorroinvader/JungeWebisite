@@ -40,8 +40,9 @@ const SpecialEventModeration = () => {
   async function handleApprove(id) {
     try {
       setActionState(s => ({ ...s, [id]: 'approving' }))
-      await approveEntry(id)
+      const updated = await approveEntry(id)
       setPending(p => p.filter(x => x.id !== id))
+      try { sessionStorage.removeItem('special_event_entries_' + (updated?.event_id || selectedEventId)) } catch {}
     } catch (err) {
       console.error('[Admin SE] Approve failed:', err)
       setError(`Freigeben fehlgeschlagen: ${err?.message || String(err)}`)
@@ -53,8 +54,9 @@ const SpecialEventModeration = () => {
   async function handleReject(id) {
     try {
       setActionState(s => ({ ...s, [id]: 'rejecting' }))
-      await rejectEntry(id)
+      const updated = await rejectEntry(id)
       setPending(p => p.filter(x => x.id !== id))
+      try { sessionStorage.removeItem('special_event_entries_' + (updated?.event_id || selectedEventId)) } catch {}
     } catch (err) {
       console.error('[Admin SE] Reject failed:', err)
       setError(`Ablehnen fehlgeschlagen: ${err?.message || String(err)}`)
