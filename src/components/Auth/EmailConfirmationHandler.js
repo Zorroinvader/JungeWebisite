@@ -15,55 +15,124 @@ const EmailConfirmationHandler = () => {
 
   useEffect(() => {
     const handleEmailConfirmation = async () => {
-      // Check if URL has confirmation parameters
-      const urlParams = new URLSearchParams(window.location.search);
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      
-      const token = urlParams.get('token') || hashParams.get('access_token');
-      const type = urlParams.get('type') || hashParams.get('type');
+      try {
+        // Check if URL has confirmation parameters in hash (most common for Supabase)
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        const accessToken = hashParams.get('access_token');
+        const type = hashParams.get('type') || urlParams.get('type');
+        const token = urlParams.get('token');
+        const tokenHash = hashParams.get('token_hash');
+        const email = hashParams.get('email') || urlParams.get('email');
 
-      console.log('Email confirmation URL params:', { token, type, hash: window.location.hash });
+        console.log('Email confirmation URL params:', { 
+          accessToken: !!accessToken, 
+          token: !!token,
+          tokenHash: !!tokenHash,
+          type, 
+          email,
+          hash: window.location.hash.substring(0, 50)
+        });
 
-      if (token && type === 'signup') {
-        try {
-          console.log('Getting session from Supabase (auto-handles email confirmation)...');
+        // Handle hash-based token (most common Supabase flow)
+        if (accessToken && type === 'signup') {
+          console.log('Processing hash-based email confirmation...');
           
-          // Supabase automatically handles the token from the URL
-          // Just get the session which will be created from the token
-          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+          // Extract token and type from hash
+          const access_token = hashParams.get('access_token');
+          const refresh_token = hashParams.get('refresh_token');
+          const expires_in = hashParams.get('expires_in');
+          const token_type = hashParams.get('token_type') || 'bearer';
 
-          if (sessionError) {
-            console.error('Error getting session:', sessionError);
-            setError(sessionError.message);
+          if (access_token && refresh_token) {
+            // Set the session directly with the tokens from the hash
+            const { data: { session }, error: sessionError } = await supabase.auth.setSession({
+              access_token,
+              refresh_token
+            });
+
+            if (sessionError) {
+              console.error('Error setting session:', sessionError);
+              setError(sessionError.message || 'E-Mail-Bestätigung fehlgeschlagen. Bitte versuchen Sie sich anzumelden.');
+              setChecking(false);
+              return;
+            }
+
+            if (session?.user) {
+              console.log('Email confirmed successfully, user:', session.user.email);
+              setConfirmed(true);
+              setChecking(false);
+              
+              // Clean up the URL
+              window.history.replaceState({}, document.title, window.location.pathname);
+              
+              // Redirect to login page after 2 seconds
+              setTimeout(() => {
+                navigate('/login');
+              }, 2000);
+              return;
+            }
+          }
+        }
+
+        // Handle OTP-based token (alternative flow)
+        if (tokenHash && email && type === 'signup') {
+          console.log('Processing OTP-based email confirmation...');
+          
+          const { data, error: verifyError } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: 'signup'
+          });
+
+          if (verifyError) {
+            console.error('Error verifying OTP:', verifyError);
+            setError(verifyError.message || 'E-Mail-Bestätigung fehlgeschlagen. Bitte versuchen Sie sich anzumelden.');
             setChecking(false);
             return;
           }
 
-          if (session?.user) {
-            console.log('Email confirmed successfully, user:', session.user.email);
+          if (data?.user) {
+            console.log('Email confirmed successfully via OTP, user:', data.user.email);
             setConfirmed(true);
             setChecking(false);
             
             // Clean up the URL
             window.history.replaceState({}, document.title, window.location.pathname);
             
-            // Redirect to home page after 1 second
+            // Redirect to login page after 2 seconds
             setTimeout(() => {
-              navigate('/');
-            }, 1000);
-          } else {
-            console.log('No session found after confirmation');
-            setError('E-Mail-Bestätigung fehlgeschlagen. Bitte versuchen Sie sich anzumelden.');
-            setChecking(false);
+              navigate('/login');
+            }, 2000);
+            return;
           }
-        } catch (err) {
-          console.error('Error in email confirmation:', err);
-          setError(err.message);
-          setChecking(false);
         }
-      } else {
-        // No valid confirmation params
-        console.log('No valid confirmation params found');
+
+        // Try to get session (might work if Supabase auto-handled it)
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (session?.user && session.user.email_confirmed_at) {
+          console.log('Email already confirmed, session found:', session.user.email);
+          setConfirmed(true);
+          setChecking(false);
+          
+          // Clean up the URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+          
+          // Redirect to login page after 2 seconds
+          setTimeout(() => {
+            navigate('/login');
+          }, 2000);
+          return;
+        }
+
+        // No valid confirmation params or confirmation failed
+        console.log('No valid confirmation params found or confirmation incomplete');
+        setError('E-Mail-Bestätigung fehlgeschlagen. Bitte versuchen Sie sich anzumelden oder kontaktieren Sie den Administrator.');
+        setChecking(false);
+      } catch (err) {
+        console.error('Error in email confirmation:', err);
+        setError(err.message || 'Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie sich anzumelden.');
         setChecking(false);
       }
     };
@@ -136,7 +205,7 @@ const EmailConfirmationHandler = () => {
           Willkommen bei Junge Gesellschaft!
         </p>
         <p className={`text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mb-6`}>
-          Sie werden zur Startseite weitergeleitet...
+          Sie werden zur Anmeldeseite weitergeleitet...
         </p>
       </div>
     </div>
