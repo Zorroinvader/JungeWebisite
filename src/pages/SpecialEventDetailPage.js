@@ -11,7 +11,8 @@ import {
   getPublicImageUrl,
   getUserUploadForEvent,
   deleteUserUpload,
-  getUserVoteForEntry
+  getUserVoteForEntry,
+  getVoteStatsForEvent
 } from '../services/specialEvents'
 
 const SpecialEventDetailPage = () => {
@@ -41,6 +42,8 @@ const SpecialEventDetailPage = () => {
   const fileInputGalleryRef = useRef(null)
   const [refreshingEntries, setRefreshingEntries] = useState(false)
   const [showVotePrompt, setShowVotePrompt] = useState(false)
+  const [voteStats, setVoteStats] = useState([])
+  const [refreshingResults, setRefreshingResults] = useState(false)
 
   const voterToken = useMemo(() => localStorage.getItem('se_voter_anon_token') || '', [])
 
@@ -133,6 +136,11 @@ const SpecialEventDetailPage = () => {
             }
             setUserLikes(likesMap)
           }
+          // Load public vote stats for results section
+          try {
+            const stats = await getVoteStatsForEvent(ev.id)
+            if (isMounted) setVoteStats(Array.isArray(stats) ? stats : [])
+          } catch {}
         }
         setCurrentVoteEntryId('') // No longer needed for event-wide voting
       } catch (e) {
