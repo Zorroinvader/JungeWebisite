@@ -159,13 +159,42 @@ const SpecialEventDetailPage = () => {
 
   // Handle hash navigation to results section
   useEffect(() => {
-    if (window.location.hash === '#special-event-results' && voteStats && voteStats.length > 0) {
-      setTimeout(() => {
-        const el = document.getElementById('special-event-results')
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }, 500)
+    const handleHashScroll = () => {
+      if (window.location.hash === '#special-event-results') {
+        // Multiple attempts to ensure it works on mobile
+        const attemptScroll = (attempt = 1) => {
+          const el = document.getElementById('special-event-results')
+          if (el && !loading) {
+            // Use scrollIntoView with better mobile support
+            const yOffset = -20 // Small offset for better visibility
+            const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset
+            window.scrollTo({ top: y, behavior: 'smooth' })
+          } else if (attempt < 5) {
+            // Retry if element not found yet
+            setTimeout(() => attemptScroll(attempt + 1), 300)
+          }
+        }
+        
+        // Start scrolling after a short delay
+        setTimeout(() => attemptScroll(), 500)
+      }
     }
-  }, [voteStats])
+    
+    // Check immediately on mount if hash is present
+    if (window.location.hash === '#special-event-results') {
+      // Initial check
+      setTimeout(handleHashScroll, 500)
+    }
+    
+    // Check when voteStats load and page finishes loading
+    if (!loading && voteStats && voteStats.length > 0) {
+      handleHashScroll()
+    }
+    
+    // Also listen for hash changes
+    window.addEventListener('hashchange', handleHashScroll)
+    return () => window.removeEventListener('hashchange', handleHashScroll)
+  }, [voteStats, loading])
 
   async function handleUpload(e) {
     e.preventDefault()
@@ -185,7 +214,7 @@ const SpecialEventDetailPage = () => {
       setAlreadyUploaded(true)
       // No auto-approve: entries appear after admin approval
       setNotification({ type: 'success', text: 'Upload erfolgreich! Nach Freigabe wird es sichtbar.' })
-      setShowVotePrompt(true)
+      // setShowVotePrompt(true) // Removed - no upload form
     } catch (err) {
       const msg = (err?.message || String(err)).toLowerCase()
       if (msg.includes('duplicate') || msg.includes('unique')) {
@@ -355,7 +384,7 @@ const SpecialEventDetailPage = () => {
 
         {/* Öffentliche Ergebnisse */}
         {voteStats && voteStats.length > 0 && (
-          <div id="special-event-results" className="mt-10">
+          <div id="special-event-results" className="mt-8 scroll-mt-24">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-2xl font-semibold text-[#252422] dark:text-[#F4F1E8]">Ergebnisse</h2>
               <button
@@ -401,144 +430,7 @@ const SpecialEventDetailPage = () => {
           </div>
         )}
 
-        <div className="bg-white dark:bg-[#2a2a2a] border-2 border-[#A58C81] dark:border-[#EBE9E9] rounded-2xl p-5 mb-8 shadow-sm">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="inline-flex items-center justify-center h-9 w-9 rounded-lg bg-[#A58C81]/15 text-[#A58C81]"><Upload className="h-5 w-5" /></div>
-            <h2 className="text-xl font-semibold text-[#252422] dark:text-[#F4F1E8]">Foto hochladen</h2>
-          </div>
-          <p className="text-sm text-[#A58C81] dark:text-[#EBE9E9] mb-4">Zeig uns dein bestes Bild. Bitte nur ein Foto pro Person.</p>
-          {alreadyUploaded && (
-            <div className="mb-3 p-3 rounded-lg bg-[#A58C81]/10 dark:bg-[#A58C81]/20 border border-[#A58C81] dark:border-[#A58C81]/30">
-              <p className="text-sm font-medium text-[#252422] dark:text-[#F4F1E8]">
-                ✓ Du hast bereits ein Foto für dieses Event hochgeladen.
-              </p>
-              <p className="text-xs text-[#A58C81] dark:text-[#EBE9E9] mt-1">
-                Pro Person ist nur ein Upload erlaubt. Weitere Uploads sind nicht möglich.
-              </p>
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                className="mt-3 px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 rounded-lg transition-colors"
-              >
-                Meinen Upload löschen
-              </button>
-              {showDeleteConfirm && (
-                <div className="mt-3 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700">
-                  <p className="text-sm font-semibold text-red-700 dark:text-red-300">
-                    Bist du dir sicher?
-                  </p>
-                  <p className="text-xs text-red-700/90 dark:text-red-200 mt-1">
-                    Das Foto und alle Stimmen für diesen Beitrag werden dauerhaft gelöscht.
-                  </p>
-                  <div className="mt-3 flex gap-2">
-                    <button onClick={handleDeleteUpload} className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md">
-                      Ja, endgültig löschen
-                    </button>
-                    <button onClick={() => setShowDeleteConfirm(false)} className="px-3 py-1.5 text-sm font-medium border border-[#A58C81] text-[#252422] dark:text-[#F4F1E8] rounded-md">
-                      Abbrechen
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-          {userEntry && userEntry.status === 'rejected' && (
-            <div className="mb-3 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700">
-              <p className="text-sm font-semibold text-red-700 dark:text-red-300">Ihr Beitrag wurde abgelehnt.</p>
-              <p className="text-xs text-red-700/90 dark:text-red-200 mt-1">Bitte versucht es mit einem anderen Foto erneut.</p>
-            </div>
-          )}
-          <form onSubmit={handleUpload} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-semibold text-[#252422] dark:text-[#F4F1E8] mb-1">Titel (optional)</label>
-                  <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="z. B. Vampir Kostüm" className="w-full rounded-lg border-2 border-[#A58C81]/40 focus:border-[#A58C81] focus:ring-0 px-3 py-2 bg-white dark:bg-[#1a1a1a] text-[#252422] dark:text-[#F4F1E8]" />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[#252422] dark:text-[#F4F1E8] mb-1">Beschreibung (optional)</label>
-                  <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Kurzbeschreibung deines Fotos" className="w-full rounded-lg border-2 border-[#A58C81]/40 focus:border-[#A58C81] focus:ring-0 px-3 py-2 bg-white dark:bg-[#1a1a1a] text-[#252422] dark:text-[#F4F1E8] min-h-[88px]" />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[#252422] dark:text-[#F4F1E8] mb-1">Kontakt/Name (für Gewinn)</label>
-                  <input type="text" value={contact} onChange={e => setContact(e.target.value)} placeholder="Name oder Kontaktinfo" className="w-full rounded-lg border-2 border-[#A58C81]/40 focus:border-[#A58C81] focus:ring-0 px-3 py-2 bg-white dark:bg-[#1a1a1a] text-[#252422] dark:text-[#F4F1E8]" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-[#252422] dark:text-[#F4F1E8] mb-2">Bilddatei</label>
-                <div className="rounded-xl border-2 border-dashed border-[#A58C81]/50 hover:border-[#A58C81] transition-colors bg-[#F4F1E8]/40 dark:bg-[#1a1a1a] p-4 flex flex-col items-center justify-center text-center">
-                  {previewUrl ? (
-                    <img src={previewUrl} alt="Vorschau" className="w-full h-40 object-cover rounded-lg border border-[#A58C81]/40" />
-                  ) : (
-                    <div className="flex flex-col items-center text-[#A58C81]">
-                      <ImagePlus className="h-8 w-8 mb-2" />
-                      <p className="text-xs">Wähle ein Foto aus oder nimm eines auf</p>
-                    </div>
-                  )}
-                  <div className="mt-3 flex gap-2">
-                    <button type="button" className="px-3 py-2 text-sm font-medium rounded-md border-2 border-[#A58C81] text-[#252422] dark:text-[#F4F1E8] hover:bg-gray-50 dark:hover:bg-[#1a1a1a]" onClick={() => fileInputGalleryRef.current && fileInputGalleryRef.current.click()}>
-                      Aus Galerie wählen
-                    </button>
-                    <button type="button" className="px-3 py-2 text-sm font-medium rounded-md bg-[#A58C81] text-white hover:opacity-90" onClick={() => fileInputCameraRef.current && fileInputCameraRef.current.click()}>
-                      Foto aufnehmen
-                    </button>
-                  </div>
-                  <input
-                    ref={fileInputGalleryRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={e => {
-                      const f = e.target.files?.[0] || null
-                      if (f && f.size > 5 * 1024 * 1024) {
-                        setNotification({ type: 'error', text: 'Bild ist größer als 5MB. Bitte kleineres Bild wählen.' })
-                        return
-                      }
-                      setFile(f)
-                      if (f) {
-                        const url = URL.createObjectURL(f)
-                        setPreviewUrl(url)
-                      } else {
-                        setPreviewUrl('')
-                      }
-                    }}
-                    className="sr-only"
-                  />
-                  <input
-                    ref={fileInputCameraRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={e => {
-                      const f = e.target.files?.[0] || null
-                      if (f && f.size > 5 * 1024 * 1024) {
-                        setNotification({ type: 'error', text: 'Bild ist größer als 5MB. Bitte kleineres Bild wählen.' })
-                        return
-                      }
-                      setFile(f)
-                      if (f) {
-                        const url = URL.createObjectURL(f)
-                        setPreviewUrl(url)
-                      } else {
-                        setPreviewUrl('')
-                      }
-                    }}
-                    className="sr-only"
-                  />
-                </div>
-                <p className="mt-2 text-[11px] text-[#A58C81] dark:text-[#EBE9E9]">Max. 5 MB. Erlaubte Formate: JPG/PNG.</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <button type="submit" disabled={uploading || alreadyUploaded} className="px-4 py-2 rounded-lg bg-[#6054d9] hover:bg-[#4f44c7] text-white font-semibold disabled:opacity-60">
-                {uploading ? 'Lädt…' : 'Hochladen'}
-              </button>
-              {previewUrl && (
-                <button type="button" onClick={() => { setFile(null); setPreviewUrl('') }} className="px-3 py-2 rounded-lg border-2 border-[#A58C81] text-[#252422] dark:text-[#F4F1E8] text-sm">
-                  Auswahl löschen
-                </button>
-              )}
-            </div>
-          </form>
-        </div>
+        {/* Upload form removed - only showing results */}
 
         {/* Gallery hidden - showing results instead */}
         {false && alreadyUploaded && (
@@ -593,8 +485,8 @@ const SpecialEventDetailPage = () => {
           </>
         )}
       </div>
-      {/* Vote Prompt Overlay */}
-      {showVotePrompt && (
+      {/* Vote Prompt Overlay - Removed since upload form is removed */}
+      {false && showVotePrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="max-w-md w-full bg-white dark:bg-[#2a2a2a] rounded-2xl shadow-2xl overflow-hidden">
             <div className="p-6 border-b border-gray-200 dark:border-gray-700">
