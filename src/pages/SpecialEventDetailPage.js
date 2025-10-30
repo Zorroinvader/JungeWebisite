@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react'
-import { Upload, ImagePlus, Trash2 } from 'lucide-react'
+import { Upload, ImagePlus, Trash2, RefreshCw } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
@@ -38,6 +38,7 @@ const SpecialEventDetailPage = () => {
   const [previewUrl, setPreviewUrl] = useState('')
   const [userLikes, setUserLikes] = useState({}) // {entryId: true/false}
   const fileInputRef = useRef(null)
+  const [refreshingEntries, setRefreshingEntries] = useState(false)
 
   const voterToken = useMemo(() => localStorage.getItem('se_voter_anon_token') || '', [])
 
@@ -282,6 +283,24 @@ const SpecialEventDetailPage = () => {
         {!alreadyUploaded && (
           <>
             <h2 className="text-2xl font-semibold text-[#252422] dark:text-[#F4F1E8] mb-4 text-center ">Galerie</h2>
+            <div className="flex justify-end mb-3">
+              <button
+                onClick={async () => {
+                  if (!event) return
+                  setRefreshingEntries(true)
+                  try {
+                    const { listApprovedEntriesREST } = await import('../services/specialEvents')
+                    const fresh = await listApprovedEntriesREST(event.id)
+                    setEntries(fresh)
+                  } finally {
+                    setRefreshingEntries(false)
+                  }
+                }}
+                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md border-2 border-[#A58C81] text-[#252422] dark:text-[#F4F1E8] hover:bg-gray-50 dark:hover:bg-[#1a1a1a]"
+              >
+                <RefreshCw className={`h-4 w-4 ${refreshingEntries ? 'animate-spin' : ''}`} /> Aktualisieren
+              </button>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-8">
               {entries.map(en => (
                 <div key={en.id} className="border-2 border-[#A58C81] dark:border-[#EBE9E9] rounded-xl overflow-hidden bg-white dark:bg-[#2a2a2a]">

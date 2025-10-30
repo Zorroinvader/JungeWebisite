@@ -245,6 +245,23 @@ export async function listApprovedEntries(eventId) {
   return list
 }
 
+export async function listApprovedEntriesREST(eventId) {
+  try {
+    const url = process.env.REACT_APP_SUPABASE_URL
+    const key = process.env.REACT_APP_SUPABASE_ANON_KEY
+    if (!url || !key) return []
+    const resp = await fetch(`${url}/rest/v1/special_event_entries?event_id=eq.${encodeURIComponent(eventId)}&status=eq.approved&select=id,title,description,image_path,status,approved_at&order=approved_at.desc`, {
+      headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+    })
+    if (!resp.ok) return []
+    const json = await resp.json()
+    return Array.isArray(json) ? json : []
+  } catch (e) {
+    console.warn('[SE] listApprovedEntriesREST error:', e?.message)
+    return []
+  }
+}
+
 export function getPublicImageUrl(path) {
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path)
   return data?.publicUrl || ''
