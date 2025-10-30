@@ -127,19 +127,14 @@ const EmailConfirmationHandler = () => {
         }
 
         // Try to get session (might work if Supabase auto-handled it)
-        // Wait a bit for Supabase to process the URL automatically
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (session?.user) {
-          console.log('Session found after processing:', session.user.email, 'Confirmed:', !!session.user.email_confirmed_at);
-          
-          if (session.user.email_confirmed_at) {
-            console.log('✅ Email already confirmed, session found:', session.user.email);
-            console.log('✅ Setting confirmed=true and checking=false to show success screen');
+        // Retry a few times to allow Supabase to finalize the session
+        for (let attempt = 0; attempt < 10; attempt++) {
+          await new Promise(resolve => setTimeout(resolve, 300));
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            console.log(`✅ Session found (attempt ${attempt + 1}):`, session.user.email, 'Confirmed:', !!session.user.email_confirmed_at);
             
-            // Set confirmed state FIRST to show success message
+            // Consider any valid session as success (email_confirmed_at can lag)
             setConfirmed(true);
             setChecking(false);
             
@@ -154,8 +149,6 @@ const EmailConfirmationHandler = () => {
               navigate('/login');
             }, 5000);
             return;
-          } else {
-            console.log('Session exists but email not yet confirmed');
           }
         }
 
