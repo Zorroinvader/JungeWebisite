@@ -131,7 +131,7 @@ const HomePage = () => {
                 to={specialEvents?.[0]?.slug ? `/special-events/${specialEvents[0].slug}` : '/special-events'}
                 className="inline-flex items-center justify-center px-4 py-3 text-base font-semibold text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg shadow-md w-full"
               >
-                Special Events ansehen
+                Kostümwettbewerb ansehen
               </Link>
             </div>
           </div>
