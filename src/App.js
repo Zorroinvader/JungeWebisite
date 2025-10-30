@@ -17,7 +17,7 @@ import AdminPanelClean from './components/Admin/AdminPanelClean'
 import SpecialEventsPage from './pages/SpecialEventsPage'
 import SpecialEventDetailPage from './pages/SpecialEventDetailPage'
 import './index.css'
-import Analytics from './components/Analytics'
+import { Analytics } from '@vercel/analytics/react'
 import { prefetchActiveSpecialEvents } from './services/specialEvents'
 
 // Protected Route Component
