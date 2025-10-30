@@ -384,7 +384,10 @@ export const eventRequestsAPI = {
       const headers = await getHeaders(email)
       console.log('Headers for email search:', headers)
       
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?requester_email=eq.${email}&select=id,title,event_name,requester_name,requester_email,start_date,end_date,request_stage,status,created_at&order=created_at.desc`, {
+      // Use ilike for case-insensitive match and encode the email
+      const encoded = encodeURIComponent(email.trim())
+      const url = `${SUPABASE_URL}/rest/v1/event_requests?requester_email=ilike.${encoded}&select=id,title,event_name,requester_name,requester_email,start_date,end_date,request_stage,status,created_at&order=created_at.desc`
+      const response = await fetch(url, {
         method: 'GET',
         headers
       })
@@ -600,8 +603,7 @@ export const eventRequestsAPI = {
       // Send email to user
       try {
         await sendUserNotification(request.requester_email, request, 'initial_request_accepted')
-        // Also notify admins that the request was accepted
-        await sendAdminNotification(request, 'detailed_info_submitted')
+        // Do not notify admins yet; wait until the user submits detailed info
       } catch (emailError) {
         console.error('Failed to send acceptance email:', emailError)
       }
