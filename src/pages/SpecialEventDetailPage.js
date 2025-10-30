@@ -40,6 +40,7 @@ const SpecialEventDetailPage = () => {
   const fileInputCameraRef = useRef(null)
   const fileInputGalleryRef = useRef(null)
   const [refreshingEntries, setRefreshingEntries] = useState(false)
+  const [showVotePrompt, setShowVotePrompt] = useState(false)
 
   const voterToken = useMemo(() => localStorage.getItem('se_voter_anon_token') || '', [])
 
@@ -166,6 +167,7 @@ const SpecialEventDetailPage = () => {
       setAlreadyUploaded(true)
       // No auto-approve: entries appear after admin approval
       setNotification({ type: 'success', text: 'Upload erfolgreich! Nach Freigabe wird es sichtbar.' })
+      setShowVotePrompt(true)
     } catch (err) {
       const msg = (err?.message || String(err)).toLowerCase()
       if (msg.includes('duplicate') || msg.includes('unique')) {
@@ -302,10 +304,12 @@ const SpecialEventDetailPage = () => {
                 <RefreshCw className={`h-4 w-4 ${refreshingEntries ? 'animate-spin' : ''}`} /> Aktualisieren
               </button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-8">
+            <div id="special-event-gallery" className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-8">
               {entries.map(en => (
-                <div key={en.id} className="border-2 border-[#A58C81] dark:border-[#EBE9E9] rounded-xl overflow-hidden bg-white dark:bg-[#2a2a2a]">
-                  <img src={getPublicImageUrl(en.image_path)} alt={en.title || 'Beitrag'} className="w-full h-56 object-cover" />
+              <div key={en.id} className="border-2 border-[#A58C81] dark:border-[#EBE9E9] rounded-xl overflow-hidden bg-white dark:bg-[#2a2a2a]">
+                <div className="w-full h-56 bg-gray-50 dark:bg-[#1a1a1a] flex items-center justify-center">
+                  <img src={getPublicImageUrl(en.image_path)} alt={en.title || 'Beitrag'} className="max-h-full max-w-full object-contain" />
+                </div>
                   <div className="p-3">
                     {en.title && <div className="font-semibold text-[#252422] dark:text-[#F4F1E8]">{en.title}</div>}
                     {en.description && <div className="text-sm text-[#A58C81] dark:text-[#EBE9E9] mt-1 line-clamp-3">{en.description}</div>}
@@ -491,10 +495,12 @@ const SpecialEventDetailPage = () => {
                 <RefreshCw className={`h-4 w-4 ${refreshingEntries ? 'animate-spin' : ''}`} /> Aktualisieren
               </button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            <div id="special-event-gallery" className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
               {entries.map(en => (
-                <div key={en.id} className="border-2 border-[#A58C81] dark:border-[#EBE9E9] rounded-xl overflow-hidden bg-white dark:bg-[#2a2a2a]">
-                  <img src={getPublicImageUrl(en.image_path)} alt={en.title || 'Beitrag'} className="w-full h-56 object-cover" />
+              <div key={en.id} className="border-2 border-[#A58C81] dark:border-[#EBE9E9] rounded-xl overflow-hidden bg-white dark:bg-[#2a2a2a]">
+                <div className="w-full h-56 bg-gray-50 dark:bg-[#1a1a1a] flex items-center justify-center">
+                  <img src={getPublicImageUrl(en.image_path)} alt={en.title || 'Beitrag'} className="max-h-full max-w-full object-contain" />
+                </div>
                   <div className="p-3">
                     {en.title && <div className="font-semibold text-[#252422] dark:text-[#F4F1E8]">{en.title}</div>}
                     {en.description && <div className="text-sm text-[#A58C81] dark:text-[#EBE9E9] mt-1 line-clamp-3">{en.description}</div>}
@@ -520,6 +526,42 @@ const SpecialEventDetailPage = () => {
           </>
         )}
       </div>
+      {/* Vote Prompt Overlay */}
+      {showVotePrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="max-w-md w-full bg-white dark:bg-[#2a2a2a] rounded-2xl shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-xl font-bold text-[#252422] dark:text-[#F4F1E8]">Danke für deinen Upload!</h3>
+            </div>
+            <div className="p-6 space-y-3">
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                Jetzt bist du dran: Stimme im Wettbewerb für dein Lieblingsbild ab.
+              </p>
+              <p className="text-xs text-[#A58C81] dark:text-[#EBE9E9]">
+                Hinweis: Dein Foto erscheint erst nach Freigabe durch das Team.
+              </p>
+            </div>
+            <div className="px-6 pb-6 flex gap-3 justify-end">
+              <button
+                className="px-4 py-2 text-sm font-semibold rounded-lg border-2 border-[#A58C81] text-[#252422] dark:text-[#F4F1E8] hover:bg-gray-50 dark:hover:bg-[#1a1a1a]"
+                onClick={() => setShowVotePrompt(false)}
+              >
+                Später
+              </button>
+              <button
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-[#A58C81] text-white hover:opacity-90"
+                onClick={() => {
+                  setShowVotePrompt(false)
+                  const el = document.getElementById('special-event-gallery')
+                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }}
+              >
+                Zur Galerie
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
