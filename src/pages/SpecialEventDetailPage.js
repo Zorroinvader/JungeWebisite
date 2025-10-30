@@ -157,6 +157,16 @@ const SpecialEventDetailPage = () => {
     return () => { isMounted = false }
   }, [slug])
 
+  // Handle hash navigation to results section
+  useEffect(() => {
+    if (window.location.hash === '#special-event-results' && voteStats && voteStats.length > 0) {
+      setTimeout(() => {
+        const el = document.getElementById('special-event-results')
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 500)
+    }
+  }, [voteStats])
+
   async function handleUpload(e) {
     e.preventDefault()
     if (!event || !file) return
