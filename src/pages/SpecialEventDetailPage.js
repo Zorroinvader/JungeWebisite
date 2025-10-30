@@ -37,7 +37,8 @@ const SpecialEventDetailPage = () => {
   const [pendingLikeEntryId, setPendingLikeEntryId] = useState('')
   const [previewUrl, setPreviewUrl] = useState('')
   const [userLikes, setUserLikes] = useState({}) // {entryId: true/false}
-  const fileInputRef = useRef(null)
+  const fileInputCameraRef = useRef(null)
+  const fileInputGalleryRef = useRef(null)
   const [refreshingEntries, setRefreshingEntries] = useState(false)
 
   const voterToken = useMemo(() => localStorage.getItem('se_voter_anon_token') || '', [])
@@ -394,18 +395,45 @@ const SpecialEventDetailPage = () => {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-[#252422] dark:text-[#F4F1E8] mb-2">Bilddatei</label>
-                <div className="rounded-xl border-2 border-dashed border-[#A58C81]/50 hover:border-[#A58C81] transition-colors bg-[#F4F1E8]/40 dark:bg-[#1a1a1a] p-4 flex flex-col items-center justify-center text-center cursor-pointer"
-                     onClick={() => fileInputRef.current && fileInputRef.current.click()}>
+                <div className="rounded-xl border-2 border-dashed border-[#A58C81]/50 hover:border-[#A58C81] transition-colors bg-[#F4F1E8]/40 dark:bg-[#1a1a1a] p-4 flex flex-col items-center justify-center text-center">
                   {previewUrl ? (
                     <img src={previewUrl} alt="Vorschau" className="w-full h-40 object-cover rounded-lg border border-[#A58C81]/40" />
                   ) : (
                     <div className="flex flex-col items-center text-[#A58C81]">
                       <ImagePlus className="h-8 w-8 mb-2" />
-                      <p className="text-xs">Tippe hier, um ein Foto aufzunehmen oder auszuwählen</p>
+                      <p className="text-xs">Wähle ein Foto aus oder nimm eines auf</p>
                     </div>
                   )}
+                  <div className="mt-3 flex gap-2">
+                    <button type="button" className="px-3 py-2 text-sm font-medium rounded-md border-2 border-[#A58C81] text-[#252422] dark:text-[#F4F1E8] hover:bg-gray-50 dark:hover:bg-[#1a1a1a]" onClick={() => fileInputGalleryRef.current && fileInputGalleryRef.current.click()}>
+                      Aus Galerie wählen
+                    </button>
+                    <button type="button" className="px-3 py-2 text-sm font-medium rounded-md bg-[#A58C81] text-white hover:opacity-90" onClick={() => fileInputCameraRef.current && fileInputCameraRef.current.click()}>
+                      Foto aufnehmen
+                    </button>
+                  </div>
                   <input
-                    ref={fileInputRef}
+                    ref={fileInputGalleryRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={e => {
+                      const f = e.target.files?.[0] || null
+                      if (f && f.size > 5 * 1024 * 1024) {
+                        setNotification({ type: 'error', text: 'Bild ist größer als 5MB. Bitte kleineres Bild wählen.' })
+                        return
+                      }
+                      setFile(f)
+                      if (f) {
+                        const url = URL.createObjectURL(f)
+                        setPreviewUrl(url)
+                      } else {
+                        setPreviewUrl('')
+                      }
+                    }}
+                    className="sr-only"
+                  />
+                  <input
+                    ref={fileInputCameraRef}
                     type="file"
                     accept="image/*"
                     capture="environment"
