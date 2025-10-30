@@ -150,13 +150,20 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log('🚀 Form submit button clicked!');
     
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      console.log('❌ Form validation failed');
+      return;
+    }
 
+    console.log('✅ Form validation passed, starting submission...');
     setLoading(true);
     setError('');
 
     try {
+      console.log('📝 Preparing request data...')
+      
       // Generate date range array
       const dateRange = [];
       const startDate = new Date(formData.start_date);
@@ -167,6 +174,8 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
         dateRange.push(currentDate.toISOString().split('T')[0]);
         currentDate.setDate(currentDate.getDate() + 1);
       }
+
+      console.log('📅 Date range:', dateRange);
 
       // Create request data matching existing structure
       const requestData = {
@@ -190,51 +199,124 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
         created_by: user?.id || null
       };
 
-      const result = await eventRequestsAPI.createInitialRequest(requestData);
-
-      // Send notification to admins about new initial request (silently fail if errors occur)
-      if (areNotificationsEnabled()) {
-        try {
-          await sendAdminNotification({
-            title: formData.title,
-            requester_name: formData.requester_name,
-            requester_email: formData.requester_email,
-            start_date: formData.start_date,
-            end_date: formData.end_date,
-            event_type: formData.event_type
-          }, 'initial_request');
-        } catch (notifError) {
-          // Silently log the error but don't show it to the user
-          console.error('Admin notification failed (logged for debugging):', notifError);
-        }
-      }
-
-      // Send confirmation email to the user (requester) (silently fail if errors occur)
+      console.log('📤 Calling eventRequestsAPI.createInitialRequest...')
+      
+      // Try the API with a short timeout (3 seconds)
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout after 3 seconds')), 3000)
+      )
+      
+      const requestPromise = eventRequestsAPI.createInitialRequest(requestData)
+      
+      console.log('⏳ Waiting for API response...')
+      let result
       try {
-        await sendUserNotification(formData.requester_email, {
-          title: formData.title,
-          event_name: formData.title,
-          requester_name: formData.requester_name,
-          requester_email: formData.requester_email,
-          start_date: formData.start_date,
-          end_date: formData.end_date,
-          event_type: formData.event_type
-        }, 'initial_request_received');
-      } catch (notifError) {
-        // Silently log the error but don't show it to the user
-        console.error('User notification failed (logged for debugging):', notifError);
+        result = await Promise.race([requestPromise, timeoutPromise])
+        console.log('✅ Event request created successfully:', result)
+      } catch (apiError) {
+        // If API fails, use fallback immediately
+        throw new Error('API_TIMEOUT')
       }
 
+      // Send notifications asynchronously without blocking the success message
       setSubmissionResult(result);
       setSuccess(true);
+      setLoading(false);
+
+      // Send notification to admins about new initial request (async, don't wait)
+      if (areNotificationsEnabled()) {
+        console.log('📧 Scheduling admin notification...')
+        sendAdminNotification(result, 'initial_request').catch(err => {
+          console.error('❌ Admin notification failed (non-blocking):', err);
+        });
+      }
+
+      // Send confirmation email to the user (async, don't wait)
+      console.log('📧 Scheduling user notification...')
+      sendUserNotification(formData.requester_email, result, 'initial_request_received').catch(err => {
+        console.error('❌ User notification failed (non-blocking):', err);
+      });
       
       // Don't auto-close - let user close manually when ready
 
     } catch (err) {
       console.error('Error submitting request:', err);
-      setError(err.message || 'Fehler beim Senden der Anfrage');
-    } finally {
-      setLoading(false);
+      // Fallback: use HTTP REST API for insert (more reliable)
+      if (err.message === 'API_TIMEOUT' || true) {
+        try {
+          console.log('🛟 Using fast HTTP REST API for insert...')
+          const supabaseUrl = process.env.REACT_APP_SUPABASE_URL
+          const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY
+
+          const fallbackData = {
+            title: formData.title,
+            description: formData.additional_notes || '',
+            requester_name: formData.requester_name,
+            requester_email: formData.requester_email,
+            start_date: formData.start_date,
+            end_date: formData.end_date,
+            is_private: formData.event_type === 'Privates Event',
+            event_type: formData.event_type,
+            status: 'pending',
+            created_at: new Date().toISOString(),
+            event_name: formData.title,
+            requester_phone: formData.requester_phone || null,
+            requested_days: JSON.stringify([formData.start_date, formData.end_date]),
+            initial_notes: formData.additional_notes || '',
+            request_stage: 'initial',
+            requested_by: user?.id || null,
+            created_by: user?.id || null
+          }
+
+          console.log('📤 POSTing to Supabase REST API...')
+          const response = await fetch(`${supabaseUrl}/rest/v1/event_requests`, {
+            method: 'POST',
+            headers: {
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${supabaseKey}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify(fallbackData)
+          })
+
+          if (!response.ok) {
+            const text = await response.text()
+            console.error('❌ HTTP error:', text)
+            throw new Error(`HTTP ${response.status}: ${text}`)
+          }
+
+          const result = await response.json()
+          const created = Array.isArray(result) ? result[0] : result
+          console.log('✅ HTTP REST API insert success:', created)
+
+          // Show success immediately
+          setSubmissionResult(created)
+          setSuccess(true)
+          setLoading(false)
+
+          // Fire notifications asynchronously (don't wait for them)
+          if (areNotificationsEnabled()) {
+            console.log('📧 Scheduling admin notification...')
+            sendAdminNotification(created, 'initial_request').catch(err => {
+              console.error('❌ Admin notification failed (non-blocking):', err)
+            })
+          }
+          console.log('📧 Scheduling user notification...')
+          sendUserNotification(formData.requester_email, {
+            ...created,
+            requester_name: formData.requester_name,
+            event_name: formData.title,
+            event_type: formData.event_type
+          }, 'initial_request_received').catch(err => {
+            console.error('❌ User notification failed (non-blocking):', err)
+          })
+        } catch (fallbackError) {
+          console.error('❌ Fallback insert failed:', fallbackError)
+          setError(err.message || 'Fehler beim Senden der Anfrage')
+          setLoading(false)
+        }
+      }
     }
   };
 

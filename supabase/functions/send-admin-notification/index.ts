@@ -1,5 +1,12 @@
 // Edge Function to send admin notification emails via Resend
+import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+
+declare const Deno: {
+  env: {
+    get(key: string): string | undefined
+  }
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -43,15 +50,31 @@ serve(async (req) => {
     // Send email using Resend API
     console.log('📤 Sending to Resend API...')
     
+    // Use verified email for testing (replace with your verified domain email later)
+    const fromEmail = Deno.env.get('RESEND_FROM_EMAIL') || 'zorro.invader@gmail.com'
+    const fromName = Deno.env.get('RESEND_FROM_NAME') || 'Event Management'
+    
+    // For testing: filter recipients to only send to verified email
+    // For production with verified domain: send to all recipients
+    const isProduction = Deno.env.get('ENVIRONMENT') === 'production'
+    let recipientsToSend = emailRecipients
+    
+    if (!isProduction && fromEmail === 'zorro.invader@gmail.com') {
+      // In development/testing mode, only send to verified email
+      console.log('⚠️ Development mode: Limiting recipients to verified email only')
+      recipientsToSend = ['zorro.invader@gmail.com']
+    }
+    
     const emailPayload = {
-      from: 'Event Management <onboarding@resend.dev>',
-      to: emailRecipients,
+      from: `${fromName} <${fromEmail}>`,
+      to: recipientsToSend,
       subject: subject,
       html: htmlContent || message,
       text: message,
     }
 
     console.log('📦 Email payload:', JSON.stringify(emailPayload, null, 2))
+    console.log('📧 From address:', emailPayload.from)
 
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',

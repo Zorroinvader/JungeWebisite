@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDarkMode } from '../../contexts/DarkModeContext'
-import { Calendar, Users, FileText, Settings, AlertCircle, Check, X, Clock, Eye, Download, ArrowLeft, Workflow, Plus, Edit } from 'lucide-react'
+import { Calendar, Users, FileText, Settings, AlertCircle, Check, X, Clock, Eye, Download, ArrowLeft, Workflow, Plus, Edit, RefreshCw } from 'lucide-react'
 import { eventRequestsAPI, eventsAPI } from '../../services/httpApi'
 import eventBus from '../../utils/eventBus'
 import UserManagement from './UserManagement'
@@ -447,8 +447,15 @@ const SettingsTab = () => {
   const [showBlockedDates, setShowBlockedDates] = useState(true)
   const [defaultToWeekView, setDefaultToWeekView] = useState(false)
   const [adminEmails, setAdminEmails] = useState([])
+  const [adminEmailsFull, setAdminEmailsFull] = useState([]) // Full objects from DB
+  const [pendingEmails, setPendingEmails] = useState([]) // Emails to be added
+  const [emailsToRemove, setEmailsToRemove] = useState([]) // Email IDs to remove
   const [newEmail, setNewEmail] = useState('')
   const [emailError, setEmailError] = useState('')
+  const [loadingEmails, setLoadingEmails] = useState(true)
+  const [saveSuccess, setSaveSuccess] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [saving, setSaving] = useState(false)
 
   // Load settings from localStorage on mount
   useEffect(() => {
@@ -461,11 +468,27 @@ const SettingsTab = () => {
         setShowPrivateEvents(settings.showPrivateEvents ?? true)
         setShowBlockedDates(settings.showBlockedDates ?? true)
         setDefaultToWeekView(settings.defaultToWeekView ?? false)
-        setAdminEmails(settings.adminEmails ?? [])
       } catch (error) {
         console.error('Error loading settings:', error)
       }
     }
+  }, [])
+
+  // Load admin emails from database
+  useEffect(() => {
+    async function loadEmails() {
+      try {
+        const { getAdminNotificationEmails } = await import('../../services/adminEmails')
+        const emails = await getAdminNotificationEmails()
+        setAdminEmailsFull(emails)
+        setAdminEmails(emails.map(e => e.email))
+      } catch (error) {
+        console.error('Error loading admin emails:', error)
+      } finally {
+        setLoadingEmails(false)
+      }
+    }
+    loadEmails()
   }, [])
 
   const validateEmail = (email) => {
@@ -475,28 +498,74 @@ const SettingsTab = () => {
 
   const handleAddEmail = () => {
     setEmailError('')
+    setSaveSuccess(false)
+    setSaveError('')
     
     if (!newEmail.trim()) {
-      setEmailError('Bitte geben Sie eine E-Mail-Adresse ein')
+      setEmailError('Bitte geben Sie eine oder mehrere E-Mail-Adressen ein')
       return
     }
 
-    if (!validateEmail(newEmail)) {
-      setEmailError('Bitte geben Sie eine gültige E-Mail-Adresse ein')
+    // Parse multiple emails (separated by comma, semicolon, or newline)
+    const emailRegex = /[\s,;]+/
+    const rawEmails = newEmail.split(emailRegex).map(e => e.trim()).filter(e => e.length > 0)
+    
+    if (rawEmails.length === 0) {
+      setEmailError('Bitte geben Sie mindestens eine E-Mail-Adresse ein')
       return
     }
 
-    if (adminEmails.includes(newEmail.toLowerCase())) {
-      setEmailError('Diese E-Mail-Adresse wurde bereits hinzugefügt')
+    const validEmails = []
+    const invalidEmails = []
+    const duplicates = []
+    
+    rawEmails.forEach(rawEmail => {
+      if (!validateEmail(rawEmail)) {
+        invalidEmails.push(rawEmail)
+      } else {
+        const emailLower = rawEmail.toLowerCase()
+        
+        // Check if already in database or pending
+        if (adminEmails.map(e => e.toLowerCase()).includes(emailLower) || 
+            pendingEmails.map(e => e.toLowerCase()).includes(emailLower)) {
+          duplicates.push(rawEmail)
+        } else {
+          validEmails.push(rawEmail)
+        }
+      }
+    })
+
+    // Show errors if any
+    if (invalidEmails.length > 0) {
+      setEmailError(`Ungültige E-Mail-Adressen: ${invalidEmails.join(', ')}`)
       return
     }
 
-    setAdminEmails([...adminEmails, newEmail.toLowerCase()])
-    setNewEmail('')
+    if (duplicates.length > 0) {
+      setEmailError(`Diese E-Mail-Adressen existieren bereits: ${duplicates.join(', ')}`)
+      return
+    }
+
+    // Add valid emails to pending list
+    if (validEmails.length > 0) {
+      setPendingEmails([...pendingEmails, ...validEmails])
+      setNewEmail('')
+    }
   }
 
-  const handleRemoveEmail = (emailToRemove) => {
-    setAdminEmails(adminEmails.filter(email => email !== emailToRemove))
+  const handleRemoveEmail = (emailId, emailToRemove) => {
+    setSaveSuccess(false)
+    setSaveError('')
+    
+    // If email is in database, add to removal list
+    if (emailId) {
+      setEmailsToRemove([...emailsToRemove, emailId])
+      setAdminEmailsFull(adminEmailsFull.filter(e => e.id !== emailId))
+      setAdminEmails(adminEmails.filter(email => email !== emailToRemove))
+    } else {
+      // If it's a pending email, just remove from pending
+      setPendingEmails(pendingEmails.filter(e => e.toLowerCase() !== emailToRemove.toLowerCase()))
+    }
   }
 
   const handleImportOldCalendar = async () => {
@@ -802,37 +871,110 @@ const SettingsTab = () => {
     }
   }
 
-  const handleSaveSettings = () => {
-    const settings = {
-      notificationsEnabled,
-      autoApprovePublic,
-      showPrivateEvents,
-      showBlockedDates,
-      defaultToWeekView,
-      adminEmails,
-      lastUpdated: new Date().toISOString()
-    }
-
-    localStorage.setItem('adminSettings', JSON.stringify(settings))
+  const handleSaveSettings = async () => {
+    console.log('🔄 Save button clicked!')
+    console.log('Pending emails:', pendingEmails)
+    console.log('Emails to remove:', emailsToRemove)
     
-    alert('✓ Einstellungen wurden erfolgreich gespeichert!\n\n' +
-          `Benachrichtigungen: ${notificationsEnabled ? 'Aktiviert' : 'Deaktiviert'}\n` +
-          `Admin E-Mails: ${adminEmails.length} konfiguriert\n` +
-          `Auto-Genehmigung: ${autoApprovePublic ? 'Aktiviert' : 'Deaktiviert'}`)
+    setSaving(true)
+    setSaveSuccess(false)
+    setSaveError('')
+    
+    try {
+      // Save basic settings to localStorage
+      const settings = {
+        notificationsEnabled,
+        autoApprovePublic,
+        showPrivateEvents,
+        showBlockedDates,
+        defaultToWeekView,
+        lastUpdated: new Date().toISOString()
+      }
+      localStorage.setItem('adminSettings', JSON.stringify(settings))
+      console.log('✅ Settings saved to localStorage')
+
+      // Only save emails if there are changes
+      if (pendingEmails.length > 0 || emailsToRemove.length > 0) {
+        console.log('📧 Saving email changes to database...')
+        
+        // Save admin emails to database
+        const { addAdminNotificationEmail, removeAdminNotificationEmail } = await import('../../services/adminEmails')
+        
+        // Add pending emails
+        for (const email of pendingEmails) {
+          console.log('➕ Adding email:', email)
+          await addAdminNotificationEmail(email)
+        }
+        
+        // Remove marked emails
+        for (const emailId of emailsToRemove) {
+          console.log('➖ Removing email ID:', emailId)
+          await removeAdminNotificationEmail(emailId)
+        }
+        
+        // Reload emails from database
+        const { getAdminNotificationEmails } = await import('../../services/adminEmails')
+        const updatedEmails = await getAdminNotificationEmails()
+        setAdminEmailsFull(updatedEmails)
+        setAdminEmails(updatedEmails.map(e => e.email))
+        console.log('✅ Emails reloaded from database')
+      }
+      
+      // Clear pending lists
+      setPendingEmails([])
+      setEmailsToRemove([])
+      
+      setSaveSuccess(true)
+      console.log('✅ Settings saved successfully!')
+      setTimeout(() => setSaveSuccess(false), 3000)
+      
+    } catch (error) {
+      console.error('❌ Error saving settings:', error)
+      setSaveError('Fehler beim Speichern der Einstellungen: ' + (error.message || 'Unbekannter Fehler'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-xl font-semibold text-[#252422] dark:text-[#F4F1E8]">Einstellungen</h2>
         <button
           onClick={handleSaveSettings}
-          className="inline-flex items-center px-6 py-3 text-sm font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg transition-colors shadow-md"
+          disabled={saving}
+          className="inline-flex items-center px-6 py-3 text-sm font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Check className="h-4 w-4 mr-2" />
-          Einstellungen speichern
+          {saving ? (
+            <>
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              Speichern...
+            </>
+          ) : (
+            <>
+              <Check className="h-4 w-4 mr-2" />
+              Einstellungen speichern
+            </>
+          )}
         </button>
       </div>
+
+      {/* Success/Error Messages */}
+      {saveSuccess && (
+        <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg">
+          <p className="text-green-700 dark:text-green-300 font-medium">
+            ✓ Einstellungen wurden erfolgreich gespeichert!
+          </p>
+        </div>
+      )}
+      
+      {saveError && (
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg">
+          <p className="text-red-700 dark:text-red-300 font-medium">
+            ✗ {saveError}
+          </p>
+        </div>
+      )}
 
       {/* Notification Settings */}
       <div className={`bg-white dark:bg-[#2a2a2a] rounded-lg p-6 border-2 border-[#A58C81] dark:border-[#4a4a4a]`}>
@@ -874,8 +1016,9 @@ const SettingsTab = () => {
             <h4 className={`text-sm font-bold text-[#252422] dark:text-[#F4F1E8] mb-2`}>
               Admin E-Mail-Adressen für Benachrichtigungen
             </h4>
-            <p className={`text-xs text-[#A58C81] dark:text-[#EBE9E9] mb-3`}>
-              Diese E-Mail-Adressen erhalten Benachrichtigungen bei neuen Event-Anfragen
+              <p className={`text-xs text-[#A58C81] dark:text-[#EBE9E9] mb-3`}>
+              Diese E-Mail-Adressen erhalten Benachrichtigungen bei neuen Event-Anfragen. 
+              Sie können mehrere E-Mails gleichzeitig hinzufügen (durch Komma getrennt).
             </p>
 
             {/* Add Email Form */}
@@ -894,7 +1037,7 @@ const SettingsTab = () => {
                       handleAddEmail()
                     }
                   }}
-                  placeholder="admin@beispiel.de"
+                  placeholder="admin@beispiel.de, admin2@beispiel.de (mehrere durch Komma getrennt)"
                   className="w-full px-3 py-2 border-2 border-[#A58C81] dark:border-[#6a6a6a] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6054d9] bg-white dark:bg-[#1a1a1a] text-[#252422] dark:text-[#F4F1E8]"
                 />
                 {emailError && (
@@ -910,19 +1053,55 @@ const SettingsTab = () => {
             </div>
 
             {/* Email List */}
-            {adminEmails.length > 0 ? (
+            {loadingEmails ? (
+              <p className={`text-xs text-[#A58C81] dark:text-[#EBE9E9] italic text-center py-3`}>
+                E-Mail-Adressen werden geladen...
+              </p>
+            ) : (adminEmailsFull.length > 0 || pendingEmails.length > 0) ? (
               <div className="space-y-2">
-                {adminEmails.map((email, index) => (
+                {/* Pending emails (will be added when save is clicked) */}
+                {pendingEmails.map((email, index) => (
                   <div
-                    key={index}
-                    className="flex items-center justify-between p-2 bg-gray-50 dark:bg-[#1a1a1a] rounded-lg border border-[#A58C81] dark:border-[#6a6a6a]"
+                    key={`pending-${index}`}
+                    className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border-2 border-yellow-300 dark:border-yellow-700"
                   >
-                    <span className={`text-sm text-[#252422] dark:text-[#F4F1E8]`}>
-                      {email}
-                    </span>
+                    <div className="flex-1">
+                      <span className={`text-sm font-medium text-[#252422] dark:text-[#F4F1E8]`}>
+                        {email} <span className="text-xs text-yellow-600 dark:text-yellow-400">(wird hinzugefügt)</span>
+                      </span>
+                    </div>
                     <button
-                      onClick={() => handleRemoveEmail(email)}
-                      className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                      onClick={() => handleRemoveEmail(null, email)}
+                      className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors ml-2"
+                      title="Entfernen"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+                
+                {/* Database emails */}
+                {adminEmailsFull.map((emailObj) => (
+                  <div
+                    key={emailObj.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-[#1a1a1a] rounded-lg border border-[#A58C81] dark:border-[#6a6a6a]"
+                  >
+                    <div className="flex-1">
+                      <span className={`text-sm font-medium text-[#252422] dark:text-[#F4F1E8]`}>
+                        {emailObj.email}
+                        {emailsToRemove.includes(emailObj.id) && (
+                          <span className="text-xs text-red-600 dark:text-red-400 ml-2">(wird entfernt)</span>
+                        )}
+                      </span>
+                      {emailObj.added_at && (
+                        <p className="text-xs text-[#A58C81] dark:text-[#EBE9E9] mt-1">
+                          Hinzugefügt am {new Date(emailObj.added_at).toLocaleDateString('de-DE')}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => handleRemoveEmail(emailObj.id, emailObj.email)}
+                      className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors ml-2"
                       title="Entfernen"
                     >
                       <X className="h-4 w-4" />
@@ -933,6 +1112,13 @@ const SettingsTab = () => {
             ) : (
               <p className={`text-xs text-[#A58C81] dark:text-[#EBE9E9] italic text-center py-3`}>
                 Noch keine E-Mail-Adressen konfiguriert
+              </p>
+            )}
+            
+            {/* Info text about saving */}
+            {(pendingEmails.length > 0 || emailsToRemove.length > 0) && (
+              <p className="text-xs text-blue-600 dark:text-blue-400 italic text-center py-2">
+                ⚠️ Klicken Sie auf "Einstellungen speichern", um die Änderungen zu speichern
               </p>
             )}
           </div>
