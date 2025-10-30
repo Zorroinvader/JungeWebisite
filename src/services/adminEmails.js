@@ -1,25 +1,43 @@
 import { supabase } from '../lib/supabase'
 
+const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL
+const SUPABASE_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY
+
 /**
  * Get all active admin notification emails from database
  * @returns {Promise<Array<{id: string, email: string, added_at: string, notes: string}>>}
  */
 export async function getAdminNotificationEmails() {
-  console.log('📬 Fetching admin emails...')
-  
-  const { data, error } = await supabase
-    .from('admin_notification_emails')
-    .select('*')
-    .eq('is_active', true)
-    .order('added_at', { ascending: false })
+  console.log('📬 Fetching admin emails (HTTP REST)...')
 
-  if (error) {
-    console.error('❌ Error fetching admin emails:', error)
+  try {
+    if (!SUPABASE_URL || !SUPABASE_KEY) {
+      throw new Error('Missing Supabase env vars')
+    }
+
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/admin_notification_emails?select=id,email,added_at,notes,is_active&is_active=eq.true&order=added_at.desc`, {
+      method: 'GET',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      }
+    })
+
+    if (!response.ok) {
+      const text = await response.text()
+      console.error('❌ HTTP error fetching admin emails:', text)
+      return []
+    }
+
+    const data = await response.json()
+    console.log('✅ Fetched', data?.length || 0, 'admin emails (HTTP)')
+    return data || []
+  } catch (error) {
+    console.error('❌ Error fetching admin emails (HTTP):', error)
     return []
   }
-
-  console.log('✅ Fetched', data?.length || 0, 'admin emails')
-  return data || []
 }
 
 /**
