@@ -200,7 +200,9 @@ const SpecialEventModeration = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             {activeTab === 'pending' && pending.map(en => (
               <div key={en.id} className="border-2 border-[#A58C81]/30 dark:border-[#EBE9E9]/30 rounded-xl overflow-hidden bg-white dark:bg-[#1a1a1a] shadow-md hover:shadow-lg transition-shadow">
-                <img src={getPublicImageUrl(en.image_path)} alt={en.title || 'Beitrag'} className="w-full h-48 object-cover" />
+                <div className="w-full h-48 bg-gray-50 dark:bg-[#0f0f0f] flex items-center justify-center">
+                  <img src={getPublicImageUrl(en.image_path)} alt={en.title || 'Beitrag'} className="max-w-full max-h-full object-contain" />
+                </div>
                 <div className="p-4">
                   {en.title && <div className="font-semibold text-[#252422] dark:text-[#F4F1E8] mb-2">{en.title}</div>}
                   {en.description && <div className="text-sm text-[#A58C81] dark:text-[#EBE9E9] mb-3">{en.description}</div>}
@@ -230,7 +232,9 @@ const SpecialEventModeration = () => {
             {activeTab === 'approved' && approved.map(en => (
               <div key={en.id} className="border-2 border-green-300 dark:border-green-700 rounded-xl overflow-hidden bg-white dark:bg-[#1a1a1a] shadow-md hover:shadow-lg transition-shadow">
                 <div className="relative">
-                  <img src={getPublicImageUrl(en.image_path)} alt={en.title || 'Beitrag'} className="w-full h-48 object-cover" />
+                  <div className="w-full h-48 bg-gray-50 dark:bg-[#0f0f0f] flex items-center justify-center">
+                    <img src={getPublicImageUrl(en.image_path)} alt={en.title || 'Beitrag'} className="max-w-full max-h-full object-contain" />
+                  </div>
                   <div className="absolute top-2 left-2 bg-green-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
                     ✓ Freigegeben
                   </div>
@@ -315,7 +319,9 @@ const SpecialEventModeration = () => {
                   {voteStats.map((entry, index) => (
                     <div key={entry.entry_id} className="border-2 border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-[#1a1a1a] hover:shadow-xl transition-all">
                       <div className="relative">
-                        <img src={getPublicImageUrl(entry.image_path)} alt={entry.title || 'Beitrag'} className="w-full h-48 object-cover" />
+                        <div className="w-full h-48 bg-gray-50 dark:bg-[#0f0f0f] flex items-center justify-center">
+                          <img src={getPublicImageUrl(entry.image_path)} alt={entry.title || 'Beitrag'} className="max-w-full max-h-full object-contain" />
+                        </div>
                         <div className="absolute top-2 left-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-3 py-2 rounded-full font-bold flex items-center gap-2 shadow-lg">
                           {index === 0 && <Trophy className="h-5 w-5" />}
                           <span className="text-base md:text-lg">#{entry.rank}</span>
