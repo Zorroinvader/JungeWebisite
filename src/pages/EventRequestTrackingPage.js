@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Layout from '../components/Layout/Layout';
 import { eventRequestsAPI } from '../services/httpApi';
 import RequestTimeline from '../components/Calendar/RequestTimeline';
 import DetailedEventForm from '../components/Calendar/DetailedEventForm';
 import { useDarkMode } from '../contexts/DarkModeContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const EventRequestTrackingPage = () => {
   const { isDarkMode } = useDarkMode();
+  const { user } = useAuth();
   const [email, setEmail] = useState('');
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -17,6 +19,11 @@ const EventRequestTrackingPage = () => {
   const [cancellingId, setCancellingId] = useState(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [requestToCancel, setRequestToCancel] = useState(null);
+
+  // Prefill email if logged in
+  useEffect(() => {
+    if (user?.email && !email) setEmail(user.email);
+  }, [user, email]);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -45,6 +52,22 @@ const EventRequestTrackingPage = () => {
   const handleFillDetails = (request) => {
     setSelectedRequest(request);
     setShowDetailedForm(true);
+  };
+
+  const handleLoadMyRequests = async () => {
+    if (!user?.id) return;
+    setError('');
+    setLoading(true);
+    setSearched(true);
+    try {
+      const data = await eventRequestsAPI.getByUser(user.id);
+      setRequests(data || []);
+      // Do not overwrite the email input; keep what the user typed
+    } catch (err) {
+      setError('Fehler beim Laden Ihrer Anfragen: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDetailsSubmitted = () => {
@@ -117,14 +140,25 @@ const EventRequestTrackingPage = () => {
                   placeholder="ihre@email.de"
                 />
               </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className={`w-full px-6 py-3 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} hover:bg-[#8a6a5a] ${isDarkMode ? 'dark:hover:bg-[#8a8a8a]' : ''}`}
-              >
-                {loading ? 'Suche läuft...' : 'Anfragen suchen'}
-              </button>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className={`w-full px-6 py-3 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} hover:bg-[#8a6a5a] ${isDarkMode ? 'dark:hover:bg-[#8a8a8a]' : ''}`}
+                >
+                  {loading ? 'Suche läuft...' : 'Anfragen suchen'}
+                </button>
+                {user?.id && (
+                  <button
+                    type="button"
+                    onClick={handleLoadMyRequests}
+                    disabled={loading}
+                    className={`w-full px-6 py-3 text-sm font-medium text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''}`}
+                  >
+                    Meine Anfragen anzeigen
+                  </button>
+                )}
+              </div>
             </form>
           </div>
 
