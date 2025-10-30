@@ -53,31 +53,6 @@ const SimpleMonthCalendar = ({
       // Load all events (not just current month) to show all available events
       let allEvents = []
       
-      // Add test events first to see if calendar rendering works
-      const testEvents = [
-        {
-          id: 'test-1',
-          title: 'Test Event 1',
-          start_date: new Date().toISOString(),
-          end_date: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(), // 2 hours later
-          is_private: false,
-          status: 'approved',
-          description: 'This is a test event'
-        },
-        {
-          id: 'test-2',
-          title: 'Test Event 2',
-          start_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // tomorrow
-          end_date: new Date(Date.now() + 25 * 60 * 60 * 1000).toISOString(), // tomorrow + 1 hour
-          is_private: false,
-          status: 'approved',
-          description: 'This is another test event'
-        }
-      ]
-      
-      console.log('📅 Calendar: Adding test events first:', testEvents.length)
-      allEvents = [...testEvents]
-      
       try {
         console.log('📅 Calendar: Calling httpAPI.events.getAll()...')
         const apiEvents = await httpAPI.events.getAll()
@@ -104,7 +79,7 @@ const SimpleMonthCalendar = ({
             allEvents = [...allEvents, ...simpleEvents]
           } catch (simpleError) {
             console.error('📅 Calendar: All API methods failed:', simpleError)
-            console.log('📅 Calendar: Using only test events')
+            console.log('📅 Calendar: No events available from API methods')
           }
         }
       }
@@ -138,9 +113,6 @@ const SimpleMonthCalendar = ({
           // Check if this is a public event that should be visible
           const isPublicEvent = !event.is_private && event.status === 'approved'
           
-          // For test events, always show them
-          const isTestEvent = event.id.startsWith('test-')
-          
           const isPrivate = event.is_private || false
           // Check if user owns this event (check multiple possible ID fields)
           const isOwnEvent = user && (
@@ -154,7 +126,7 @@ const SimpleMonthCalendar = ({
           let isBlocked = false
 
           // Handle privacy based on user role
-          if (isPrivate && !isTestEvent) {
+          if (isPrivate) {
             
             if (isAdmin()) {
               // Admin sees everything with full details
@@ -173,7 +145,7 @@ const SimpleMonthCalendar = ({
               isBlocked = true
             }
           } else {
-            // Public event or test event - everyone can see
+            // Public event - everyone can see
             eventTitle = event.title
             eventDescription = event.description
             isBlocked = false

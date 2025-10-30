@@ -423,20 +423,7 @@ const EventCalendar = () => {
     loadEvents(today)
   }, []) // Empty dependency array to run only once on mount
 
-  // Force add a test event if no events are loaded (for debugging)
-  const testEvents = events.length === 0 ? [{
-    id: 'test-event',
-    title: 'Test Event',
-    start: new Date(2025, 9, 20, 10, 0), // October 20, 2025
-    end: new Date(2025, 9, 20, 18, 0),   // October 20, 2025
-    resource: {
-      isRequest: false,
-      isPrivate: false,
-      isBlocked: false
-    }
-  }] : events
-  
-  console.log('🔵 Calendar: Using events for calendar:', testEvents.length, 'events')
+  console.log('🔵 Calendar: Using events for calendar:', events.length, 'events')
 
   // Memoized calendar props
   const calendarProps = useMemo(() => {
@@ -444,7 +431,7 @@ const EventCalendar = () => {
     console.log('🔵 Calendar: Events count:', events.length)
     return {
       localizer,
-      events: testEvents,
+      events,
       startAccessor: 'start',
       endAccessor: 'end',
       style: { height: '600px' },

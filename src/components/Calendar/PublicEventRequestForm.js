@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { X, CheckCircle, Mail } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { eventRequestsAPI, profileAPI } from '../../services/httpApi';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDarkMode } from '../../contexts/DarkModeContext';
 import { sendAdminNotification, sendUserNotification, areNotificationsEnabled } from '../../utils/settingsHelper';
 
 const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, userData }) => {
+  const UNDER_CONSTRUCTION = true; // Visual overlay to inform users
   const { user } = useAuth();
   const { isDarkMode } = useDarkMode();
   
@@ -343,7 +345,28 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-8">
+        <form onSubmit={handleSubmit} className="p-8 space-y-8 relative">
+          {UNDER_CONSTRUCTION && !success && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center">
+              <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+              <div className={`relative z-10 mx-4 w-full max-w-md rounded-2xl border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} p-6 text-center shadow-2xl`} role="status" aria-live="polite">
+                <h3 className={`text-xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} mb-2`}>
+                  Buchungsanfrage im Aufbau
+                </h3>
+                <p className={`text-sm text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mb-4`}>
+                  Dieser Bereich wird gerade entwickelt und ist in Kürze verfügbar.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <button type="button" onClick={onClose} className={`inline-flex justify-center px-5 py-2.5 text-sm font-medium rounded-lg border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} bg-transparent hover:bg-gray-50 ${isDarkMode ? 'dark:hover:bg-[#1a1a1a]' : ''}`}>
+                    Schließen
+                  </button>
+                  <Link to="/contact" className="inline-flex justify-center px-5 py-2.5 text-sm font-semibold text-white rounded-lg bg-[#6054d9] hover:bg-[#4f44c7]">
+                    Kontakt
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
           {error && (
             <div className={`rounded-lg p-4 bg-red-50 ${isDarkMode ? 'dark:bg-red-900/20' : ''} border border-red-200 ${isDarkMode ? 'dark:border-red-800' : ''}`}>
               <p className={`text-sm text-red-600 ${isDarkMode ? 'dark:text-red-400' : ''}`}>{error}</p>

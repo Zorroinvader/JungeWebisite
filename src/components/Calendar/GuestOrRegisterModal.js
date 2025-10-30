@@ -1,11 +1,12 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { UserPlus, Users } from 'lucide-react';
 import { useDarkMode } from '../../contexts/DarkModeContext';
 
 const GuestOrRegisterModal = ({ isOpen, onClose, onContinueAsGuest, selectedDate }) => {
   const { isDarkMode } = useDarkMode();
   const navigate = useNavigate();
+  const UNDER_CONSTRUCTION = true; // Visual overlay active
 
   if (!isOpen) return null;
 
@@ -31,7 +32,7 @@ const GuestOrRegisterModal = ({ isOpen, onClose, onContinueAsGuest, selectedDate
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-xl sm:rounded-2xl shadow-xl max-w-2xl w-full border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#4a4a4a]' : ''} max-h-[95vh] overflow-y-auto`}>
+      <div className={`relative bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-xl sm:rounded-2xl shadow-xl max-w-2xl w-full border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#4a4a4a]' : ''} max-h-[95vh] overflow-y-auto`}>
         {/* Header */}
         <div className={`p-4 sm:p-6 md:p-8 border-b border-[#A58C81] ${isDarkMode ? 'dark:border-[#EBE9E9]' : ''}`}>
           <h2 className={`text-xl sm:text-2xl md:text-3xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} text-center mb-2 sm:mb-3`}>
@@ -137,6 +138,28 @@ const GuestOrRegisterModal = ({ isOpen, onClose, onContinueAsGuest, selectedDate
             Abbrechen
           </button>
         </div>
+
+        {UNDER_CONSTRUCTION && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+            <div className={`relative z-10 mx-4 w-full max-w-md rounded-2xl border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} p-6 text-center shadow-2xl`} role="status" aria-live="polite">
+              <h3 className={`text-xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} mb-2`}>
+                Buchungsanfrage im Aufbau
+              </h3>
+              <p className={`text-sm text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mb-4`}>
+                Dieser Bereich wird gerade entwickelt und ist in Kürze verfügbar.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <button type="button" onClick={onClose} className={`inline-flex justify-center px-5 py-2.5 text-sm font-medium rounded-lg border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} bg-transparent hover:bg-gray-50 ${isDarkMode ? 'dark:hover:bg-[#1a1a1a]' : ''}`}>
+                  Schließen
+                </button>
+                <Link to="/contact" className="inline-flex justify-center px-5 py-2.5 text-sm font-semibold text-white rounded-lg bg-[#6054d9] hover:bg-[#4f44c7]">
+                  Kontakt
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
