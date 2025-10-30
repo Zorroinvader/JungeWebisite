@@ -82,6 +82,11 @@ export const AuthProvider = ({ children }) => {
       // Generate a unique email if none provided
       const userEmail = email || `user_${Date.now()}@temp.local`
       
+      // Get the current origin for redirect URL
+      const redirectTo = typeof window !== 'undefined' 
+        ? `${window.location.origin}${window.location.pathname}` 
+        : undefined
+
       const { data, error } = await supabase.auth.signUp({
         email: userEmail,
         password,
@@ -89,7 +94,8 @@ export const AuthProvider = ({ children }) => {
           data: {
             full_name: fullName,
             original_email: email || null // Store original email if provided
-          }
+          },
+          emailRedirectTo: redirectTo // Explicitly set redirect URL for email confirmation
         }
       })
 

@@ -584,6 +584,11 @@ const SuperAdminUserForm = ({ onClose, onSuccess }) => {
       // Create user with signUp and immediately confirm email
       console.log('🔄 Creating user via signUp:', { email: formData.email, role: formData.role })
       
+      // Get the current origin for redirect URL
+      const redirectTo = typeof window !== 'undefined' 
+        ? `${window.location.origin}${window.location.pathname}` 
+        : undefined
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -592,7 +597,8 @@ const SuperAdminUserForm = ({ onClose, onSuccess }) => {
             username: formData.username,
             full_name: formData.fullName,
             role: formData.role // Pass role in metadata
-          }
+          },
+          emailRedirectTo: redirectTo // Explicitly set redirect URL for email confirmation
         }
       })
 

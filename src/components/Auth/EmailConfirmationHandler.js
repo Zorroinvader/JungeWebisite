@@ -14,6 +14,8 @@ const EmailConfirmationHandler = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    let timeoutId;
+    
     const handleEmailConfirmation = async () => {
       try {
         // Check if URL has confirmation parameters in hash (most common for Supabase)
@@ -21,9 +23,9 @@ const EmailConfirmationHandler = () => {
         const urlParams = new URLSearchParams(window.location.search);
         
         const accessToken = hashParams.get('access_token');
-        const type = hashParams.get('type') || urlParams.get('type');
+        const type = hashParams.get('type') || urlParams.get('type') || (hashParams.get('token_hash') || urlParams.get('token_hash') ? 'signup' : null);
         const token = urlParams.get('token');
-        const tokenHash = hashParams.get('token_hash');
+        const tokenHash = hashParams.get('token_hash') || urlParams.get('token_hash');
         const email = hashParams.get('email') || urlParams.get('email');
 
         console.log('Email confirmation URL params:', { 
@@ -32,11 +34,13 @@ const EmailConfirmationHandler = () => {
           tokenHash: !!tokenHash,
           type, 
           email,
-          hash: window.location.hash.substring(0, 50)
+          hash: window.location.hash.substring(0, 100),
+          fullHash: window.location.hash,
+          search: window.location.search
         });
 
         // Handle hash-based token (most common Supabase flow)
-        if (accessToken && type === 'signup') {
+        if (accessToken) {
           console.log('Processing hash-based email confirmation...');
           
           // Extract token and type from hash
@@ -67,32 +71,34 @@ const EmailConfirmationHandler = () => {
               // Clean up the URL
               window.history.replaceState({}, document.title, window.location.pathname);
               
-              // Redirect to login page after 2 seconds
+              // Redirect to login page after 5 seconds (give user time to see success message)
               setTimeout(() => {
                 navigate('/login');
-              }, 2000);
+              }, 5000);
               return;
+            } else {
+              console.warn('Session set but no user found');
             }
+          } else {
+            console.warn('Missing access_token or refresh_token in hash');
           }
         }
 
         // Handle OTP-based token (alternative flow)
-        if (tokenHash && email && type === 'signup') {
+        if (tokenHash || token) {
           console.log('Processing OTP-based email confirmation...');
           
           const { data, error: verifyError } = await supabase.auth.verifyOtp({
-            token_hash: tokenHash,
-            type: 'signup'
+            token_hash: tokenHash || token,
+            type: 'signup',
+            email: email || undefined
           });
 
           if (verifyError) {
             console.error('Error verifying OTP:', verifyError);
-            setError(verifyError.message || 'E-Mail-Bestätigung fehlgeschlagen. Bitte versuchen Sie sich anzumelden.');
-            setChecking(false);
-            return;
-          }
-
-          if (data?.user) {
+            // Don't set error yet, try other methods first
+            console.log('OTP verification failed, trying alternative methods...');
+          } else if (data?.user) {
             console.log('Email confirmed successfully via OTP, user:', data.user.email);
             setConfirmed(true);
             setChecking(false);
@@ -100,35 +106,52 @@ const EmailConfirmationHandler = () => {
             // Clean up the URL
             window.history.replaceState({}, document.title, window.location.pathname);
             
-            // Redirect to login page after 2 seconds
+            // Redirect to login page after 5 seconds (give user time to see success message)
             setTimeout(() => {
               navigate('/login');
-            }, 2000);
+            }, 5000);
             return;
           }
         }
 
         // Try to get session (might work if Supabase auto-handled it)
+        // Wait a bit for Supabase to process the URL automatically
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        if (session?.user && session.user.email_confirmed_at) {
-          console.log('Email already confirmed, session found:', session.user.email);
-          setConfirmed(true);
-          setChecking(false);
+        if (session?.user) {
+          console.log('Session found after processing:', session.user.email, 'Confirmed:', !!session.user.email_confirmed_at);
           
-          // Clean up the URL
-          window.history.replaceState({}, document.title, window.location.pathname);
-          
-          // Redirect to login page after 2 seconds
-          setTimeout(() => {
-            navigate('/login');
-          }, 2000);
-          return;
+          if (session.user.email_confirmed_at) {
+            console.log('Email already confirmed, session found:', session.user.email);
+            setConfirmed(true);
+            setChecking(false);
+            
+            // Clean up the URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+            
+            // Redirect to login page after 5 seconds (give user time to see success message)
+            setTimeout(() => {
+              navigate('/login');
+            }, 5000);
+            return;
+          } else {
+            console.log('Session exists but email not yet confirmed');
+          }
         }
 
-        // No valid confirmation params or confirmation failed
-        console.log('No valid confirmation params found or confirmation incomplete');
-        setError('E-Mail-Bestätigung fehlgeschlagen. Bitte versuchen Sie sich anzumelden oder kontaktieren Sie den Administrator.');
+        // If we have any confirmation params but nothing worked, show error
+        const hasAnyParams = accessToken || tokenHash || token || type;
+        
+        if (hasAnyParams) {
+          console.log('Confirmation params found but processing failed');
+          setError('E-Mail-Bestätigung konnte nicht abgeschlossen werden. Ihr Konto könnte bereits bestätigt sein. Bitte versuchen Sie sich anzumelden.');
+        } else {
+          console.log('No confirmation params found in URL');
+          setError('Keine Bestätigungsparameter gefunden. Bitte verwenden Sie den Link aus Ihrer E-Mail.');
+        }
+        
         setChecking(false);
       } catch (err) {
         console.error('Error in email confirmation:', err);
@@ -137,8 +160,22 @@ const EmailConfirmationHandler = () => {
       }
     };
 
+    // Set a timeout to prevent infinite loading (15 seconds max)
+    timeoutId = setTimeout(() => {
+      if (checking) {
+        console.warn('Email confirmation timeout');
+        setError('Die Bestätigung dauert länger als erwartet. Bitte versuchen Sie sich anzumelden oder kontaktieren Sie den Administrator.');
+        setChecking(false);
+      }
+    }, 15000);
+
     handleEmailConfirmation();
-  }, [navigate]);
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [navigate, checking]);
 
   if (checking) {
     return (
@@ -196,17 +233,26 @@ const EmailConfirmationHandler = () => {
 
   return (
     <div className={`min-h-screen bg-[#F4F1E8] ${isDarkMode ? 'dark:bg-[#252422]' : ''} flex items-center justify-center p-4`}>
-      <div className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-2xl shadow-xl p-12 max-w-md w-full text-center border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#4a4a4a]' : ''}`}>
-        <CheckCircle className={`w-20 h-20 text-green-600 ${isDarkMode ? 'dark:text-green-400' : ''} mx-auto mb-6`} />
+      <div className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-2xl shadow-xl p-12 max-w-md w-full text-center border-2 border-green-500 ${isDarkMode ? 'dark:border-green-400' : ''}`}>
+        <CheckCircle className={`w-20 h-20 text-green-600 ${isDarkMode ? 'dark:text-green-400' : ''} mx-auto mb-6 animate-pulse`} />
         <h2 className={`text-3xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} mb-4`}>
-          E-Mail bestätigt!
+          Email Aktivierung erfolgreich!
         </h2>
+        <p className={`text-xl font-semibold text-green-600 ${isDarkMode ? 'dark:text-green-400' : ''} mb-4`}>
+          ✓ E-Mail bestätigt
+        </p>
         <p className={`text-lg text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} mb-2`}>
           Willkommen bei Junge Gesellschaft!
         </p>
         <p className={`text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mb-6`}>
-          Sie werden zur Anmeldeseite weitergeleitet...
+          Ihre E-Mail-Adresse wurde erfolgreich bestätigt. Sie werden in wenigen Sekunden zur Anmeldeseite weitergeleitet...
         </p>
+        <button
+          onClick={() => navigate('/login')}
+          className={`w-full px-6 py-3 bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} text-white rounded-lg hover:opacity-90 transition-opacity font-semibold`}
+        >
+          Jetzt zur Anmeldung
+        </button>
       </div>
     </div>
   );
