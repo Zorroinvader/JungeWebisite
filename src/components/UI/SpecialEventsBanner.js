@@ -8,16 +8,47 @@ const SpecialEventsBanner = () => {
   const { isDarkMode } = useDarkMode()
   const [activeEvents, setActiveEvents] = useState([])
   const [loading, setLoading] = useState(true)
+  const [showPlaceholder, setShowPlaceholder] = useState(false)
 
   useEffect(() => {
-    getActiveSpecialEvents()
-      .then(events => setActiveEvents(events || []))
+    let mounted = true
+    // Seed from cache synchronously for instant render
+    try {
+      const raw = sessionStorage.getItem('special_events_active_cache_v1')
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed && parsed.expiresAt && Date.now() < parsed.expiresAt && Array.isArray(parsed.data)) {
+          setActiveEvents(parsed.data)
+          setLoading(false)
+        }
+      }
+    } catch {}
+
+    // Show a quick placeholder if network takes too long
+    const t = setTimeout(() => mounted && setShowPlaceholder(true), 150)
+    // Hard stop loading after 1500ms to avoid stuck skeletons
+    const hardStop = setTimeout(() => mounted && setLoading(false), 1500)
+
+    getActiveSpecialEvents({ useCache: true })
+      .then(events => { if (mounted && events) setActiveEvents(events) })
       .catch(err => console.error('Error loading special events:', err))
-      .finally(() => setLoading(false))
+      .finally(() => { if (mounted) setLoading(false) })
+    return () => { mounted = false; clearTimeout(t); clearTimeout(hardStop) }
   }, [])
 
-  // Only show if there are active events
-  if (loading || activeEvents.length === 0) return null
+  // While loading, show a slim placeholder bar so it's visible on mobile
+  if (loading && showPlaceholder) {
+    return (
+      <div className="w-full bg-[#F4F1E8] dark:bg-[#252422] border-b border-[#A58C81]/50 dark:border-[#EBE9E9]/20">
+        <div className="max-w-7xl mx-auto px-4 py-2">
+          <div className="h-5 sm:h-6 w-48 rounded bg-gray-200 dark:bg-[#333] animate-pulse" />
+        </div>
+      </div>
+    )
+  }
+
+  // Only show links if there are active events
+  if (activeEvents.length === 0) return null
 
   return (
     <div className="w-full bg-[#F4F1E8] dark:bg-[#252422] border-b border-[#A58C81]/50 dark:border-[#EBE9E9]/20">

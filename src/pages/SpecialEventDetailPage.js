@@ -44,35 +44,99 @@ const SpecialEventDetailPage = () => {
     let isMounted = true
     async function load() {
       try {
-        const ev = await getSpecialEventBySlug(slug)
+        console.log('[SE:Detail] slug=', slug)
+        // Seed from cache synchronously for instant paint
+        try {
+          const raw = sessionStorage.getItem('special_event_detail_' + slug)
+          if (raw) {
+            const parsed = JSON.parse(raw)
+            if (parsed?.data && parsed.expiresAt && Date.now() < parsed.expiresAt) {
+              console.log('[SE:Detail] detail cache hit for slug', slug)
+              setEvent(parsed.data)
+            }
+          }
+        } catch {}
+
+        let ev = null
+        try {
+          ev = await getSpecialEventBySlug(slug)
+        } catch (e) {
+          console.warn('[SE:Detail] getSpecialEventBySlug failed:', e?.message)
+        }
+        if (!ev) {
+          // Fallback: load the first available event regardless of status
+          const { getFirstSpecialEventAny } = await import('../services/specialEvents')
+          ev = await getFirstSpecialEventAny()
+          console.log('[SE:Detail] Fallback first event slug=', ev?.slug)
+        }
+        if (!ev) {
+          // Last-resort: use cached active events (banner cache)
+          try {
+            const raw = sessionStorage.getItem('special_events_active_cache_v1')
+            if (raw) {
+              const parsed = JSON.parse(raw)
+              const list = Array.isArray(parsed?.data) ? parsed.data : []
+              if (list.length) {
+                const bySlug = list.find(x => x.slug === slug)
+                ev = bySlug || list[0]
+                console.log('[SE:Detail] Last-resort picked slug=', ev?.slug)
+              }
+            }
+          } catch {}
+        }
         if (!isMounted) return
         setEvent(ev)
+        console.log('[SE:Detail] Selected event id=', ev?.id, 'slug=', ev?.slug)
         const uploadedFlag = localStorage.getItem(`se_uploaded_${ev.id}`)
         setAlreadyUploaded(!!uploadedFlag)
         if (uploadedFlag) {
           const userUpload = await getUserUploadForEvent(ev.id)
           if (userUpload) setUserEntry(userUpload)
         }
-        const list = await listApprovedEntries(ev.id)
-        if (!isMounted) return
-        setEntries(list)
-        
-        // Load user likes for all entries
-        const likesMap = {}
-        for (const entry of list) {
-          const vote = await getUserVoteForEntry(entry.id)
-          likesMap[entry.id] = !!vote
+        if (ev && ev.id) {
+          let latestEntries = []
+          // Try entries cache first
+          try {
+            const rawEntries = sessionStorage.getItem('special_event_entries_' + ev.id)
+            if (rawEntries) {
+              const parsed = JSON.parse(rawEntries)
+              if (parsed?.data && parsed.expiresAt && Date.now() < parsed.expiresAt) {
+                setEntries(parsed.data)
+                latestEntries = parsed.data
+              }
+            }
+          } catch {}
+
+          try {
+            const list = await listApprovedEntries(ev.id)
+            if (!isMounted) return
+            setEntries(list)
+            latestEntries = list
+          } catch (_) {
+            // ignore entries failure
+          }
+          // Load user likes for all entries
+          if (latestEntries && latestEntries.length) {
+            const likesMap = {}
+            for (const entry of latestEntries) {
+              const vote = await getUserVoteForEntry(entry.id)
+              likesMap[entry.id] = !!vote
+            }
+            setUserLikes(likesMap)
+          }
         }
-        setUserLikes(likesMap)
         setCurrentVoteEntryId('') // No longer needed for event-wide voting
       } catch (e) {
         if (!isMounted) return
         setError(e.message || String(e))
+        console.error('[SE:Detail] Fatal load error:', e)
       } finally {
         if (isMounted) setLoading(false)
       }
     }
-    load()
+    // Hard stop loading after 1500ms in case network hangs
+    const stop = setTimeout(() => { if (isMounted) setLoading(false) }, 2500)
+    load().finally(() => { if (isMounted) setLoading(false); clearTimeout(stop) })
     return () => { isMounted = false }
   }, [slug])
 
@@ -163,7 +227,27 @@ const SpecialEventDetailPage = () => {
     }
   }
 
-  if (loading) return <div className="p-6">Laden…</div>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F4F1E8] dark:bg-[#252422]">
+        <div className="max-w-6xl mx-auto px-4 py-8">
+          <div className="h-7 w-48 rounded bg-gray-200 dark:bg-[#333] animate-pulse mb-3" />
+          <div className="h-4 w-80 max-w-full rounded bg-gray-200 dark:bg-[#333] animate-pulse mb-6" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="border-2 border-[#A58C81] dark:border-[#EBE9E9] rounded-xl overflow-hidden bg-white dark:bg-[#2a2a2a]">
+                <div className="w-full h-56 bg-gray-200 dark:bg-[#333] animate-pulse" />
+                <div className="p-3">
+                  <div className="h-4 w-32 bg-gray-200 dark:bg-[#333] rounded mb-2 animate-pulse" />
+                  <div className="h-3 w-full bg-gray-200 dark:bg-[#333] rounded animate-pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
   if (error) return <div className="p-6 text-red-600">{error}</div>
   if (!event) return <div className="p-6">Event nicht gefunden</div>
 

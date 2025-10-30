@@ -50,7 +50,7 @@ export const getAdminNotificationEmails = () => {
     return ['zorro.invader@gmail.com', 'jungegesellschaft@wedelheine.de']
   }
   
-  return emails·
+  return emails
 }
 
 /**

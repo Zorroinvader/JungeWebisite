@@ -4,6 +4,8 @@ const BUCKET = 'special-event-images'
 
 // Simple session cache to speed up mobile loads
 const CACHE_KEY = 'special_events_active_cache_v1'
+const DETAIL_CACHE_PREFIX = 'special_event_detail_'
+const ENTRIES_CACHE_PREFIX = 'special_event_entries_'
 const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 
 function readCache() {
@@ -28,22 +30,84 @@ function writeCache(data, ttlMs = CACHE_TTL_MS) {
 }
 
 export async function getActiveSpecialEvents({ useCache = true } = {}) {
+  console.log('[SE] getActiveSpecialEvents called. useCache=', useCache)
   if (useCache) {
     const cached = readCache()
     if (cached) return cached
   }
 
-  // Fetch minimal fields needed for UI
-  const { data, error } = await supabase
+  // Fetch minimal fields needed for UI with a timeout + REST fallback
+  const fetchPromise = supabase
     .from('special_events')
     .select('id, title, slug, description, starts_at, is_active')
     .eq('is_active', true)
     .order('starts_at', { ascending: false })
+    .limit(1)
 
-  if (error) throw error
-  const list = data || []
-  writeCache(list)
-  return list
+  const timeoutMs = 3000
+  const timeoutPromise = new Promise((_, reject) => {
+    const id = setTimeout(() => {
+      clearTimeout(id)
+      reject(new Error('timeout'))
+    }, timeoutMs)
+  })
+
+  try {
+    const { data, error } = await Promise.race([fetchPromise, timeoutPromise])
+    if (error) throw error
+    let list = data || []
+    console.log('[SE] client getActiveSpecialEvents result count=', list.length)
+    if (list.length === 0) {
+      // Retry without order in case null starts_at interferes
+      const { data: data2, error: err2 } = await supabase
+        .from('special_events')
+        .select('id, title, slug, description, starts_at, is_active')
+        .eq('is_active', true)
+        .limit(1)
+      if (err2) console.warn('[SE] retry without order error:', err2.message)
+      if (!err2 && data2 && data2.length > 0) list = data2
+    }
+    writeCache(list)
+    return list
+  } catch (e) {
+    console.warn('[SE] client getActiveSpecialEvents failed:', e?.message)
+    // Try REST fallback with anon key
+    try {
+      const url = process.env.REACT_APP_SUPABASE_URL
+      const key = process.env.REACT_APP_SUPABASE_ANON_KEY
+      if (url && key) {
+        const controller = new AbortController()
+        const to = setTimeout(() => controller.abort(), timeoutMs)
+        let resp = await fetch(`${url}/rest/v1/special_events?select=id,title,slug,description,starts_at,is_active&is_active=eq.true&order=starts_at.desc&limit=1`, {
+          headers: { 'apikey': key, 'Authorization': `Bearer ${key}` },
+          signal: controller.signal
+        })
+        clearTimeout(to)
+        if (!resp.ok) {
+          // Retry without order
+          resp = await fetch(`${url}/rest/v1/special_events?select=id,title,slug,description,starts_at,is_active&is_active=eq.true&limit=1`, {
+            headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+          })
+        }
+        if (!resp.ok) {
+          // Retry without filter; RLS will still enforce is_active=true
+          resp = await fetch(`${url}/rest/v1/special_events?select=id,title,slug,description,starts_at,is_active&limit=1`, {
+            headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+          })
+        }
+        if (resp.ok) {
+          const json = await resp.json()
+          const list = Array.isArray(json) ? json : []
+          console.log('[SE] REST getActiveSpecialEvents result count=', list.length)
+          writeCache(list)
+          return list
+        }
+      }
+    } catch {}
+    const cached = readCache()
+    if (cached) return cached
+    return []
+  }
 }
 
 export async function prefetchActiveSpecialEvents() {
@@ -61,26 +125,102 @@ export async function prefetchActiveSpecialEvents() {
 }
 
 export async function getSpecialEventBySlug(slug) {
+  console.log('[SE] getSpecialEventBySlug:', slug)
+  // Try detail cache first
+  try {
+    const cached = sessionStorage.getItem(DETAIL_CACHE_PREFIX + slug)
+    if (cached) {
+      const parsed = JSON.parse(cached)
+      if (parsed && parsed.expiresAt && Date.now() < parsed.expiresAt) {
+        console.log('[SE] detail cache hit for slug', slug)
+        return parsed.data
+      }
+    }
+  } catch {}
+
   const { data, error } = await supabase
     .from('special_events')
-    .select('*')
+    .select('id, title, slug, description, starts_at, is_active')
     .eq('slug', slug)
     .single()
 
-  if (error) throw error
+  if (error) {
+    console.warn('[SE] getSpecialEventBySlug error:', error.message)
+    throw error
+  }
+  console.log('[SE] getSpecialEventBySlug found?', !!data)
+  try {
+    sessionStorage.setItem(DETAIL_CACHE_PREFIX + slug, JSON.stringify({ data, expiresAt: Date.now() + CACHE_TTL_MS }))
+  } catch {}
   return data
 }
 
+export async function getFirstSpecialEventAny() {
+  console.log('[SE] getFirstSpecialEventAny called')
+  // Attempt to fetch any single event regardless of is_active
+  try {
+    const { data, error } = await supabase
+      .from('special_events')
+      .select('id, title, slug, description, starts_at, is_active')
+      .limit(1)
+    if (error) console.warn('[SE] getFirstSpecialEventAny client error:', error.message)
+    if (!error && data && data.length > 0) {
+      console.log('[SE] getFirstSpecialEventAny client found slug=', data[0]?.slug)
+      return data[0]
+    }
+  } catch {}
+
+  // REST fallback
+  try {
+    const url = process.env.REACT_APP_SUPABASE_URL
+    const key = process.env.REACT_APP_SUPABASE_ANON_KEY
+    if (url && key) {
+      const resp = await fetch(`${url}/rest/v1/special_events?select=id,title,slug,description,starts_at,is_active&limit=1`, {
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      })
+      if (resp.ok) {
+        const json = await resp.json()
+        if (Array.isArray(json) && json.length > 0) {
+          console.log('[SE] getFirstSpecialEventAny REST found slug=', json[0]?.slug)
+          return json[0]
+        }
+      }
+    }
+  } catch {}
+  return null
+}
+
 export async function listApprovedEntries(eventId) {
+  console.log('[SE] listApprovedEntries for eventId=', eventId)
+  // Cache per event to speed up mobile
+  try {
+    const cached = sessionStorage.getItem(ENTRIES_CACHE_PREFIX + eventId)
+    if (cached) {
+      const parsed = JSON.parse(cached)
+      if (parsed && parsed.expiresAt && Date.now() < parsed.expiresAt) {
+        console.log('[SE] entries cache hit. count=', parsed.data?.length || 0)
+        return parsed.data || []
+      }
+    }
+  } catch {}
+
   const { data, error } = await supabase
     .from('special_event_entries')
-    .select('*')
+    .select('id, title, description, image_path, status, approved_at')
     .eq('event_id', eventId)
     .eq('status', 'approved')
     .order('approved_at', { ascending: false })
 
-  if (error) throw error
-  return data || []
+  if (error) {
+    console.warn('[SE] listApprovedEntries error:', error.message)
+    throw error
+  }
+  const list = data || []
+  console.log('[SE] listApprovedEntries fetched count=', list.length)
+  try {
+    sessionStorage.setItem(ENTRIES_CACHE_PREFIX + eventId, JSON.stringify({ data: list, expiresAt: Date.now() + CACHE_TTL_MS }))
+  } catch {}
+  return list
 }
 
 export function getPublicImageUrl(path) {

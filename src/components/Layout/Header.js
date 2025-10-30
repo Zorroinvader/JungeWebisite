@@ -14,8 +14,9 @@ const Header = () => {
 
   return (
     <>
-    <SpecialEventsBanner />
     <nav className="w-full border-b sticky top-0 z-40 bg-[#F4F1E8] dark:bg-[#252422] border-[#A58C81] dark:border-[#EBE9E9]">
+      {/* Special Events banner inside sticky header for mobile visibility */}
+      <SpecialEventsBanner />
       <div className="w-full px-[1vw] sm:px-[1.5vw] md:px-[2vw] lg:px-[2.5vw] xl:px-[3vw] 2xl:px-[3.5vw]">
         <div className="flex justify-between items-center h-[10vh] sm:h-[9vh] md:h-[8vh] lg:h-[7vh] xl:h-[6vh] 2xl:h-[5vh] w-full">
           {/* Logo on the left - Clickable to homepage */}
