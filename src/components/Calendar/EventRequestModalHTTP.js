@@ -203,10 +203,20 @@ const EventRequestModalHTTP = ({ isOpen, onClose, selectedDate }) => {
     setError('')
 
     try {
-      // Convert file to base64
-      const arrayBuffer = await uploadedFile.arrayBuffer()
-      const uint8Array = new Uint8Array(arrayBuffer)
-      const base64String = btoa(String.fromCharCode(...uint8Array))
+      // Convert file to base64 safely using FileReader to avoid stack overflows
+      const toBase64 = (file) => new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          const result = reader.result || ''
+          // result is a data URL like: data:<mime>;base64,<data>
+          const commaIndex = result.indexOf(',')
+          resolve(commaIndex >= 0 ? result.substring(commaIndex + 1) : '')
+        }
+        reader.onerror = (e) => reject(e)
+        reader.readAsDataURL(file)
+      })
+
+      const base64String = await toBase64(uploadedFile)
 
       const requestData = {
         title: formData.title,
