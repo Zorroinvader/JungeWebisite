@@ -25,37 +25,32 @@ export const getAdminSettings = () => {
   }
 }
 
-// Resolve the correct public base URL for links in emails (use production domain)
-const getBaseUrl = () => 'https://www.jg-wedeswedel.de'
+// Resolve the correct public base URL for links in emails (prod-safe)
+const getBaseUrl = () => {
+  try {
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      return window.location.origin
+    }
+  } catch (_) {}
+  // Fallback to production domain if not running in browser
+  return 'https://jungengesellschaft-website.vercel.app'
+}
 
 /**
- * Get the list of admin emails for notifications (from database)
- * @returns {Promise<Array<string>>} Array of admin email addresses
+ * Get the list of admin emails for notifications
+ * @returns {Array<string>} Array of admin email addresses
  */
-export const getAdminNotificationEmails = async () => {
-  try {
-    const { getAdminEmailsList } = await import('../services/adminEmails')
-    const emails = await getAdminEmailsList()
-    
-    // If no emails configured, use default
-    if (emails.length === 0) {
-      console.warn('No admin emails configured, using default: zorro.invader@gmail.com')
-      return ['zorro.invader@gmail.com', 'jungegesellschaft@wedelheine.de']
-    }
-    
-    // Return emails from database
-    return emails
-  } catch (error) {
-    console.error('Error fetching admin emails from database:', error)
-    // Fallback to localStorage if database fails
-    const settings = getAdminSettings()
-    const fallbackEmails = settings.adminEmails || []
-    if (fallbackEmails.length === 0) {
-      console.warn('No admin emails configured, using default: zorro.invader@gmail.com')
-      return ['zorro.invader@gmail.com', 'jungegesellschaft@wedelheine.de']
-    }
-    return fallbackEmails
+export const getAdminNotificationEmails = () => {
+  const settings = getAdminSettings()
+  const emails = settings.adminEmails || []
+  
+  // If no emails configured, use admin@admin.com as default
+  if (emails.length === 0) {
+    console.warn('No admin emails configured, using default: zorro.invader@gmail.com')
+    return ['zorro.invader@gmail.com', 'jungegesellschaft@wedelheine.de']
   }
+  
+  return emails·
 }
 
 /**
@@ -203,9 +198,6 @@ export const sendUserNotification = async (userEmail, eventData, type) => {
       return
     }
 
-    console.log('📧 Sending user email to:', userEmail)
-    console.log('📧 Email subject:', subject)
-    
     const response = await fetch(`${supabaseUrl}/functions/v1/send-admin-notification`, {
       method: 'POST',
       headers: {
@@ -222,10 +214,7 @@ export const sendUserNotification = async (userEmail, eventData, type) => {
       })
     })
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('❌ Email response error:', response.status, errorText)
-    } else {
+    if (response.ok) {
       console.log('✅ User notification sent successfully!')
     }
   } catch (error) {
@@ -239,24 +228,15 @@ export const sendUserNotification = async (userEmail, eventData, type) => {
  * @param {string} type - Type of notification ('initial_request', 'detailed_info_submitted', 'final_acceptance', etc.)
  */
 export const sendAdminNotification = async (eventData, type = 'initial_request') => {
-  console.log('[NOTIFICATION] Starting email notification...')
-  
   if (!areNotificationsEnabled()) {
-    console.log('[NOTIFICATION] Notifications disabled, skipping email')
+    console.log('Notifications disabled, skipping email')
     return
   }
 
-  let adminEmails = []
-  try {
-    adminEmails = await getAdminNotificationEmails()
-    console.log('[NOTIFICATION] Retrieved admin emails from database:', adminEmails)
-  } catch (error) {
-    console.error('[NOTIFICATION] Failed to get admin emails:', error)
-    return
-  }
+  const adminEmails = getAdminNotificationEmails()
   
   if (adminEmails.length === 0) {
-    console.warn('[NOTIFICATION] No admin emails configured for notifications')
+    console.warn('No admin emails configured for notifications')
     return
   }
 
@@ -280,7 +260,7 @@ export const sendAdminNotification = async (eventData, type = 'initial_request')
                 `Kontakt: ${eventData.requester_email}\n` +
                 `Zeitraum: ${eventData.start_date ? new Date(eventData.start_date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''}${eventData.end_date && eventData.end_date !== eventData.start_date ? ' - ' + new Date(eventData.end_date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''}\n` +
                 `Kategorie: ${eventData.event_type}\n\n` +
-                `Zum Admin-Panel: ${getBaseUrl()}/admin\n\n` +
+                `Zum Admin-Panel: http://localhost:3000/admin\n\n` +
                 `Mit freundlichen Grüßen\n` +
                 `Ihr Event-Management-System\n\n` +
                 `Junge Gesellschaft Pferdestall Wedes Wedel\n` +
@@ -302,7 +282,7 @@ export const sendAdminNotification = async (eventData, type = 'initial_request')
                 `STATUS\n` +
                 `${'-'.repeat(50)}\n` +
                 `Mietvertrag hochgeladen: Ja\n\n` +
-                `Zum Admin-Panel: ${getBaseUrl()}/admin\n\n` +
+                `Zum Admin-Panel: http://localhost:3000/admin\n\n` +
                 `Mit freundlichen Grüßen\n` +
                 `Ihr Event-Management-System\n\n` +
                 `Junge Gesellschaft Pferdestall Wedes Wedel\n` +
@@ -363,9 +343,6 @@ export const sendAdminNotification = async (eventData, type = 'initial_request')
       return
     }
     
-    console.log('[NOTIFICATION] Sending email via Supabase Edge Function...')
-    console.log('[NOTIFICATION] Recipients:', adminEmails)
-    
     const response = await fetch(`${supabaseUrl}/functions/v1/send-admin-notification`, {
       method: 'POST',
       headers: {
@@ -382,19 +359,14 @@ export const sendAdminNotification = async (eventData, type = 'initial_request')
       })
     })
 
-    console.log('[NOTIFICATION] Edge function response status:', response.status)
-
     if (!response.ok) {
-      const errorText = await response.text()
-      console.error('[NOTIFICATION] Email service error:', errorText)
-      throw new Error('Email service returned an error: ' + errorText)
+      throw new Error('Email service returned an error')
     }
 
     const result = await response.json()
-    console.log('[NOTIFICATION] Edge function result:', result)
     
     if (result.success) {
-      console.log('[NOTIFICATION] ✅ Email sent successfully!')
+      console.log('✅ Email sent successfully!')
       // Optionally show a subtle success notification
     } else {
       throw new Error(result.error || 'Unknown error')
