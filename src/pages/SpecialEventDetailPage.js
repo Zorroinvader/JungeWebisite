@@ -290,8 +290,8 @@ const SpecialEventDetailPage = () => {
           <p className="text-[#A58C81] dark:text-[#EBE9E9] mb-6">{event.description}</p>
         )}
 
-        {/* Show gallery first for users who haven't uploaded yet (mobile one-hand priority) */}
-        {!alreadyUploaded && (
+        {/* Gallery hidden - showing results instead */}
+        {false && !alreadyUploaded && (
           <>
             <h2 className="text-2xl font-semibold text-[#252422] dark:text-[#F4F1E8] mb-4 text-center ">Galerie</h2>
             <div className="flex justify-end mb-3">
@@ -341,6 +341,54 @@ const SpecialEventDetailPage = () => {
               ))}
             </div>
           </>
+        )}
+
+        {/* Öffentliche Ergebnisse */}
+        {voteStats && voteStats.length > 0 && (
+          <div id="special-event-results" className="mt-10">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-2xl font-semibold text-[#252422] dark:text-[#F4F1E8]">Ergebnisse</h2>
+              <button
+                onClick={async () => {
+                  if (!event) return
+                  setRefreshingResults(true)
+                  try {
+                    const fresh = await getVoteStatsForEvent(event.id)
+                    setVoteStats(Array.isArray(fresh) ? fresh : [])
+                  } finally {
+                    setRefreshingResults(false)
+                  }
+                }}
+                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md border-2 border-[#A58C81] text-[#252422] dark:text-[#F4F1E8] hover:bg-gray-50 dark:hover:bg-[#1a1a1a]"
+              >
+                <span className={refreshingResults ? 'animate-pulse' : ''}>Aktualisieren</span>
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {voteStats.map((entry, index) => (
+                <div key={entry.entry_id} className="border-2 border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-[#2a2a2a]">
+                  <div className="relative">
+                    <div className="w-full h-48 bg-gray-50 dark:bg-[#1a1a1a] flex items-center justify-center">
+                      <img src={getPublicImageUrl(entry.image_path)} alt={entry.title || 'Beitrag'} className="max-w-full max-h-full object-contain" />
+                    </div>
+                    <div className="absolute top-2 left-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-3 py-1 rounded-full text-xs font-semibold shadow">
+                      #{entry.rank}{index === 0 ? ' • Leader' : ''}
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    {entry.title && <div className="font-semibold text-[#252422] dark:text-[#F4F1E8] mb-1">{entry.title}</div>}
+                    {entry.description && (
+                      <div className="text-sm text-[#A58C81] dark:text-[#EBE9E9] mb-2 line-clamp-2">{entry.description}</div>
+                    )}
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-sm font-semibold">
+                      <span>{entry.vote_count}</span>
+                      <span>{entry.vote_count === 1 ? 'Stimme' : 'Stimmen'}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         <div className="bg-white dark:bg-[#2a2a2a] border-2 border-[#A58C81] dark:border-[#EBE9E9] rounded-2xl p-5 mb-8 shadow-sm">
@@ -482,7 +530,8 @@ const SpecialEventDetailPage = () => {
           </form>
         </div>
 
-        {alreadyUploaded && (
+        {/* Gallery hidden - showing results instead */}
+        {false && alreadyUploaded && (
           <>
             <h2 className="text-2xl font-semibold text-[#252422] dark:text-[#F4F1E8] mb-4">Galerie</h2>
             <div className="flex justify-end mb-3">
@@ -543,7 +592,7 @@ const SpecialEventDetailPage = () => {
             </div>
             <div className="p-6 space-y-3">
               <p className="text-sm text-gray-700 dark:text-gray-300">
-                Jetzt bist du dran: Stimme im Wettbewerb für dein Lieblingsbild ab.
+                Jetzt bist du dran: Sieh dir die aktuellen Ergebnisse an und stimme für dein Lieblingsbild!
               </p>
               <p className="text-xs text-[#A58C81] dark:text-[#EBE9E9]">
                 Hinweis: Dein Foto erscheint erst nach Freigabe durch das Team.
@@ -560,11 +609,13 @@ const SpecialEventDetailPage = () => {
                 className="px-4 py-2 text-sm font-semibold rounded-lg bg-[#A58C81] text-white hover:opacity-90"
                 onClick={() => {
                   setShowVotePrompt(false)
-                  const el = document.getElementById('special-event-gallery')
-                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  setTimeout(() => {
+                    const el = document.getElementById('special-event-results')
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }, 100)
                 }}
               >
-                Zur Galerie
+                Zu den Ergebnissen
               </button>
             </div>
           </div>
