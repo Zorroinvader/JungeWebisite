@@ -389,6 +389,23 @@ export async function listPendingEntries(eventId) {
   return data || []
 }
 
+export async function listPendingEntriesREST(eventId) {
+  try {
+    const url = process.env.REACT_APP_SUPABASE_URL
+    const key = process.env.REACT_APP_SUPABASE_ANON_KEY
+    if (!url || !key) return []
+    const resp = await fetch(`${url}/rest/v1/special_event_entries?event_id=eq.${encodeURIComponent(eventId)}&status=eq.pending&select=id,title,description,image_path,submitter_contact,status,created_at&order=created_at.asc`, {
+      headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+    })
+    if (!resp.ok) return []
+    const json = await resp.json()
+    return Array.isArray(json) ? json : []
+  } catch (e) {
+    console.warn('[SE] listPendingEntriesREST error:', e?.message)
+    return []
+  }
+}
+
 export async function approveEntry(entryId) {
   const { data, error } = await supabase
     .from('special_event_entries')
@@ -401,6 +418,30 @@ export async function approveEntry(entryId) {
   return data
 }
 
+export async function approveEntryREST(entryId) {
+  try {
+    const url = process.env.REACT_APP_SUPABASE_URL
+    const key = process.env.REACT_APP_SUPABASE_ANON_KEY
+    if (!url || !key) throw new Error('Missing Supabase env')
+    const resp = await fetch(`${url}/rest/v1/special_event_entries?id=eq.${encodeURIComponent(entryId)}`, {
+      method: 'PATCH',
+      headers: {
+        'apikey': key,
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify({ status: 'approved', approved_at: new Date().toISOString() })
+    })
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    const json = await resp.json()
+    return Array.isArray(json) ? json[0] : json
+  } catch (e) {
+    console.warn('[SE] approveEntryREST error:', e?.message)
+    throw e
+  }
+}
+
 export async function rejectEntry(entryId) {
   const { data, error } = await supabase
     .from('special_event_entries')
@@ -411,6 +452,30 @@ export async function rejectEntry(entryId) {
 
   if (error) throw error
   return data
+}
+
+export async function rejectEntryREST(entryId) {
+  try {
+    const url = process.env.REACT_APP_SUPABASE_URL
+    const key = process.env.REACT_APP_SUPABASE_ANON_KEY
+    if (!url || !key) throw new Error('Missing Supabase env')
+    const resp = await fetch(`${url}/rest/v1/special_event_entries?id=eq.${encodeURIComponent(entryId)}`, {
+      method: 'PATCH',
+      headers: {
+        'apikey': key,
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify({ status: 'rejected' })
+    })
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    const json = await resp.json()
+    return Array.isArray(json) ? json[0] : json
+  } catch (e) {
+    console.warn('[SE] rejectEntryREST error:', e?.message)
+    throw e
+  }
 }
 
 export async function getUserUploadForEvent(eventId) {
