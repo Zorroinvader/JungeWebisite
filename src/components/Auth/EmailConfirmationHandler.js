@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDarkMode } from '../../contexts/DarkModeContext';
@@ -12,6 +12,7 @@ const EmailConfirmationHandler = () => {
   const [checking, setChecking] = useState(true);
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState(null);
+  const redirectTimerRef = useRef(null);
 
   useEffect(() => {
     let timeoutId;
@@ -64,18 +65,23 @@ const EmailConfirmationHandler = () => {
             }
 
             if (session?.user) {
-              console.log('Email confirmed successfully, user:', session.user.email);
+              console.log('✅ Email confirmed successfully, user:', session.user.email);
+              console.log('✅ Setting confirmed=true and checking=false to show success screen');
+              
+              // Set confirmed state FIRST to show success message
               setConfirmed(true);
               setChecking(false);
               
-              // Clean up the URL
-              window.history.replaceState({}, document.title, window.location.pathname);
+              // Clean up the URL AFTER state is set (use setTimeout to ensure state update happens first)
+              setTimeout(() => {
+                window.history.replaceState({}, document.title, window.location.pathname);
+              }, 100);
               
               // Redirect to login page after 5 seconds (give user time to see success message)
-              setTimeout(() => {
+              redirectTimerRef.current = setTimeout(() => {
+                console.log('🔄 Auto-redirecting to login after 5 seconds...');
                 navigate('/login');
               }, 5000);
-              return;
             } else {
               console.warn('Session set but no user found');
             }
@@ -99,15 +105,21 @@ const EmailConfirmationHandler = () => {
             // Don't set error yet, try other methods first
             console.log('OTP verification failed, trying alternative methods...');
           } else if (data?.user) {
-            console.log('Email confirmed successfully via OTP, user:', data.user.email);
+            console.log('✅ Email confirmed successfully via OTP, user:', data.user.email);
+            console.log('✅ Setting confirmed=true and checking=false to show success screen');
+            
+            // Set confirmed state FIRST to show success message
             setConfirmed(true);
             setChecking(false);
             
-            // Clean up the URL
-            window.history.replaceState({}, document.title, window.location.pathname);
+            // Clean up the URL AFTER state is set
+            setTimeout(() => {
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }, 100);
             
             // Redirect to login page after 5 seconds (give user time to see success message)
-            setTimeout(() => {
+            redirectTimerRef.current = setTimeout(() => {
+              console.log('🔄 Auto-redirecting to login after 5 seconds...');
               navigate('/login');
             }, 5000);
             return;
@@ -124,15 +136,21 @@ const EmailConfirmationHandler = () => {
           console.log('Session found after processing:', session.user.email, 'Confirmed:', !!session.user.email_confirmed_at);
           
           if (session.user.email_confirmed_at) {
-            console.log('Email already confirmed, session found:', session.user.email);
+            console.log('✅ Email already confirmed, session found:', session.user.email);
+            console.log('✅ Setting confirmed=true and checking=false to show success screen');
+            
+            // Set confirmed state FIRST to show success message
             setConfirmed(true);
             setChecking(false);
             
-            // Clean up the URL
-            window.history.replaceState({}, document.title, window.location.pathname);
+            // Clean up the URL AFTER state is set
+            setTimeout(() => {
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }, 100);
             
             // Redirect to login page after 5 seconds (give user time to see success message)
-            setTimeout(() => {
+            redirectTimerRef.current = setTimeout(() => {
+              console.log('🔄 Auto-redirecting to login after 5 seconds...');
               navigate('/login');
             }, 5000);
             return;
@@ -171,9 +189,10 @@ const EmailConfirmationHandler = () => {
 
     handleEmailConfirmation();
 
-    // Cleanup timeout on unmount
+    // Cleanup timeout and redirect timer on unmount
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
+      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
     };
   }, [navigate, checking]);
 
@@ -227,35 +246,67 @@ const EmailConfirmationHandler = () => {
     );
   }
 
-  if (!confirmed) {
-    return null;
+  // Don't return null - always show something
+  // If not confirmed and not checking and no error, show a default state
+  if (!confirmed && !checking && !error) {
+    // This shouldn't happen, but handle gracefully
+    return (
+      <div className={`min-h-screen bg-[#F4F1E8] ${isDarkMode ? 'dark:bg-[#252422]' : ''} flex items-center justify-center p-4`}>
+        <div className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-2xl shadow-xl p-12 max-w-md w-full text-center border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#4a4a4a]' : ''}`}>
+          <Mail className={`w-20 h-20 text-[#A58C81] mx-auto mb-6`} />
+          <h2 className={`text-2xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} mb-4`}>
+            Bestätigung wird verarbeitet...
+          </h2>
+          <button
+            onClick={() => navigate('/login')}
+            className={`w-full px-6 py-3 bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} text-white rounded-lg hover:opacity-90 transition-opacity font-semibold mt-4`}
+          >
+            Zur Anmeldung
+          </button>
+        </div>
+      </div>
+    );
   }
 
-  return (
-    <div className={`min-h-screen bg-[#F4F1E8] ${isDarkMode ? 'dark:bg-[#252422]' : ''} flex items-center justify-center p-4`}>
-      <div className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-2xl shadow-xl p-12 max-w-md w-full text-center border-2 border-green-500 ${isDarkMode ? 'dark:border-green-400' : ''}`}>
-        <CheckCircle className={`w-20 h-20 text-green-600 ${isDarkMode ? 'dark:text-green-400' : ''} mx-auto mb-6 animate-pulse`} />
-        <h2 className={`text-3xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} mb-4`}>
-          Email Aktivierung erfolgreich!
-        </h2>
-        <p className={`text-xl font-semibold text-green-600 ${isDarkMode ? 'dark:text-green-400' : ''} mb-4`}>
-          ✓ E-Mail bestätigt
-        </p>
-        <p className={`text-lg text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} mb-2`}>
-          Willkommen bei Junge Gesellschaft!
-        </p>
-        <p className={`text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mb-6`}>
-          Ihre E-Mail-Adresse wurde erfolgreich bestätigt. Sie werden in wenigen Sekunden zur Anmeldeseite weitergeleitet...
-        </p>
-        <button
-          onClick={() => navigate('/login')}
-          className={`w-full px-6 py-3 bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} text-white rounded-lg hover:opacity-90 transition-opacity font-semibold`}
-        >
-          Jetzt zur Anmeldung
-        </button>
+  // Show success message when confirmed
+  if (confirmed) {
+    console.log('✅ Rendering success screen - Email Aktivierung erfolgreich!');
+    return (
+      <div className={`min-h-screen bg-[#F4F1E8] ${isDarkMode ? 'dark:bg-[#252422]' : ''} flex items-center justify-center p-4`}>
+        <div className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-2xl shadow-xl p-12 max-w-md w-full text-center border-2 border-green-500 ${isDarkMode ? 'dark:border-green-400' : ''}`}>
+          <CheckCircle className={`w-20 h-20 text-green-600 ${isDarkMode ? 'dark:text-green-400' : ''} mx-auto mb-6 animate-pulse`} />
+          <h2 className={`text-3xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} mb-4`}>
+            Email Aktivierung erfolgreich!
+          </h2>
+          <p className={`text-xl font-semibold text-green-600 ${isDarkMode ? 'dark:text-green-400' : ''} mb-4`}>
+            ✓ E-Mail bestätigt
+          </p>
+          <p className={`text-lg text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} mb-2`}>
+            Willkommen bei Junge Gesellschaft!
+          </p>
+          <p className={`text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mb-6`}>
+            Ihre E-Mail-Adresse wurde erfolgreich bestätigt. Sie werden in wenigen Sekunden zur Anmeldeseite weitergeleitet...
+          </p>
+          <button
+            onClick={() => {
+              console.log('🔘 User clicked "Jetzt zur Anmeldung" button');
+              if (redirectTimerRef.current) {
+                clearTimeout(redirectTimerRef.current);
+                redirectTimerRef.current = null;
+              }
+              navigate('/login');
+            }}
+            className={`w-full px-6 py-3 bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} text-white rounded-lg hover:opacity-90 transition-opacity font-semibold`}
+          >
+            Jetzt zur Anmeldung
+          </button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  // Should not reach here if everything works correctly
+  return null;
 };
 
 export default EmailConfirmationHandler;
