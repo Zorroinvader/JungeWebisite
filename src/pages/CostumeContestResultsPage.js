@@ -90,9 +90,17 @@ const CostumeContestResultsPage = () => {
           }
         } catch (err) {
           console.warn('Failed to load vote stats:', err)
-          // Don't show error if we have cached data
-          if (!voteStats.length && isMounted) {
-            setVoteStats([])
+          // Don't set empty array if we have cached data
+          if (isMounted) {
+            // Check if we already have stats from cache
+            try {
+              const cachedStats = sessionStorage.getItem(`vote_stats_${activeEvent.id}`)
+              if (!cachedStats) {
+                setVoteStats([])
+              }
+            } catch {
+              setVoteStats([])
+            }
           }
         }
       } catch (err) {
@@ -105,8 +113,8 @@ const CostumeContestResultsPage = () => {
       }
     }
     
-    // Only show loading if we don't have cached data
-    if (!event || !voteStats.length) {
+    // Load data - if no cache, show loading
+    if (!event || voteStats.length === 0) {
       setLoading(true)
     }
     
