@@ -128,10 +128,10 @@ const HomePage = () => {
             {/* Mobile Special Events CTA: always visible on home */}
             <div className="mt-4 md:hidden">
               <Link
-                to={specialEvents?.[0]?.slug ? `/special-events/${specialEvents[0].slug}` : '/special-events'}
+                to="/kostuemwettbewerb-ergebnisse"
                 className="inline-flex items-center justify-center px-4 py-3 text-base font-semibold text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg shadow-md w-full"
               >
-                Kostümwettbewerb ansehen
+                Kostümwettbewerb Ergebnisse
               </Link>
             </div>
           </div>
@@ -178,19 +178,15 @@ const HomePage = () => {
               >
                 Status verfolgen
               </Link>
-              {specialEvents?.[0]?.slug && (
-                <>
-                  <span className={`text-[2.2vw] sm:text-[1.8vw] md:text-[1.4vw] lg:text-[1.1vw] xl:text-[0.9vw] text-[#252422] dark:text-[#F4F1E8]`}>
-                    oder
-                  </span>
-                  <Link 
-                    to={`/special-events/${specialEvents[0].slug}#special-event-results`}
-                    className={`text-[2.5vw] sm:text-[2vw] md:text-[1.6vw] lg:text-[1.3vw] xl:text-[1.1vw] font-medium text-[#252422] dark:text-[#F4F1E8] hover:text-[#A58C81] dark:hover:text-[#EBE9E9] transition-colors underline decoration-2 underline-offset-4 decoration-[#A58C81] dark:decoration-[#EBE9E9]`}
-                  >
-                    Ergebnisse ansehen
-                  </Link>
-                </>
-              )}
+              <span className={`text-[2.2vw] sm:text-[1.8vw] md:text-[1.4vw] lg:text-[1.1vw] xl:text-[0.9vw] text-[#252422] dark:text-[#F4F1E8]`}>
+                oder
+              </span>
+              <Link 
+                to="/kostuemwettbewerb-ergebnisse"
+                className={`text-[2.5vw] sm:text-[2vw] md:text-[1.6vw] lg:text-[1.3vw] xl:text-[1.1vw] font-medium text-[#252422] dark:text-[#F4F1E8] hover:text-[#A58C81] dark:hover:text-[#EBE9E9] transition-colors underline decoration-2 underline-offset-4 decoration-[#A58C81] dark:decoration-[#EBE9E9]`}
+              >
+                Ergebnisse ansehen
+              </Link>
             </div>
           </div>
         </div>

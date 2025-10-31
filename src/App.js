@@ -16,6 +16,7 @@ import EmailConfirmationHandler from './components/Auth/EmailConfirmationHandler
 import AdminPanelClean from './components/Admin/AdminPanelClean'
 import SpecialEventsPage from './pages/SpecialEventsPage'
 import SpecialEventDetailPage from './pages/SpecialEventDetailPage'
+import CostumeContestResultsPage from './pages/CostumeContestResultsPage'
 import './index.css'
 import { Analytics } from '@vercel/analytics/react'
 import { prefetchActiveSpecialEvents } from './services/specialEvents'
@@ -95,6 +96,7 @@ const AppContent = () => {
         <Route path="/event-tracking" element={<EventRequestTrackingPage />} />
         <Route path="/special-events" element={<Layout><SpecialEventsPage /></Layout>} />
         <Route path="/special-events/:slug" element={<Layout><SpecialEventDetailPage /></Layout>} />
+        <Route path="/kostuemwettbewerb-ergebnisse" element={<Layout><CostumeContestResultsPage /></Layout>} />
         
         {/* Test Route */}
         <Route path="/test" element={<div>Test Route Works!</div>} />
