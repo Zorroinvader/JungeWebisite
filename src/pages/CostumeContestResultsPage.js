@@ -4,38 +4,99 @@ import { getPublicImageUrl, getActiveSpecialEvents, getVoteStatsForEvent } from 
 const CostumeContestResultsPage = () => {
   const [event, setEvent] = useState(null)
   const [voteStats, setVoteStats] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false) // Start with false to show cached data immediately
   const [error, setError] = useState(null)
 
   useEffect(() => {
     let isMounted = true
+    
+    // Try to load from cache immediately (synchronous)
+    try {
+      const cachedEvents = sessionStorage.getItem('special_events_active_cache_v1')
+      if (cachedEvents) {
+        const parsed = JSON.parse(cachedEvents)
+        if (parsed?.data && Array.isArray(parsed.data) && parsed.data.length > 0) {
+          const cachedEvent = parsed.data[0]
+          setEvent(cachedEvent)
+          
+          // Try to load cached vote stats
+          try {
+            const cachedStats = sessionStorage.getItem(`vote_stats_${cachedEvent.id}`)
+            if (cachedStats) {
+              const statsParsed = JSON.parse(cachedStats)
+              if (statsParsed?.data && statsParsed.expiresAt && Date.now() < statsParsed.expiresAt) {
+                setVoteStats(statsParsed.data)
+                setLoading(false) // Already have data, no loading needed
+              }
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+    
     async function load() {
       try {
-        // Get the first active special event
+        // Get the first active special event (uses cache)
         const events = await getActiveSpecialEvents({ useCache: true })
         if (!isMounted) return
         
         const activeEvent = events && events.length > 0 ? events[0] : null
         if (!activeEvent) {
-          setError('Kein aktives Event gefunden')
+          if (!event) { // Only set error if we don't have cached event
+            setError('Kein aktives Event gefunden')
+          }
           setLoading(false)
           return
         }
         
         setEvent(activeEvent)
         
-        // Load vote stats for this event
+        // Load vote stats for this event - use REST for faster loading
         try {
-          const stats = await getVoteStatsForEvent(activeEvent.id)
+          // Try REST first for faster loading
+          const url = process.env.REACT_APP_SUPABASE_URL
+          const key = process.env.REACT_APP_SUPABASE_ANON_KEY
+          
+          let stats = []
+          if (url && key) {
+            try {
+              const resp = await fetch(
+                `${url}/rest/v1/special_event_vote_stats?event_id=eq.${activeEvent.id}&order=vote_count.desc`,
+                {
+                  headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+                }
+              )
+              if (resp.ok) {
+                const json = await resp.json()
+                stats = Array.isArray(json) ? json : []
+              }
+            } catch {}
+          }
+          
+          // Fallback to regular function if REST fails
+          if (stats.length === 0) {
+            stats = await getVoteStatsForEvent(activeEvent.id)
+          }
+          
           if (isMounted) {
             setVoteStats(Array.isArray(stats) ? stats : [])
+            // Cache the stats
+            try {
+              sessionStorage.setItem(`vote_stats_${activeEvent.id}`, JSON.stringify({
+                data: stats,
+                expiresAt: Date.now() + (5 * 60 * 1000) // 5 minutes
+              }))
+            } catch {}
           }
         } catch (err) {
           console.warn('Failed to load vote stats:', err)
-          if (isMounted) setVoteStats([])
+          // Don't show error if we have cached data
+          if (!voteStats.length && isMounted) {
+            setVoteStats([])
+          }
         }
       } catch (err) {
-        if (isMounted) {
+        if (isMounted && !event) { // Only set error if we don't have cached event
           setError(err.message || 'Fehler beim Laden der Daten')
           console.error('Load error:', err)
         }
@@ -44,11 +105,17 @@ const CostumeContestResultsPage = () => {
       }
     }
     
+    // Only show loading if we don't have cached data
+    if (!event || !voteStats.length) {
+      setLoading(true)
+    }
+    
     load()
     return () => { isMounted = false }
   }, [])
 
-  if (loading) {
+  // Show loading only if we have no cached data
+  if (loading && !voteStats.length && !event) {
     return (
       <div className="min-h-screen bg-[#F4F1E8] dark:bg-[#252422]">
         <div className="max-w-6xl mx-auto px-4 py-8">
