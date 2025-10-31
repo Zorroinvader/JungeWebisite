@@ -10,7 +10,8 @@ const CostumeContestResultsPage = () => {
   useEffect(() => {
     let isMounted = true
     
-    // Try to load from cache immediately (synchronous)
+    // Try to load from cache immediately (synchronous) - check if we have data
+    let hasCachedData = false
     try {
       const cachedEvents = sessionStorage.getItem('special_events_active_cache_v1')
       if (cachedEvents) {
@@ -26,7 +27,7 @@ const CostumeContestResultsPage = () => {
               const statsParsed = JSON.parse(cachedStats)
               if (statsParsed?.data && statsParsed.expiresAt && Date.now() < statsParsed.expiresAt) {
                 setVoteStats(statsParsed.data)
-                setLoading(false) // Already have data, no loading needed
+                hasCachedData = true
               }
             }
           } catch {}
@@ -113,8 +114,8 @@ const CostumeContestResultsPage = () => {
       }
     }
     
-    // Load data - if no cache, show loading
-    if (!event || voteStats.length === 0) {
+    // Load data - only show loading if we don't have cached data
+    if (!hasCachedData) {
       setLoading(true)
     }
     
