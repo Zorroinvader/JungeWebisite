@@ -15,7 +15,6 @@ const SideMenu = () => {
       await logout()
       setIsOpen(false)
     } catch (error) {
-      console.error('Logout error:', error)
     }
   }
 

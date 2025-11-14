@@ -227,25 +227,17 @@ const EventsTab = () => {
       setLoading(true)
       setError(null)
       
-      console.log('📋 Admin Events: Loading events...')
       // Get all events directly from events table
       let data = []
       try {
         data = await eventsAPI.getAll()
-        console.log('📋 Admin Events: API response:', data)
-        console.log('📋 Admin Events: Total events loaded:', data?.length || 0)
       } catch (error) {
-        console.error('📋 Admin Events: Primary API failed, trying fallback:', error)
         try {
           data = await eventsAPI.getAllDirect()
-          console.log('📋 Admin Events: Fallback API success:', data?.length || 0, 'events')
         } catch (fallbackError) {
-          console.error('📋 Admin Events: Direct API failed, trying ultra-simple:', fallbackError)
           try {
             data = await eventsAPI.getAllSimple()
-            console.log('📋 Admin Events: Ultra-simple API success:', data?.length || 0, 'events')
           } catch (simpleError) {
-            console.error('📋 Admin Events: All API methods failed:', simpleError)
             data = []
           }
         }
@@ -256,14 +248,11 @@ const EventsTab = () => {
       const futureEvents = (data || []).filter(event => {
         const eventDate = new Date(event.start_date || event.end_date)
         const isFuture = eventDate >= now
-        console.log(`📋 Admin Events: Event "${event.title}" - Date: ${event.start_date}, Is Future: ${isFuture}`)
         return isFuture
       })
       
-      console.log('📋 Admin Events: Future events count:', futureEvents.length)
       setEvents(futureEvents)
     } catch (err) {
-      console.error('📋 Admin Events: Error loading events:', err)
       setError(err.message)
     } finally {
       setLoading(false)
@@ -469,7 +458,6 @@ const SettingsTab = () => {
         setShowBlockedDates(settings.showBlockedDates ?? true)
         setDefaultToWeekView(settings.defaultToWeekView ?? false)
       } catch (error) {
-        console.error('Error loading settings:', error)
       }
     }
   }, [])
@@ -483,7 +471,6 @@ const SettingsTab = () => {
         setAdminEmailsFull(emails)
         setAdminEmails(emails.map(e => e.email))
       } catch (error) {
-        console.error('Error loading admin emails:', error)
       } finally {
         setLoadingEmails(false)
       }
@@ -572,63 +559,31 @@ const SettingsTab = () => {
     // Use Supabase Edge Function as proxy to bypass CORS
     const ICS_FEED_URL = `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/fetch-ics`
     
-    console.log('═══════════════════════════════════════════════════════════')
-    console.log('🚀 CALENDAR IMPORT STARTED')
-    console.log('═══════════════════════════════════════════════════════════')
-    console.log('⏰ Start Time:', new Date().toLocaleString())
-    console.log('🔗 ICS Feed URL:', ICS_FEED_URL)
-    console.log('')
     
     if (!window.confirm('Möchten Sie Events aus dem alten Kalender importieren?\n\nDies kann einige Minuten dauern.')) {
-      console.log('❌ Import cancelled by user')
       return
     }
     
     try {
       // Show loading indicator
-      console.log('───────────────────────────────────────────────────────────')
-      console.log('📡 PHASE 1: FETCHING ICS FEED')
-      console.log('───────────────────────────────────────────────────────────')
       
       alert('Import wird gestartet...\n\nBitte warten Sie, während die Events importiert werden.\n\nÖffnen Sie die Browser-Konsole (F12) für Live-Logs!')
       
       // Fetch and parse ICS feed
-      console.log('📥 Fetching ICS feed...')
       const startFetch = Date.now()
       const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY
       const parsedEvents = await fetchAndParseICS(ICS_FEED_URL, supabaseKey)
       const fetchTime = Date.now() - startFetch
       
-      console.log(`✅ Fetch completed in ${fetchTime}ms`)
-      console.log(`📊 Total events parsed: ${parsedEvents.length}`)
-      console.log('')
       
       // Show sample of first few events
-      console.log('───────────────────────────────────────────────────────────')
-      console.log('📋 SAMPLE OF PARSED EVENTS (First 3):')
-      console.log('───────────────────────────────────────────────────────────')
       parsedEvents.slice(0, 3).forEach((evt, idx) => {
-        console.log(`${idx + 1}. ${evt.SUMMARY}`)
-        console.log(`   📅 Date: ${evt.startDate?.toLocaleDateString()}`)
-        console.log(`   🏷️ Category: ${evt.CATEGORIES}`)
-        console.log(`   🔒 Private: ${evt.isPrivate}`)
-        console.log(`   📍 Location: ${evt.LOCATION || 'N/A'}`)
-        console.log('')
       })
       
       // Get existing events once
-      console.log('───────────────────────────────────────────────────────────')
-      console.log('📡 PHASE 2: CHECKING FOR DUPLICATES')
-      console.log('───────────────────────────────────────────────────────────')
-      console.log('🔍 Fetching existing events from database...')
       const existingEvents = await eventsAPI.getAll()
-      console.log(`📊 Found ${existingEvents.length} existing events in database`)
-      console.log('')
       
       // Convert and import events
-      console.log('───────────────────────────────────────────────────────────')
-      console.log('📡 PHASE 3: IMPORTING EVENTS')
-      console.log('───────────────────────────────────────────────────────────')
       
       let successCount = 0
       let errorCount = 0
@@ -648,78 +603,37 @@ const SettingsTab = () => {
           
           if (exists) {
             skipCount++
-            console.log(`${progress} ⏭️  SKIP (duplicate): "${dbEvent.title}"`)
             continue
           }
           
           // Create event in database
-          console.log(`${progress} 📝 Creating: "${dbEvent.title}"`)
-          console.log(`         📅 ${dbEvent.start_date} - ${dbEvent.end_date}`)
-          console.log(`         🎨 Type: ${dbEvent.event_type}, Private: ${dbEvent.is_private}`)
           
           await eventsAPI.create(dbEvent)
           successCount++
-          console.log(`${progress} ✅ SUCCESS: "${dbEvent.title}"`)
-          console.log('')
           
         } catch (error) {
           errorCount++
           errors.push({ event: icsEvent.SUMMARY, error: error.message })
-          console.error(`${progress} ❌ ERROR: "${icsEvent.SUMMARY}"`)
-          console.error(`         ⚠️  ${error.message}`)
-          console.error(error)
-          console.log('')
         }
       }
       
       const importTime = Date.now() - startImport
       
       // Show results
-      console.log('')
-      console.log('═══════════════════════════════════════════════════════════')
-      console.log('🎉 IMPORT COMPLETED')
-      console.log('═══════════════════════════════════════════════════════════')
-      console.log('📊 STATISTICS:')
-      console.log(`   ✅ Successfully imported: ${successCount}`)
-      console.log(`   ❌ Errors: ${errorCount}`)
-      console.log(`   ⏭️  Skipped (duplicates): ${skipCount}`)
-      console.log(`   📊 Total processed: ${parsedEvents.length}`)
-      console.log('')
-      console.log('⏱️  TIMING:')
-      console.log(`   📥 Fetch time: ${fetchTime}ms`)
-      console.log(`   💾 Import time: ${importTime}ms`)
-      console.log(`   🕐 Total time: ${fetchTime + importTime}ms`)
-      console.log('')
-      console.log('⏰ End Time:', new Date().toLocaleString())
       
       if (errors.length > 0) {
-        console.log('')
-        console.log('───────────────────────────────────────────────────────────')
-        console.log('⚠️  ERRORS DETAILS:')
-        console.log('───────────────────────────────────────────────────────────')
         errors.forEach((err, idx) => {
-          console.error(`${idx + 1}. Event: "${err.event}"`)
-          console.error(`   Error: ${err.error}`)
         })
       }
       
-      console.log('═══════════════════════════════════════════════════════════')
       
       const message = `Import abgeschlossen!\n\n✅ Erfolgreich importiert: ${successCount}\n❌ Fehler: ${errorCount}\n⏭️ Übersprungen (Duplikate): ${skipCount}\n\nDetails in der Browser-Konsole (F12)\n\nSeite wird neu geladen...`
       alert(message)
       
       // Reload events
-      console.log('🔄 Reloading page...')
       window.location.reload()
       
     } catch (error) {
-      console.error('')
-      console.error('═══════════════════════════════════════════════════════════')
-      console.error('💥 IMPORT FAILED')
-      console.error('═══════════════════════════════════════════════════════════')
-      console.error('❌ Error:', error.message)
-      console.error('📍 Stack:', error.stack)
-      console.error('═══════════════════════════════════════════════════════════')
       
       alert(`Import fehlgeschlagen!\n\nFehler: ${error.message}\n\nBitte überprüfen Sie die Browser-Konsole (F12) für Details.`)
     }
@@ -753,7 +667,6 @@ const SettingsTab = () => {
     )
     
     if (!confirmStep1) {
-      console.log('❌ Delete cancelled at step 1')
       return
     }
 
@@ -765,7 +678,6 @@ const SettingsTab = () => {
     
     if (confirmStep2 !== 'ALLE EVENTS LÖSCHEN') {
       alert('❌ Abgebrochen: Falsche Eingabe')
-      console.log('❌ Delete cancelled at step 2')
       return
     }
 
@@ -777,31 +689,19 @@ const SettingsTab = () => {
     )
     
     if (!confirmStep3) {
-      console.log('❌ Delete cancelled at step 3')
       return
     }
 
     try {
-      console.log('═══════════════════════════════════════════════════════════')
-      console.log('🗑️ DELETE ALL EVENTS STARTED')
-      console.log('═══════════════════════════════════════════════════════════')
-      console.log('⏰ Start Time:', new Date().toLocaleString())
-      console.log('')
 
       // Fetch all events
-      console.log('📥 Fetching all events...')
       const allEvents = await eventsAPI.getAll()
-      console.log(`📊 Found ${allEvents.length} events to delete`)
       
       if (allEvents.length === 0) {
         alert('ℹ️ Keine Events zum Löschen gefunden.')
         return
       }
 
-      console.log('')
-      console.log('───────────────────────────────────────────────────────────')
-      console.log('🗑️ DELETING EVENTS')
-      console.log('───────────────────────────────────────────────────────────')
 
       let successCount = 0
       let errorCount = 0
@@ -812,41 +712,20 @@ const SettingsTab = () => {
         const progress = `[${i + 1}/${allEvents.length}]`
 
         try {
-          console.log(`${progress} 🗑️ Deleting: "${event.title}"`)
           await eventsAPI.delete(event.id)
           successCount++
-          console.log(`${progress} ✅ Deleted: "${event.title}"`)
         } catch (error) {
           errorCount++
           errors.push({ event: event.title, error: error.message })
-          console.error(`${progress} ❌ Error deleting: "${event.title}"`)
-          console.error(`         ⚠️  ${error.message}`)
         }
       }
 
-      console.log('')
-      console.log('═══════════════════════════════════════════════════════════')
-      console.log('🎯 DELETE COMPLETED')
-      console.log('═══════════════════════════════════════════════════════════')
-      console.log('📊 STATISTICS:')
-      console.log(`   ✅ Successfully deleted: ${successCount}`)
-      console.log(`   ❌ Errors: ${errorCount}`)
-      console.log(`   📊 Total processed: ${allEvents.length}`)
-      console.log('')
-      console.log('⏰ End Time:', new Date().toLocaleString())
 
       if (errors.length > 0) {
-        console.log('')
-        console.log('───────────────────────────────────────────────────────────')
-        console.log('⚠️ ERRORS DETAILS:')
-        console.log('───────────────────────────────────────────────────────────')
         errors.forEach((err, idx) => {
-          console.error(`${idx + 1}. Event: "${err.event}"`)
-          console.error(`   Error: ${err.error}`)
         })
       }
 
-      console.log('═══════════════════════════════════════════════════════════')
 
       alert(
         `✅ Löschvorgang abgeschlossen!\n\n` +
@@ -859,22 +738,12 @@ const SettingsTab = () => {
       window.location.reload()
 
     } catch (error) {
-      console.error('')
-      console.error('═══════════════════════════════════════════════════════════')
-      console.error('💥 DELETE FAILED')
-      console.error('═══════════════════════════════════════════════════════════')
-      console.error('❌ Error:', error.message)
-      console.error('📍 Stack:', error.stack)
-      console.error('═══════════════════════════════════════════════════════════')
 
       alert(`❌ Fehler beim Löschen!\n\n${error.message}\n\nDetails in der Konsole (F12).`)
     }
   }
 
   const handleSaveSettings = async () => {
-    console.log('🔄 Save button clicked!')
-    console.log('Pending emails:', pendingEmails)
-    console.log('Emails to remove:', emailsToRemove)
     
     setSaving(true)
     setSaveSuccess(false)
@@ -891,24 +760,20 @@ const SettingsTab = () => {
         lastUpdated: new Date().toISOString()
       }
       localStorage.setItem('adminSettings', JSON.stringify(settings))
-      console.log('✅ Settings saved to localStorage')
 
       // Only save emails if there are changes
       if (pendingEmails.length > 0 || emailsToRemove.length > 0) {
-        console.log('📧 Saving email changes to database...')
         
         // Save admin emails to database
         const { addAdminNotificationEmail, removeAdminNotificationEmail } = await import('../../services/adminEmails')
         
         // Add pending emails
         for (const email of pendingEmails) {
-          console.log('➕ Adding email:', email)
           await addAdminNotificationEmail(email)
         }
         
         // Remove marked emails
         for (const emailId of emailsToRemove) {
-          console.log('➖ Removing email ID:', emailId)
           await removeAdminNotificationEmail(emailId)
         }
         
@@ -917,7 +782,6 @@ const SettingsTab = () => {
         const updatedEmails = await getAdminNotificationEmails()
         setAdminEmailsFull(updatedEmails)
         setAdminEmails(updatedEmails.map(e => e.email))
-        console.log('✅ Emails reloaded from database')
       }
       
       // Clear pending lists
@@ -925,11 +789,9 @@ const SettingsTab = () => {
       setEmailsToRemove([])
       
       setSaveSuccess(true)
-      console.log('✅ Settings saved successfully!')
       setTimeout(() => setSaveSuccess(false), 3000)
       
     } catch (error) {
-      console.error('❌ Error saving settings:', error)
       setSaveError('Fehler beim Speichern der Einstellungen: ' + (error.message || 'Unbekannter Fehler'))
     } finally {
       setSaving(false)

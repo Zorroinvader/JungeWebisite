@@ -18,7 +18,7 @@ import SpecialEventsPage from './pages/SpecialEventsPage'
 import SpecialEventDetailPage from './pages/SpecialEventDetailPage'
 import CostumeContestResultsPage from './pages/CostumeContestResultsPage'
 import './index.css'
-import { Analytics } from '@vercel/analytics/react'
+// import { Analytics } from '@vercel/analytics/react' // Commented out - package not installed
 import { prefetchActiveSpecialEvents } from './services/specialEvents'
 
 // Protected Route Component
@@ -137,7 +137,7 @@ const App = () => {
   return (
     <DarkModeProvider>
       <AuthProvider>
-        <Analytics />
+        {/* <Analytics /> */}
         <AppContent />
       </AuthProvider>
     </DarkModeProvider>

@@ -52,24 +52,35 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 }
 
 const getHeaders = async (userEmail = null) => {
-  // Get the current session from Supabase
-  const { data: { session } } = await supabase.auth.getSession()
-  const userToken = session?.access_token || SUPABASE_KEY
-  
-  console.log('🔍 getHeaders: Session:', session?.user?.email || 'No session')
-  console.log('🔍 getHeaders: Using token:', userToken ? 'Yes' : 'No')
-  
-  const headers = {
-    'apikey': SUPABASE_KEY,
-    'Authorization': `Bearer ${userToken}`,
-    'Content-Type': 'application/json',
-    'Prefer': 'return=minimal',
-    'X-User-Email': userEmail || '',
-    'X-Session-ID': sessionStorage.getItem('sessionId') || ''
+  try {
+    // Get the current session from Supabase
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    
+    // Use session token if available, otherwise use anon key (for anonymous users)
+    const userToken = session?.access_token || SUPABASE_KEY
+    
+    const headers = {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${userToken}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=minimal',
+      'X-User-Email': userEmail || '',
+      'X-Session-ID': sessionStorage.getItem('sessionId') || ''
+    }
+    
+    return headers
+  } catch (error) {
+    // Fallback to anon key if session check fails (for anonymous users)
+    console.warn('Failed to get session, using anon key:', error)
+    return {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=minimal',
+      'X-User-Email': userEmail || '',
+      'X-Session-ID': sessionStorage.getItem('sessionId') || ''
+    }
   }
-  
-  console.log('🔍 getHeaders: Headers created:', headers)
-  return headers
 }
 
 // Events API
@@ -77,7 +88,6 @@ export const eventsAPI = {
   // New simple API call that bypasses complex authentication
   async getAll() {
     try {
-      console.log('🔍 Events API: Starting simple getAll()...')
       
       // Use simple headers without complex authentication
       const simpleHeaders = {
@@ -86,8 +96,6 @@ export const eventsAPI = {
         'Prefer': 'return=minimal'
       }
       
-      console.log('🔍 Events API: Using simple headers:', simpleHeaders)
-      console.log('🔍 Events API: Making request to:', `${SUPABASE_URL}/rest/v1/events?select=id,title,description,start_date,end_date,created_by,is_private,status&order=start_date.asc`)
       
       // Add timeout to prevent hanging
            const controller = new AbortController()
@@ -102,18 +110,13 @@ export const eventsAPI = {
         })
 
         clearTimeout(timeoutId)
-        console.log('🔍 Events API: Response status:', response.status)
-        console.log('🔍 Events API: Response ok:', response.ok)
 
         if (!response.ok) {
           const errorText = await response.text()
-          console.error('🔍 Events API: Error response:', errorText)
           throw new Error(`HTTP ${response.status}: ${errorText}`)
         }
 
         const result = await response.json()
-        console.log('🔍 Events API: Response data:', result)
-        console.log('🔍 Events API: Response count:', result.length)
         return result
       } catch (fetchError) {
         clearTimeout(timeoutId)
@@ -123,7 +126,6 @@ export const eventsAPI = {
         throw fetchError
       }
     } catch (error) {
-      console.error('🔍 Events API: Error:', error)
       throw error
     }
   },
@@ -131,7 +133,6 @@ export const eventsAPI = {
   // Fallback API call using direct Supabase client
   async getAllDirect() {
     try {
-      console.log('🔍 Events API: Trying direct Supabase call...')
       
       const { data, error } = await supabase
         .from('events')
@@ -139,14 +140,11 @@ export const eventsAPI = {
         .order('start_date', { ascending: true })
       
       if (error) {
-        console.error('🔍 Events API: Direct call error:', error)
         throw error
       }
       
-      console.log('🔍 Events API: Direct call success:', data?.length || 0, 'events')
       return data || []
     } catch (error) {
-      console.error('🔍 Events API: Direct call failed:', error)
       throw error
     }
   },
@@ -154,7 +152,6 @@ export const eventsAPI = {
   // Ultra-simple API call with minimal headers
   async getAllSimple() {
     try {
-      console.log('🔍 Events API: Trying ultra-simple call...')
       
       const response = await fetch(`${SUPABASE_URL}/rest/v1/events?select=id,title,description,start_date,end_date,created_by,is_private,status&order=start_date.asc`, {
         method: 'GET',
@@ -169,10 +166,8 @@ export const eventsAPI = {
       }
       
       const data = await response.json()
-      console.log('🔍 Events API: Ultra-simple call success:', data?.length || 0, 'events')
       return data || []
     } catch (error) {
-      console.error('🔍 Events API: Ultra-simple call failed:', error)
       throw error
     }
   },
@@ -192,7 +187,6 @@ export const eventsAPI = {
       const data = await response.json()
       return data[0] || null
     } catch (error) {
-      console.error('HTTP API getEventById error:', error)
       throw error
     }
   },
@@ -219,7 +213,6 @@ export const eventsAPI = {
         return { success: true }
       }
     } catch (error) {
-      console.error('HTTP API createEvent error:', error)
       throw error
     }
   },
@@ -246,7 +239,6 @@ export const eventsAPI = {
         return { success: true }
       }
     } catch (error) {
-      console.error('HTTP API updateEvent error:', error)
       throw error
     }
   },
@@ -265,7 +257,6 @@ export const eventsAPI = {
 
       return { success: true }
     } catch (error) {
-      console.error('HTTP API deleteEvent error:', error)
       throw error
     }
   },
@@ -283,7 +274,6 @@ export const eventsAPI = {
           const end = new Date(endDate).toISOString()
           dateFilter = `&start_date=gte.${start}&start_date=lte.${end}`
         } catch (dateError) {
-          console.warn('Invalid date range provided, loading all events:', dateError)
           // Fallback to loading all events if date parsing fails
         }
       }
@@ -302,7 +292,6 @@ export const eventsAPI = {
       const result = await response.json()
       return result
     } catch (error) {
-      console.error('HTTP API getCalendarEvents error:', error)
       throw error
     }
   }
@@ -328,7 +317,6 @@ export const eventRequestsAPI = {
       const result = await response.json()
       return result
     } catch (error) {
-      console.error('HTTP API getEventRequests error:', error)
       throw error
     }
   },
@@ -351,7 +339,6 @@ export const eventRequestsAPI = {
       const result = await response.json()
       return result
     } catch (error) {
-      console.error('HTTP API getAdminPanelData error:', error)
       throw error
     }
   },
@@ -372,7 +359,6 @@ export const eventRequestsAPI = {
 
       return await response.json()
     } catch (error) {
-      console.error('HTTP API getByStage error:', error)
       throw error
     }
   },
@@ -380,9 +366,7 @@ export const eventRequestsAPI = {
   // Get request by email (for non-logged-in users)
   async getByEmail(email) {
     try {
-      console.log('Searching for requests with email:', email)
       const headers = await getHeaders(email)
-      console.log('Headers for email search:', headers)
       
       // Use ilike for case-insensitive match and encode the email
       const encoded = encodeURIComponent(email.trim())
@@ -392,19 +376,15 @@ export const eventRequestsAPI = {
         headers
       })
 
-      console.log('Response status:', response.status)
       
       if (!response.ok) {
         const errorText = await response.text()
-        console.error('API Error:', errorText)
         throw new Error(`HTTP ${response.status}: ${errorText}`)
       }
 
       const data = await response.json()
-      console.log('Found requests:', data)
       return data
     } catch (error) {
-      console.error('HTTP API getByEmail error:', error)
       throw error
     }
   },
@@ -423,7 +403,6 @@ export const eventRequestsAPI = {
 
       return await response.json()
     } catch (error) {
-      console.error('HTTP API getByUser error:', error)
       throw error
     }
   },
@@ -443,7 +422,6 @@ export const eventRequestsAPI = {
       const data = await response.json()
       return data[0] || null
     } catch (error) {
-      console.error('HTTP API getEventRequestById error:', error)
       throw error
     }
   },
@@ -451,7 +429,7 @@ export const eventRequestsAPI = {
   // STEP 1: Create initial event request (no login required)
   async createInitialRequest(data) {
     try {
-      // Security validation
+      // Security validation (blocking)
       if (!validateEmail(data.requester_email)) {
         throw new Error('Invalid email format')
       }
@@ -467,17 +445,25 @@ export const eventRequestsAPI = {
         event_name: sanitizeText(data.event_name || data.title)
       }
 
-      // Check for SQL injection
+      // Check for SQL injection (blocking)
       const textFields = [sanitizedData.requester_name, sanitizedData.initial_notes, sanitizedData.event_name]
       for (const field of textFields) {
         if (detectSQLInjection(field)) {
-          await securityAPI.logSuspiciousActivity('sql_injection_attempt', `SQL injection detected in event request: ${field}`, 'high')
+          // Log but don't await (non-blocking)
+          securityAPI.logSuspiciousActivity('sql_injection_attempt', `SQL injection detected in event request: ${field}`, 'high').catch(() => {})
           throw new Error('Invalid input detected')
         }
       }
 
-      // Rate limiting check
-      const rateLimitOk = await securityAPI.checkRateLimit(data.requester_email, 'event_request_create', 5, 60)
+      // Rate limiting check (non-blocking - allow if check fails)
+      let rateLimitOk = true
+      try {
+        rateLimitOk = await securityAPI.checkRateLimit(data.requester_email, 'event_request_create', 5, 60)
+      } catch (rateLimitError) {
+        console.warn('Rate limit check failed, allowing request:', rateLimitError)
+        rateLimitOk = true // Allow request if rate limiting check fails
+      }
+      
       if (!rateLimitOk) {
         throw new Error('Too many requests. Please try again later.')
       }
@@ -500,10 +486,28 @@ export const eventRequestsAPI = {
         requester_phone: data.requester_phone || null,
         requested_days: data.requested_days || null,
         initial_notes: sanitizedData.initial_notes,
-        request_stage: 'initial'
+        request_stage: 'initial',
+        // Include user ID if available
+        requested_by: data.requested_by || null,
+        created_by: data.created_by || null
       }
 
-      const headers = await getHeaders(data.requester_email)
+      // Get headers - use anon key if no session (for anonymous users)
+      let headers
+      try {
+        headers = await getHeaders(data.requester_email)
+      } catch (headerError) {
+        console.warn('Failed to get auth headers, using anon key:', headerError)
+        // Fallback to anon key for anonymous users
+        headers = {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation',
+          'X-User-Email': data.requester_email || ''
+        }
+      }
+
       const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests`, {
         method: 'POST',
         headers: {
@@ -515,29 +519,38 @@ export const eventRequestsAPI = {
 
       if (!response.ok) {
         const errorText = await response.text()
+        console.error('Event request creation failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText,
+          data: requestData
+        })
         throw new Error(`HTTP ${response.status}: ${errorText}`)
       }
 
       const result = await response.json()
+      const created = Array.isArray(result) ? result[0] : result
       
-      // Log successful creation
-      await securityAPI.logSuspiciousActivity('event_request_created', `Event request created for ${data.requester_email}`, 'low', null, null)
-      
-      // Send emails
-      try {
-        const requestData = Array.isArray(result) ? result[0] : result
-        // Send confirmation email to user
-        await sendUserNotification(data.requester_email, requestData, 'initial_request_received')
-        // Send notification email to admins
-        await sendAdminNotification(requestData, 'initial_request')
-      } catch (emailError) {
-        console.error('Failed to send notification emails:', emailError)
-        // Don't fail the request creation if emails fail
+      if (!created || !created.id) {
+        throw new Error('Event request was created but no ID was returned')
       }
       
-      return Array.isArray(result) ? result[0] : result
+      // Log successful creation (non-blocking)
+      securityAPI.logSuspiciousActivity('event_request_created', `Event request created for ${data.requester_email}`, 'low', null, null).catch(() => {})
+      
+      // Send emails (non-blocking)
+      try {
+        // Send confirmation email to user
+        sendUserNotification(data.requester_email, created, 'initial_request_received').catch(() => {})
+        // Send notification email to admins
+        sendAdminNotification(created, 'initial_request').catch(() => {})
+      } catch (emailError) {
+        console.warn('Email sending failed (non-critical):', emailError)
+      }
+      
+      return created
     } catch (error) {
-      console.error('HTTP API createInitialRequest error:', error)
+      console.error('createInitialRequest error:', error)
       throw error
     }
   },
@@ -594,9 +607,7 @@ export const eventRequestsAPI = {
         }
         
         await blockedDatesAPI.createTemporaryBlock(blockData)
-        console.log('✅ Temporary blocker created for request:', id)
       } catch (blockError) {
-        console.warn('Failed to create temporary blocker:', blockError)
         // Don't fail the whole operation if blocker creation fails
       }
 
@@ -605,22 +616,21 @@ export const eventRequestsAPI = {
         await sendUserNotification(request.requester_email, request, 'initial_request_accepted')
         // Do not notify admins yet; wait until the user submits detailed info
       } catch (emailError) {
-        console.error('Failed to send acceptance email:', emailError)
+        // Don't fail if email notification fails
       }
-
+      
       return { success: true }
     } catch (error) {
-      console.error('HTTP API acceptInitialRequest error:', error)
       throw error
     }
   },
 
-  // STEP 3: Admin rejects request
-  async rejectRequest(id, rejectionReason = '') {
+  // STEP 3: Admin accepts final request (after user submits details)
+  async finalAcceptRequest(id) {
     try {
       const headers = await getHeaders()
       
-      // Get request details first
+      // First, get the request details
       const getRequestResponse = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}&select=*`, {
         method: 'GET',
         headers
@@ -633,175 +643,11 @@ export const eventRequestsAPI = {
       const requests = await getRequestResponse.json()
       const request = requests[0]
       
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({
-          request_stage: 'rejected',
-          status: 'rejected',
-          rejection_reason: rejectionReason
-        })
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
-      }
-
-      // Send email to user
-      if (request) {
-        try {
-          await sendUserNotification(request.requester_email, {
-            ...request,
-            rejection_reason: rejectionReason
-          }, 'rejected')
-        } catch (emailError) {
-          console.error('Failed to send rejection email:', emailError)
-        }
-      }
-
-      return { success: true }
-    } catch (error) {
-      console.error('HTTP API rejectRequest error:', error)
-      throw error
-    }
-  },
-
-  // USER: Cancel own request at any stage
-  async cancelRequest(id) {
-    try {
-      const headers = await getHeaders()
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({
-          request_stage: 'cancelled',
-          status: 'cancelled',
-          rejection_reason: 'Vom Benutzer storniert'
-        })
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
-      }
-
-      return { success: true }
-    } catch (error) {
-      console.error('HTTP API cancelRequest error:', error)
-      throw error
-    }
-  },
-
-  // STEP 4: User submits detailed information
-  async submitDetailedRequest(id, data) {
-    try {
-      console.log('📝 Submitting detailed request for ID:', id)
-      console.log('📝 Data to submit:', data)
-      
-      const requestData = {
-        exact_start_datetime: data.exact_start_datetime,
-        exact_end_datetime: data.exact_end_datetime,
-        key_handover_datetime: data.key_handover_datetime,
-        key_return_datetime: data.key_return_datetime,
-        signed_contract_url: data.signed_contract_url,
-        schluesselannahme_time: data.schluesselannahme_time || null,
-        schluesselabgabe_time: data.schluesselabgabe_time || null,
-        additional_notes: data.additional_notes || '',
-        // Database fallback fields (from old system)
-        uploaded_file_name: data.uploaded_file_name || null,
-        uploaded_file_size: data.uploaded_file_size || null,
-        uploaded_file_type: data.uploaded_file_type || null,
-        uploaded_file_data: data.uploaded_file_data || null,
-        request_stage: 'details_submitted',
-        details_submitted_at: new Date().toISOString()
-      }
-
-      console.log('📝 Request data to send:', requestData)
-
-      // For detailed form submission, use anon key to allow updates by email
-      const headers = {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal'
-      }
-      
-      console.log('📝 Headers:', headers)
-      
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify(requestData)
-      })
-
-      console.log('📝 Response status:', response.status)
-      console.log('📝 Response ok:', response.ok)
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('📝 Error response:', errorText)
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
-      }
-
-      // Send notifications
-      try {
-        // Get the updated request to send notifications
-        const updatedRequestResponse = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}&select=*`, {
-          method: 'GET',
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
-            'Content-Type': 'application/json'
-          }
-        })
-        
-        if (updatedRequestResponse.ok) {
-          const updatedRequests = await updatedRequestResponse.json()
-          const updatedRequest = updatedRequests[0]
-          
-          if (updatedRequest) {
-            // Notify admins that detailed info was submitted
-            await sendAdminNotification(updatedRequest, 'detailed_info_submitted')
-          }
-        }
-      } catch (emailError) {
-        console.error('Failed to send notifications:', emailError)
-        // Don't fail the request if notifications fail
-      }
-
-      console.log('✅ Detailed request submitted successfully')
-      return { success: true }
-    } catch (error) {
-      console.error('HTTP API submitDetailedRequest error:', error)
-      throw error
-    }
-  },
-
-  // STEP 5: Admin gives final acceptance and creates event
-  async finalAcceptRequest(id) {
-    try {
-      // First, get the request details
-      const headers = await getHeaders()
-      const requestResponse = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}&select=*`, {
-        method: 'GET',
-        headers
-      })
-
-      if (!requestResponse.ok) {
-        throw new Error('Failed to fetch request details')
-      }
-
-      const requests = await requestResponse.json()
-      const request = requests[0]
-
       if (!request) {
         throw new Error('Request not found')
       }
-
-      console.log('📋 Creating event from request:', request);
-
-      // Update request status
+      
+      // Update request status to final_accepted
       const updateResponse = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}`, {
         method: 'PATCH',
         headers,
@@ -854,9 +700,7 @@ export const eventRequestsAPI = {
         // Status
         status: 'approved'
       }
-
-      console.log('📤 Creating event with data:', eventData);
-
+      
       const createEventResponse = await fetch(`${SUPABASE_URL}/rest/v1/events`, {
         method: 'POST',
         headers,
@@ -865,11 +709,8 @@ export const eventRequestsAPI = {
 
       if (!createEventResponse.ok) {
         const errorText = await createEventResponse.text()
-        console.error('❌ Event creation failed:', errorText);
         throw new Error(`Failed to create event: ${errorText}`)
       }
-
-      console.log('✅ Event created successfully!');
       
       // Send notifications
       try {
@@ -878,7 +719,6 @@ export const eventRequestsAPI = {
         // Notify admins of final acceptance
         await sendAdminNotification(request, 'final_acceptance')
       } catch (emailError) {
-        console.error('Failed to send final acceptance notifications:', emailError)
         // Don't fail if notifications fail
       }
       
@@ -890,18 +730,13 @@ export const eventRequestsAPI = {
         
         if (blocker) {
           await blockedDatesAPI.deleteTemporaryBlock(blocker.id)
-          console.log('✅ Temporary blocker deleted for request:', id)
-        } else {
-          console.log('⚠️ No temporary blocker found for request:', id)
         }
       } catch (blockError) {
-        console.warn('Failed to delete temporary blocker:', blockError)
         // Don't fail the whole operation if blocker deletion fails
       }
       
       return { success: true }
     } catch (error) {
-      console.error('HTTP API finalAcceptRequest error:', error)
       throw error
     }
   },
@@ -929,7 +764,6 @@ export const eventRequestsAPI = {
         return { success: true }
       }
     } catch (error) {
-      console.error('HTTP API createEventRequest error:', error)
       throw error
     }
   },
@@ -956,7 +790,6 @@ export const eventRequestsAPI = {
         return { success: true }
       }
     } catch (error) {
-      console.error('HTTP API updateEventRequest error:', error)
       throw error
     }
   },
@@ -975,7 +808,6 @@ export const eventRequestsAPI = {
 
       return { success: true }
     } catch (error) {
-      console.error('HTTP API deleteEventRequest error:', error)
       throw error
     }
   },
@@ -993,7 +825,6 @@ export const eventRequestsAPI = {
           const end = new Date(endDate).toISOString()
           dateFilter = `&start_date=gte.${start}&start_date=lte.${end}`
         } catch (dateError) {
-          console.warn('Invalid date range provided, loading all requests:', dateError)
           // Fallback to loading all requests if date parsing fails
         }
       }
@@ -1012,7 +843,131 @@ export const eventRequestsAPI = {
       const result = await response.json()
       return result
     } catch (error) {
-      console.error('HTTP API getCalendarRequests error:', error)
+      throw error
+    }
+  },
+
+  // Cancel/delete a request (user can cancel their own requests)
+  async cancelRequest(id) {
+    try {
+      const headers = await getHeaders()
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: {
+          ...headers,
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify({
+          status: 'cancelled',
+          cancelled_at: new Date().toISOString()
+        })
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      const result = await response.json()
+      return Array.isArray(result) ? result[0] : result
+    } catch (error) {
+      throw error
+    }
+  },
+
+  // Submit detailed request information (STEP 2: User submits details after initial acceptance)
+  async submitDetailedRequest(id, detailedData) {
+    try {
+      const headers = await getHeaders()
+      
+      // Prepare update data
+      const updateData = {
+        request_stage: 'details_submitted',
+        details_submitted_at: new Date().toISOString(),
+        exact_start_datetime: detailedData.exact_start_datetime || null,
+        exact_end_datetime: detailedData.exact_end_datetime || null,
+        location: detailedData.location || null,
+        max_participants: detailedData.max_participants || null,
+        additional_notes: detailedData.additional_notes || null,
+        schluesselannahme_time: detailedData.schluesselannahme_time || null,
+        schluesselabgabe_time: detailedData.schluesselabgabe_time || null,
+        key_handover_datetime: detailedData.key_handover_datetime || null,
+        key_return_datetime: detailedData.key_return_datetime || null,
+        signed_contract_url: detailedData.signed_contract_url || null,
+        uploaded_file_name: detailedData.uploaded_file_name || null,
+        uploaded_file_size: detailedData.uploaded_file_size || null,
+        uploaded_file_type: detailedData.uploaded_file_type || null,
+        uploaded_file_data: detailedData.uploaded_file_data || null
+      }
+
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: {
+          ...headers,
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify(updateData)
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      const result = await response.json()
+      const updated = Array.isArray(result) ? result[0] : result
+      
+      // Send notification to admins (non-blocking)
+      try {
+        await sendAdminNotification(updated, 'detailed_info_submitted')
+      } catch (emailError) {
+        console.warn('Email notification failed (non-critical):', emailError)
+      }
+      
+      return updated
+    } catch (error) {
+      console.error('submitDetailedRequest error:', error)
+      throw error
+    }
+  },
+
+  // Reject a request (admin action)
+  async rejectRequest(id, rejectionReason = '') {
+    try {
+      const headers = await getHeaders()
+      
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: {
+          ...headers,
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify({
+          request_stage: 'rejected',
+          status: 'rejected',
+          rejected_at: new Date().toISOString(),
+          rejection_reason: rejectionReason || null
+        })
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      const result = await response.json()
+      const rejected = Array.isArray(result) ? result[0] : result
+      
+      // Send notification to user (non-blocking)
+      try {
+        await sendUserNotification(rejected.requester_email, rejected, 'request_rejected')
+      } catch (emailError) {
+        console.warn('Email notification failed (non-critical):', emailError)
+      }
+      
+      return rejected
+    } catch (error) {
+      console.error('rejectRequest error:', error)
       throw error
     }
   }
@@ -1035,7 +990,6 @@ export const profilesAPI = {
       const data = await response.json()
       return data[0] || null
     } catch (error) {
-      console.error('HTTP API getProfileById error:', error)
       throw error
     }
   },
@@ -1062,7 +1016,6 @@ export const profilesAPI = {
         return { success: true }
       }
     } catch (error) {
-      console.error('HTTP API createProfile error:', error)
       throw error
     }
   },
@@ -1089,14 +1042,12 @@ export const profilesAPI = {
         return { success: true }
       }
     } catch (error) {
-      console.error('HTTP API updateProfile error:', error)
       throw error
     }
   },
 
   async getAll() {
     try {
-      console.log('👥 Profiles API: Starting getAll()...')
       
       // Use simple headers for faster loading
       const simpleHeaders = {
@@ -1124,7 +1075,6 @@ export const profilesAPI = {
         }
 
         const result = await response.json()
-        console.log('👥 Profiles API: Loaded', result.length, 'users')
         return result
       } catch (fetchError) {
         clearTimeout(timeoutId)
@@ -1134,14 +1084,12 @@ export const profilesAPI = {
         throw fetchError
       }
     } catch (error) {
-      console.error('👥 Profiles API: Error:', error)
       throw error
     }
   },
 
   async getAllDirect() {
     try {
-      console.log('👥 Profiles API: Trying direct Supabase call...')
       
       const { supabase } = await import('../lib/supabase')
       const { data, error } = await supabase
@@ -1150,21 +1098,17 @@ export const profilesAPI = {
         .order('created_at', { ascending: false })
       
       if (error) {
-        console.error('👥 Profiles API: Direct call error:', error)
         throw error
       }
       
-      console.log('👥 Profiles API: Direct call success:', data?.length || 0, 'users')
       return data || []
     } catch (error) {
-      console.error('👥 Profiles API: Direct call failed:', error)
       throw error
     }
   },
 
   async getAllSimple() {
     try {
-      console.log('👥 Profiles API: Trying ultra-simple call...')
       
       const response = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id,email,full_name,role,created_at&order=created_at.desc`, {
         method: 'GET',
@@ -1179,17 +1123,14 @@ export const profilesAPI = {
       }
       
       const data = await response.json()
-      console.log('👥 Profiles API: Ultra-simple call success:', data?.length || 0, 'users')
       return data || []
     } catch (error) {
-      console.error('👥 Profiles API: Ultra-simple call failed:', error)
       throw error
     }
   },
 
   async updateUserRole(id, role) {
     try {
-      console.log('👥 Profiles API: Updating role for user', id, 'to', role)
       
       // Use simple headers for faster updates
       const simpleHeaders = {
@@ -1217,7 +1158,6 @@ export const profilesAPI = {
           throw new Error(`HTTP ${response.status}: ${errorText}`)
         }
 
-        console.log('👥 Profiles API: Role updated successfully')
         return { success: true }
       } catch (fetchError) {
         clearTimeout(timeoutId)
@@ -1227,7 +1167,6 @@ export const profilesAPI = {
         throw fetchError
       }
     } catch (error) {
-      console.error('👥 Profiles API: updateUserRole error:', error)
       throw error
     }
   },
@@ -1235,7 +1174,6 @@ export const profilesAPI = {
   async checkAndCreateProfileForUser(email) {
     try {
       // Check if user exists in auth without a profile (orphaned user)
-      console.log('Checking for orphaned user:', email)
       
       // Use regular auth to check if we can sign in with this email
       // This will tell us if the user exists
@@ -1245,14 +1183,11 @@ export const profilesAPI = {
         
         // Since we can't access admin API, just return false
         // The actual fix should be done server-side or manually in Supabase dashboard
-        console.log('Cannot check for orphaned users from client-side - requires admin API')
         return false
       } catch (error) {
-        console.error('Error in orphaned user check:', error)
         return false
       }
     } catch (error) {
-      console.error('Error checking/creating profile:', error)
       return false
     }
   },
@@ -1346,7 +1281,6 @@ export const profilesAPI = {
           const errorText = await profileResponse.text()
           // If it's a duplicate key error, the profile might already exist
           if (errorText.includes('duplicate key value violates unique constraint')) {
-            console.log('Profile already exists, continuing...')
           } else {
             throw new Error(`Profile creation failed: ${errorText}`)
           }
@@ -1358,7 +1292,6 @@ export const profilesAPI = {
         user: authUser.user
       }
     } catch (error) {
-      console.error('HTTP API createUser error:', error)
       throw error
     }
   }
@@ -1392,8 +1325,6 @@ export const storageAPI = {
         } catch (e) {
           errorData = { message: errorText };
         }
-        
-        console.error('Storage upload failed:', errorData);
         throw new Error(`Storage Upload fehlgeschlagen: ${errorData.message || errorText}`)
       }
 
@@ -1401,7 +1332,6 @@ export const storageAPI = {
       const authenticatedURL = `${SUPABASE_URL}/storage/v1/object/authenticated/signed-contracts/${fileName}`
       return { success: true, url: authenticatedURL, fileName }
     } catch (error) {
-      console.error('HTTP API uploadSignedContract error:', error)
       throw error
     }
   },
@@ -1423,7 +1353,6 @@ export const storageAPI = {
 
       return { success: true }
     } catch (error) {
-      console.error('HTTP API deleteFile error:', error)
       throw error
     }
   }
@@ -1446,7 +1375,6 @@ export const blockedDatesAPI = {
 
       return await response.json()
     } catch (error) {
-      console.error('HTTP API getTemporarilyBlocked error:', error)
       throw error
     }
   },
@@ -1467,7 +1395,6 @@ export const blockedDatesAPI = {
 
       return await response.json()
     } catch (error) {
-      console.error('HTTP API createTemporaryBlock error:', error)
       throw error
     }
   },
@@ -1487,7 +1414,6 @@ export const blockedDatesAPI = {
 
       return { success: true }
     } catch (error) {
-      console.error('HTTP API deleteTemporaryBlock error:', error)
       throw error
     }
   }
@@ -1516,7 +1442,6 @@ export const dsgvoAPI = {
 
       return await response.json()
     } catch (error) {
-      console.error('DSGVO getUserDataExport error:', error)
       throw error
     }
   },
@@ -1537,7 +1462,6 @@ export const dsgvoAPI = {
 
       return true
     } catch (error) {
-      console.error('DSGVO deleteUserData error:', error)
       throw error
     }
   },
@@ -1562,7 +1486,6 @@ export const dsgvoAPI = {
 
       return true
     } catch (error) {
-      console.error('DSGVO updateUserData error:', error)
       throw error
     }
   },
@@ -1589,7 +1512,6 @@ export const dsgvoAPI = {
 
       return await response.json()
     } catch (error) {
-      console.error('DSGVO recordConsent error:', error)
       throw error
     }
   },
@@ -1610,7 +1532,6 @@ export const dsgvoAPI = {
 
       return true
     } catch (error) {
-      console.error('DSGVO withdrawConsent error:', error)
       throw error
     }
   }
@@ -1634,7 +1555,6 @@ export const securityAPI = {
 
       return await response.json()
     } catch (error) {
-      console.error('Security validateEmail error:', error)
       // Fallback to client-side validation
       return validateEmail(email)
     }
@@ -1656,7 +1576,6 @@ export const securityAPI = {
 
       return await response.json()
     } catch (error) {
-      console.error('Security validatePhone error:', error)
       // Fallback to client-side validation
       return validatePhone(phone)
     }
@@ -1678,7 +1597,6 @@ export const securityAPI = {
 
       return await response.json()
     } catch (error) {
-      console.error('Security sanitizeText error:', error)
       // Fallback to client-side sanitization
       return sanitizeText(text)
     }
@@ -1705,7 +1623,6 @@ export const securityAPI = {
 
       return await response.json()
     } catch (error) {
-      console.error('Security checkRateLimit error:', error)
       return true // Allow request if rate limiting fails
     }
   },
@@ -1732,7 +1649,6 @@ export const securityAPI = {
 
       return await response.json()
     } catch (error) {
-      console.error('Security logSuspiciousActivity error:', error)
       return null
     }
   }

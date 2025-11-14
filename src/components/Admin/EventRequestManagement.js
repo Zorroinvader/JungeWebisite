@@ -26,7 +26,6 @@ const EventRequestManagement = () => {
       setRequests(filteredRequests || [])
     } catch (err) {
       setError('Fehler beim Laden der Event-Anfragen')
-      console.error('Error loading requests:', err)
     } finally {
       setLoading(false)
     }
@@ -55,7 +54,6 @@ const EventRequestManagement = () => {
       setSelectedRequest(null)
     } catch (err) {
       setError('Fehler beim Genehmigen der Anfrage')
-      console.error('Error approving request:', err)
     }
   }
 
@@ -74,7 +72,6 @@ const EventRequestManagement = () => {
       setSelectedRequest(null)
     } catch (err) {
       setError('Fehler beim Ablehnen der Anfrage')
-      console.error('Error rejecting request:', err)
     }
   }
 
@@ -115,7 +112,6 @@ const EventRequestManagement = () => {
         alert('Keine Datei zum Herunterladen verfügbar')
       }
     } catch (error) {
-      console.error('Error downloading file:', error)
       alert('Fehler beim Herunterladen der Datei')
     }
   }
@@ -430,7 +426,6 @@ const ReviewModal = ({ request, onClose, onApprove, onReject }) => {
         alert('Keine Datei zum Herunterladen verfügbar')
       }
     } catch (error) {
-      console.error('Error downloading file:', error)
       alert('Fehler beim Herunterladen der Datei')
     }
   }
@@ -446,7 +441,6 @@ const ReviewModal = ({ request, onClose, onApprove, onReject }) => {
         await onReject(request.id, reviewNotes)
       }
     } catch (err) {
-      console.error('Error in review:', err)
     } finally {
       setLoading(false)
     }

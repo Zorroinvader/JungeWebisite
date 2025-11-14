@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { X, Upload, CheckCircle } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDarkMode } from '../../contexts/DarkModeContext'
+import { eventRequestsAPI } from '../../services/httpApi'
 import PDFLink from '../UI/PDFLink'
 
 const EventRequestModalHTTP = ({ isOpen, onClose, selectedDate }) => {
@@ -246,40 +247,15 @@ const EventRequestModalHTTP = ({ isOpen, onClose, selectedDate }) => {
       }
 
 
-      // Try direct HTTP call to Supabase REST API
-      const supabaseUrl = process.env.REACT_APP_SUPABASE_URL
-      const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY
-
-      const response = await fetch(`${supabaseUrl}/rest/v1/event_requests`, {
-        method: 'POST',
-        headers: {
-          'apikey': supabaseKey,
-          'Authorization': `Bearer ${supabaseKey}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify(requestData)
-      })
-
-      if (response.ok) {
+      // Use the API service to create the event request
+      try {
+        await eventRequestsAPI.createInitialRequest(requestData)
         setSuccess(true)
-      } else {
-        const errorText = await response.text()
-        console.error('HTTP request failed:', response.status, errorText)
-        
-        // Fallback to localStorage
-        const localData = {
-          ...requestData,
-          id: `local_${Date.now()}`,
-          created_at: new Date().toISOString(),
-          saved_locally: true
-        }
-        
-        const existingRequests = JSON.parse(localStorage.getItem('event_requests') || '[]')
-        existingRequests.push(localData)
-        localStorage.setItem('event_requests', JSON.stringify(existingRequests))
-        
-        setSuccess(true)
+      } catch (apiError) {
+        console.error('Failed to create event request:', apiError)
+        setError('Fehler beim Erstellen der Anfrage. Bitte versuchen Sie es erneut.')
+        setLoading(false)
+        return
       }
 
       // Show success and close after delay
@@ -301,8 +277,6 @@ const EventRequestModalHTTP = ({ isOpen, onClose, selectedDate }) => {
       }, 2000)
 
     } catch (error) {
-      console.error('Event request error:', error)
-      
       // Fallback to localStorage
       const localData = {
         id: `local_${Date.now()}`,
@@ -331,7 +305,6 @@ const EventRequestModalHTTP = ({ isOpen, onClose, selectedDate }) => {
       existingRequests.push(localData)
       localStorage.setItem('event_requests', JSON.stringify(existingRequests))
       
-      console.log('✅ Event request saved locally as fallback:', localData)
       setSuccess(true)
       
       setTimeout(() => {

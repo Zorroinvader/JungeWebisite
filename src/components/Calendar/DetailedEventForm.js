@@ -41,7 +41,6 @@ const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
           }));
         }
       } catch (e) {
-        console.error('Error parsing requested_days:', e);
       }
     } else if (request && request.start_date) {
       const startDate = request.start_date.split('T')[0];
@@ -148,10 +147,8 @@ const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
         const uploadResult = await storageAPI.uploadSignedContract(contractFile, request.id);
         if (uploadResult.success) {
           contractUrl = uploadResult.url;
-          console.log('✅ Storage upload successful:', contractUrl);
         }
       } catch (storageError) {
-        console.log('⚠️ Storage upload failed, will use database fallback:', storageError.message);
       }
 
       setUploadProgress(70);
@@ -171,9 +168,6 @@ const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
         uploaded_file_type: contractFile.type,
         uploaded_file_data: contractBase64
       };
-
-      console.log('📤 Submitting detailed request');
-
       await eventRequestsAPI.submitDetailedRequest(request.id, detailedData);
 
       // Send notification to admins that user has submitted detailed information
@@ -188,7 +182,6 @@ const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
             event_type: request.event_type
           }, 'detailed_info_submitted');
         } catch (notifError) {
-          console.warn('Failed to send notification:', notifError);
           // Don't fail the whole request if notification fails
         }
       }
@@ -202,7 +195,6 @@ const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
       }, 2000);
 
     } catch (err) {
-      console.error('Error submitting detailed request:', err);
       setError(err.message || 'Fehler beim Senden der Details');
     } finally {
       setLoading(false);

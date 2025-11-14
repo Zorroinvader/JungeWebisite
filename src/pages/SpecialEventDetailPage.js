@@ -51,14 +51,12 @@ const SpecialEventDetailPage = () => {
     let isMounted = true
     async function load() {
       try {
-        console.log('[SE:Detail] slug=', slug)
         // Seed from cache synchronously for instant paint
         try {
           const raw = sessionStorage.getItem('special_event_detail_' + slug)
           if (raw) {
             const parsed = JSON.parse(raw)
             if (parsed?.data && parsed.expiresAt && Date.now() < parsed.expiresAt) {
-              console.log('[SE:Detail] detail cache hit for slug', slug)
               setEvent(parsed.data)
             }
           }
@@ -73,13 +71,11 @@ const SpecialEventDetailPage = () => {
             ev = await getSpecialEventBySlug(slug)
           }
         } catch (e) {
-          console.warn('[SE:Detail] slug fetch failed:', e?.message)
         }
         if (!ev) {
           // Fallback: load the first available event regardless of status
           const { getFirstSpecialEventAny } = await import('../services/specialEvents')
           ev = await getFirstSpecialEventAny()
-          console.log('[SE:Detail] Fallback first event slug=', ev?.slug)
         }
         if (!ev) {
           // Last-resort: use cached active events (banner cache)
@@ -91,14 +87,12 @@ const SpecialEventDetailPage = () => {
               if (list.length) {
                 const bySlug = list.find(x => x.slug === slug)
                 ev = bySlug || list[0]
-                console.log('[SE:Detail] Last-resort picked slug=', ev?.slug)
               }
             }
           } catch {}
         }
         if (!isMounted) return
         setEvent(ev)
-        console.log('[SE:Detail] Selected event id=', ev?.id, 'slug=', ev?.slug)
         const uploadedFlag = localStorage.getItem(`se_uploaded_${ev.id}`)
         setAlreadyUploaded(!!uploadedFlag)
         if (uploadedFlag) {
@@ -146,7 +140,6 @@ const SpecialEventDetailPage = () => {
       } catch (e) {
         if (!isMounted) return
         setError(e.message || String(e))
-        console.error('[SE:Detail] Fatal load error:', e)
       } finally {
         if (isMounted) setLoading(false)
       }

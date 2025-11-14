@@ -18,9 +18,7 @@ const LoginForm = () => {
 
   // Reset loading when user logs in successfully
   useEffect(() => {
-    console.log('LoginForm useEffect - user:', user)
     if (user) {
-      console.log('User logged in, navigating to home page')
       setLoading(false)
       navigate('/')
     }
@@ -38,31 +36,24 @@ const LoginForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    console.log('Login form submitted with:', formData)
     setLoading(true)
     setError('')
 
     try {
-      console.log('Calling signIn...')
       const { data, error } = await signIn(formData.email, formData.password)
-      console.log('SignIn result:', { data, error })
       
       if (error) {
-        console.log('Login error:', error)
         setError(error.message)
         setLoading(false)
       } else {
-        console.log('Login successful, waiting for auth state change...')
       }
       // If successful, the useEffect will handle navigation and loading state
     } catch (err) {
-      console.log('Login exception:', err)
       setError('Ein unerwarteter Fehler ist aufgetreten')
       setLoading(false)
     }
   }
 
-  console.log('LoginForm rendering, loading:', loading, 'error:', error)
   
   return (
     <div className="min-h-screen bg-[#F4F1E8] dark:bg-[#252422]">

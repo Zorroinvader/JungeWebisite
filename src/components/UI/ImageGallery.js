@@ -78,7 +78,6 @@ const ImageGallery = ({ images = [], title = "Bildergalerie" }) => {
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
     } catch (error) {
-      console.error('Download failed:', error)
     } finally {
       setIsLoading(false)
     }

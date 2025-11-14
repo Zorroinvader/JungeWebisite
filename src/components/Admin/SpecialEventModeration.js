@@ -31,7 +31,6 @@ const SpecialEventModeration = () => {
         setVoteStats(voteData)
       })
       .catch(err => {
-        console.error('[Admin SE] Load failed:', err)
         setError(`Fehler beim Laden der Daten. Details: ${err?.message || String(err)}`)
       })
       .finally(() => setLoading(false))
@@ -44,7 +43,6 @@ const SpecialEventModeration = () => {
       setPending(p => p.filter(x => x.id !== id))
       try { sessionStorage.removeItem('special_event_entries_' + (updated?.event_id || selectedEventId)) } catch {}
     } catch (err) {
-      console.error('[Admin SE] Approve failed:', err)
       setError(`Freigeben fehlgeschlagen: ${err?.message || String(err)}`)
     } finally {
       setActionState(s => ({ ...s, [id]: undefined }))
@@ -58,7 +56,6 @@ const SpecialEventModeration = () => {
       setPending(p => p.filter(x => x.id !== id))
       try { sessionStorage.removeItem('special_event_entries_' + (updated?.event_id || selectedEventId)) } catch {}
     } catch (err) {
-      console.error('[Admin SE] Reject failed:', err)
       setError(`Ablehnen fehlgeschlagen: ${err?.message || String(err)}`)
     } finally {
       setActionState(s => ({ ...s, [id]: undefined }))

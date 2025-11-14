@@ -36,7 +36,6 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
       try {
         setTemplates(JSON.parse(savedTemplates));
       } catch (e) {
-        console.error('Error loading templates:', e);
       }
     }
   }, [isOpen]);
@@ -232,7 +231,6 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
       if (onClose) onClose();
 
     } catch (err) {
-      console.error('Error creating event:', err);
       setError(err.message || 'Fehler beim Erstellen des Events');
     } finally {
       setLoading(false);

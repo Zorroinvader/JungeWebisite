@@ -22,7 +22,6 @@ export const eventAPI = {
       
       return { data: filteredEvents, error: null }
     } catch (error) {
-      console.error('Error fetching events:', error)
       return { data: null, error }
     }
   },
@@ -35,7 +34,6 @@ export const eventAPI = {
 
       return await eventAPI.getEvents(startDate.toISOString(), endDate.toISOString())
     } catch (error) {
-      console.error('Error fetching events for month:', error)
       return { data: null, error }
     }
   },
@@ -55,7 +53,6 @@ export const eventAPI = {
         month: months[index]
       }))
     } catch (error) {
-      console.error('Error fetching events for months:', error)
       return []
     }
   },
@@ -66,7 +63,6 @@ export const eventAPI = {
       const data = await eventsAPI.create(eventData)
       return { data: data[0], error: null }
     } catch (error) {
-      console.error('Error creating event:', error)
       return { data: null, error }
     }
   },
@@ -77,7 +73,6 @@ export const eventAPI = {
       const data = await eventsAPI.update(eventId, updates)
       return { data: data[0], error: null }
     } catch (error) {
-      console.error('Error updating event:', error)
       return { data: null, error }
     }
   },
@@ -88,7 +83,6 @@ export const eventAPI = {
       await eventsAPI.delete(eventId)
       return { data: true, error: null }
     } catch (error) {
-      console.error('Error deleting event:', error)
       return { data: null, error }
     }
   }
@@ -112,7 +106,6 @@ export const eventRequestAPI = {
       
       return { data: filteredRequests, error: null }
     } catch (error) {
-      console.error('Error fetching event requests:', error)
       return { data: null, error }
     }
   },
@@ -121,15 +114,12 @@ export const eventRequestAPI = {
   getUserEventRequests: async (userId) => {
     try {
       const timestamp = new Date().toLocaleTimeString()
-      console.log(`[${timestamp}] getUserEventRequests called with userId:`, userId)
       
       const data = await eventRequestsAPI.getByUser(userId)
       
-      console.log(`[${timestamp}] getUserEventRequests success - found ${data?.length || 0} requests`)
       return { data, error: null }
     } catch (error) {
       const timestamp = new Date().toLocaleTimeString()
-      console.error(`[${timestamp}] Error fetching user event requests:`, error)
       return { data: null, error }
     }
   },
@@ -137,12 +127,9 @@ export const eventRequestAPI = {
   // Create a new event request
   createEventRequest: async (requestData) => {
     try {
-      console.log('Creating event request with data:', requestData)
       const data = await eventRequestsAPI.create(requestData)
-      console.log('Event request created successfully:', data)
       return { data: data[0] || data, error: null }
     } catch (error) {
-      console.error('Error creating event request:', error)
       return { data: null, error }
     }
   },
@@ -161,7 +148,6 @@ export const eventRequestAPI = {
       const data = await eventRequestsAPI.update(requestId, updates)
       return { data: data[0] || data, error: null }
     } catch (error) {
-      console.error('Error updating event request status:', error)
       return { data: null, error }
     }
   },
@@ -205,7 +191,6 @@ export const eventRequestAPI = {
 
       return { data: { event, request: updatedRequest }, error: null }
     } catch (error) {
-      console.error('Error approving event request:', error)
       return { data: null, error }
     }
   },
@@ -224,7 +209,6 @@ export const eventRequestAPI = {
 
       return { data, error: null }
     } catch (error) {
-      console.error('Error rejecting event request:', error)
       return { data: null, error }
     }
   }
@@ -242,7 +226,6 @@ export const profileAPI = {
       
       return { data, error: null }
     } catch (error) {
-      console.error('Error fetching profiles:', error)
       return { data: null, error }
     }
   },
@@ -253,7 +236,6 @@ export const profileAPI = {
       const data = await profilesAPI.update(userId, { role })
       return { data: data[0] || data, error: null }
     } catch (error) {
-      console.error('Error updating user role:', error)
       return { data: null, error }
     }
   }

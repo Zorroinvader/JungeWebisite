@@ -68,7 +68,6 @@ const AdminEventEditForm = ({ isOpen, onClose, onSuccess, event, onSaveAsTemplat
             );
             setSeriesEvents(relatedEvents);
           } catch (error) {
-            console.error('Error loading series events:', error);
           }
         } else {
           setSeriesId(null);
@@ -170,7 +169,6 @@ const AdminEventEditForm = ({ isOpen, onClose, onSuccess, event, onSaveAsTemplat
       if (onClose) onClose();
 
     } catch (err) {
-      console.error('Error updating event:', err);
       setError(err.message || 'Fehler beim Aktualisieren des Events');
     } finally {
       setLoading(false);
@@ -185,7 +183,6 @@ const AdminEventEditForm = ({ isOpen, onClose, onSuccess, event, onSaveAsTemplat
       if (onSuccess) onSuccess();
       if (onClose) onClose();
     } catch (err) {
-      console.error('Error deleting event:', err);
       setError(err.message || 'Fehler beim Löschen des Events');
       setShowDeleteConfirm(false);
     } finally {

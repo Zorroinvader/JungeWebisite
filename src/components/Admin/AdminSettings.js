@@ -36,7 +36,6 @@ const AdminSettings = () => {
       // No artificial delay
       
       // In a real application, you would save these settings to the database
-      console.log('Saving settings:', settings)
       
       setSuccess(true)
       // Success message stays visible until next action

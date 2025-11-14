@@ -67,7 +67,6 @@ const SecurityDashboard = () => {
 
       setLoading(false)
     } catch (error) {
-      console.error('Error loading security data:', error)
       setLoading(false)
     }
   }
@@ -86,7 +85,6 @@ const SecurityDashboard = () => {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } catch (error) {
-      console.error('Error exporting user data:', error)
     }
   }
 
@@ -97,7 +95,6 @@ const SecurityDashboard = () => {
         alert('User data deleted successfully')
         loadSecurityData()
       } catch (error) {
-        console.error('Error deleting user data:', error)
         alert('Error deleting user data')
       }
     }

@@ -268,13 +268,11 @@ const Header = () => {
               <button
                 onClick={async () => {
                   try {
-                    console.log('Logout confirmed')
                     await signOut()
                     setShowLogoutConfirm(false)
                     setMobileOpen(false)
                     // Don't force page reload - let auth state change handle UI update
                   } catch (error) {
-                    console.error('Logout error:', error)
                     setShowLogoutConfirm(false)
                   }
                 }}

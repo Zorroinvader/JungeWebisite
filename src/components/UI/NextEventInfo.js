@@ -28,7 +28,6 @@ const NextEventInfo = () => {
           setNextEvent(sortedEvents[0])
         }
       } catch (err) {
-        console.error('Error fetching next event:', err)
         setError(err.message)
       } finally {
         setLoading(false)

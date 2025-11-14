@@ -13,7 +13,6 @@
  */
 export const sendEmail = async (recipients, subject, messageText, htmlContent = null) => {
   if (!recipients || recipients.length === 0) {
-    console.warn('No recipients provided for email');
     return false;
   }
 
@@ -21,7 +20,6 @@ export const sendEmail = async (recipients, subject, messageText, htmlContent = 
   const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
-    console.warn('⚠️ Supabase credentials not found');
     return false;
   }
 
@@ -48,14 +46,12 @@ export const sendEmail = async (recipients, subject, messageText, htmlContent = 
     const result = await response.json();
 
     if (result.success) {
-      console.log('✅ Email sent successfully to:', recipients);
       return true;
     } else {
       throw new Error(result.error || 'Unknown error');
     }
 
   } catch (error) {
-    console.error('❌ Failed to send email:', error);
     return false;
   }
 }
@@ -68,7 +64,6 @@ export const sendEmail = async (recipients, subject, messageText, htmlContent = 
  */
 export const sendUserNotification = async (userEmail, eventData, type = 'initial_request') => {
   if (!userEmail) {
-    console.warn('No user email provided');
     return;
   }
 
@@ -144,7 +139,6 @@ export const sendUserNotification = async (userEmail, eventData, type = 'initial
  */
 export const sendAdminNotificationEmail = async (adminEmails, eventData, type = 'new_request') => {
   if (!adminEmails || adminEmails.length === 0) {
-    console.warn('No admin emails configured');
     return;
   }
 

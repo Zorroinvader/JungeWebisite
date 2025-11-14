@@ -90,7 +90,6 @@ const CostumeContestResultsPage = () => {
             } catch {}
           }
         } catch (err) {
-          console.warn('Failed to load vote stats:', err)
           // Don't set empty array if we have cached data
           if (isMounted) {
             // Check if we already have stats from cache
@@ -107,7 +106,6 @@ const CostumeContestResultsPage = () => {
       } catch (err) {
         if (isMounted && !event) { // Only set error if we don't have cached event
           setError(err.message || 'Fehler beim Laden der Daten')
-          console.error('Load error:', err)
         }
       } finally {
         if (isMounted) setLoading(false)

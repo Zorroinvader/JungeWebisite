@@ -31,7 +31,6 @@ function writeCache(data, ttlMs = CACHE_TTL_MS) {
 
 export async function getActiveSpecialEvents({ useCache = true } = {}) {
   const nocache = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('nocache')
-  console.log('[SE] getActiveSpecialEvents called. useCache=', useCache, 'nocache=', nocache)
   if (useCache && !nocache) {
     const cached = readCache()
     if (cached) return cached
@@ -57,7 +56,6 @@ export async function getActiveSpecialEvents({ useCache = true } = {}) {
     const { data, error } = await Promise.race([fetchPromise, timeoutPromise])
     if (error) throw error
     let list = data || []
-    console.log('[SE] client getActiveSpecialEvents result count=', list.length)
     if (list.length === 0) {
       // Retry without order in case null starts_at interferes
       const { data: data2, error: err2 } = await supabase
@@ -65,13 +63,11 @@ export async function getActiveSpecialEvents({ useCache = true } = {}) {
         .select('id, title, slug, description, starts_at, is_active')
         .eq('is_active', true)
         .limit(1)
-      if (err2) console.warn('[SE] retry without order error:', err2.message)
       if (!err2 && data2 && data2.length > 0) list = data2
     }
     if (!nocache) writeCache(list)
     return list
   } catch (e) {
-    console.warn('[SE] client getActiveSpecialEvents failed:', e?.message)
     // Try REST fallback with anon key
     try {
       const url = process.env.REACT_APP_SUPABASE_URL
@@ -99,7 +95,6 @@ export async function getActiveSpecialEvents({ useCache = true } = {}) {
         if (resp.ok) {
           const json = await resp.json()
           const list = Array.isArray(json) ? json : []
-          console.log('[SE] REST getActiveSpecialEvents result count=', list.length)
           if (!nocache) writeCache(list)
           return list
         }
@@ -127,14 +122,12 @@ export async function prefetchActiveSpecialEvents() {
 
 export async function getSpecialEventBySlug(slug) {
   const nocache = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('nocache')
-  console.log('[SE] getSpecialEventBySlug:', slug, 'nocache=', nocache)
   // Try detail cache first
   try {
     const cached = sessionStorage.getItem(DETAIL_CACHE_PREFIX + slug)
     if (cached && !nocache) {
       const parsed = JSON.parse(cached)
       if (parsed && parsed.expiresAt && Date.now() < parsed.expiresAt) {
-        console.log('[SE] detail cache hit for slug', slug)
         return parsed.data
       }
     }
@@ -147,10 +140,8 @@ export async function getSpecialEventBySlug(slug) {
     .single()
 
   if (error) {
-    console.warn('[SE] getSpecialEventBySlug error:', error.message)
     throw error
   }
-  console.log('[SE] getSpecialEventBySlug found?', !!data)
   try {
     if (!nocache) sessionStorage.setItem(DETAIL_CACHE_PREFIX + slug, JSON.stringify({ data, expiresAt: Date.now() + CACHE_TTL_MS }))
   } catch {}
@@ -169,22 +160,18 @@ export async function getSpecialEventBySlugREST(slug) {
     const json = await resp.json()
     return Array.isArray(json) && json.length > 0 ? json[0] : null
   } catch (e) {
-    console.warn('[SE] getSpecialEventBySlugREST error:', e?.message)
     return null
   }
 }
 
 export async function getFirstSpecialEventAny() {
-  console.log('[SE] getFirstSpecialEventAny called')
   // Attempt to fetch any single event regardless of is_active
   try {
     const { data, error } = await supabase
       .from('special_events')
       .select('id, title, slug, description, starts_at, is_active')
       .limit(1)
-    if (error) console.warn('[SE] getFirstSpecialEventAny client error:', error.message)
     if (!error && data && data.length > 0) {
-      console.log('[SE] getFirstSpecialEventAny client found slug=', data[0]?.slug)
       return data[0]
     }
   } catch {}
@@ -200,7 +187,6 @@ export async function getFirstSpecialEventAny() {
       if (resp.ok) {
         const json = await resp.json()
         if (Array.isArray(json) && json.length > 0) {
-          console.log('[SE] getFirstSpecialEventAny REST found slug=', json[0]?.slug)
           return json[0]
         }
       }
@@ -211,7 +197,6 @@ export async function getFirstSpecialEventAny() {
 
 export async function listApprovedEntries(eventId) {
   const nocache = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('nocache')
-  console.log('[SE] listApprovedEntries for eventId=', eventId, 'nocache=', nocache)
   // Cache per event to speed up mobile
   try {
     if (!nocache) {
@@ -219,7 +204,6 @@ export async function listApprovedEntries(eventId) {
       if (cached) {
         const parsed = JSON.parse(cached)
         if (parsed && parsed.expiresAt && Date.now() < parsed.expiresAt) {
-          console.log('[SE] entries cache hit. count=', parsed.data?.length || 0)
           return parsed.data || []
         }
       }
@@ -234,11 +218,9 @@ export async function listApprovedEntries(eventId) {
     .order('approved_at', { ascending: false })
 
   if (error) {
-    console.warn('[SE] listApprovedEntries error:', error.message)
     throw error
   }
   const list = data || []
-  console.log('[SE] listApprovedEntries fetched count=', list.length)
   try {
     if (!nocache) sessionStorage.setItem(ENTRIES_CACHE_PREFIX + eventId, JSON.stringify({ data: list, expiresAt: Date.now() + CACHE_TTL_MS }))
   } catch {}
@@ -257,7 +239,6 @@ export async function listApprovedEntriesREST(eventId) {
     const json = await resp.json()
     return Array.isArray(json) ? json : []
   } catch (e) {
-    console.warn('[SE] listApprovedEntriesREST error:', e?.message)
     return []
   }
 }
@@ -347,7 +328,6 @@ export async function revokeVote({ eventId, entryId }) {
   })
 
   if (error) {
-    console.error('Error revoking vote:', error)
     throw error
   }
 }
@@ -401,7 +381,6 @@ export async function listPendingEntriesREST(eventId) {
     const json = await resp.json()
     return Array.isArray(json) ? json : []
   } catch (e) {
-    console.warn('[SE] listPendingEntriesREST error:', e?.message)
     return []
   }
 }
@@ -437,7 +416,6 @@ export async function approveEntryREST(entryId) {
     const json = await resp.json()
     return Array.isArray(json) ? json[0] : json
   } catch (e) {
-    console.warn('[SE] approveEntryREST error:', e?.message)
     throw e
   }
 }
@@ -473,7 +451,6 @@ export async function rejectEntryREST(entryId) {
     const json = await resp.json()
     return Array.isArray(json) ? json[0] : json
   } catch (e) {
-    console.warn('[SE] rejectEntryREST error:', e?.message)
     throw e
   }
 }

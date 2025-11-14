@@ -8,8 +8,6 @@ const SUPABASE_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY
  * @returns {Promise<Array<{id: string, email: string, added_at: string, notes: string}>>}
  */
 export async function getAdminNotificationEmails() {
-  console.log('📬 Fetching admin emails (HTTP REST)...')
-
   try {
     if (!SUPABASE_URL || !SUPABASE_KEY) {
       throw new Error('Missing Supabase env vars')
@@ -27,15 +25,12 @@ export async function getAdminNotificationEmails() {
 
     if (!response.ok) {
       const text = await response.text()
-      console.error('❌ HTTP error fetching admin emails:', text)
       return []
     }
 
     const data = await response.json()
-    console.log('✅ Fetched', data?.length || 0, 'admin emails (HTTP)')
     return data || []
   } catch (error) {
-    console.error('❌ Error fetching admin emails (HTTP):', error)
     return []
   }
 }
@@ -47,22 +42,16 @@ export async function getAdminNotificationEmails() {
  * @returns {Promise<Object>}
  */
 export async function addAdminNotificationEmail(email, notes = '') {
-  console.log('📧 Attempting to add email:', email)
-  
   const insertData = {
     email: email.toLowerCase().trim(),
     notes: notes.trim() || null,
     is_active: true
   }
   
-  console.log('📝 Insert data:', insertData)
-  
   try {
     // Use HTTP REST API instead of Supabase client
     const supabaseUrl = process.env.REACT_APP_SUPABASE_URL
     const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY
-    
-    console.log('🚀 Making HTTP POST request to Supabase REST API...')
     
     const response = await fetch(`${supabaseUrl}/rest/v1/admin_notification_emails`, {
       method: 'POST',
@@ -75,20 +64,14 @@ export async function addAdminNotificationEmail(email, notes = '') {
       body: JSON.stringify(insertData)
     })
     
-    console.log('📥 HTTP response status:', response.status)
-    
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ HTTP error:', errorText)
       throw new Error(`Failed to add email: HTTP ${response.status} - ${errorText}`)
     }
     
     const result = await response.json()
-    console.log('✅ Email added successfully via HTTP:', result)
-    
     return result[0] || result
   } catch (error) {
-    console.error('❌ Failed to add email:', error)
     throw error
   }
 }

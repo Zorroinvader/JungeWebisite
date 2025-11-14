@@ -23,7 +23,6 @@ const ProfilePage = () => {
         setLoading(false)
       }
     } catch (err) {
-      console.error('Error loading event requests:', err)
       setLoading(false)
     } finally {
       setIsLoadingRequests(false)

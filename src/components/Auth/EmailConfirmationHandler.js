@@ -13,6 +13,15 @@ const EmailConfirmationHandler = () => {
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState(null);
   const redirectTimerRef = useRef(null);
+  // Fix Bug 1 & 3: Create refs to avoid stale closure in timeout callback
+  const confirmedRef = useRef(false);
+  const errorRef = useRef(null);
+  
+  // Fix Bug 1 (Race Condition): Sync refs with state using useEffect to avoid race conditions
+  useEffect(() => {
+    confirmedRef.current = confirmed;
+    errorRef.current = error;
+  }, [confirmed, error]);
 
   // Navigate to login and force reload if already on /login
   const goToLogin = () => {
@@ -32,8 +41,6 @@ const EmailConfirmationHandler = () => {
   };
 
   useEffect(() => {
-    let timeoutId;
-    
     const handleEmailConfirmation = async () => {
       try {
         // Check if URL has confirmation parameters in hash (most common for Supabase)
@@ -45,22 +52,8 @@ const EmailConfirmationHandler = () => {
         const token = urlParams.get('token');
         const tokenHash = hashParams.get('token_hash') || urlParams.get('token_hash');
         const email = hashParams.get('email') || urlParams.get('email');
-
-        console.log('Email confirmation URL params:', { 
-          accessToken: !!accessToken, 
-          token: !!token,
-          tokenHash: !!tokenHash,
-          type, 
-          email,
-          hash: window.location.hash.substring(0, 100),
-          fullHash: window.location.hash,
-          search: window.location.search
-        });
-
         // Handle hash-based token (most common Supabase flow)
         if (accessToken) {
-          console.log('Processing hash-based email confirmation...');
-          
           // Extract token and type from hash
           const access_token = hashParams.get('access_token');
           const refresh_token = hashParams.get('refresh_token');
@@ -75,16 +68,12 @@ const EmailConfirmationHandler = () => {
             });
 
             if (sessionError) {
-              console.error('Error setting session:', sessionError);
               setError(sessionError.message || 'E-Mail-Bestätigung fehlgeschlagen. Bitte versuchen Sie sich anzumelden.');
               setChecking(false);
               return;
             }
 
             if (session?.user) {
-              console.log('✅ Email confirmed successfully, user:', session.user.email);
-              console.log('✅ Setting confirmed=true and checking=false to show success screen');
-              
               // Set confirmed state FIRST to show success message
               setConfirmed(true);
               setChecking(false);
@@ -96,21 +85,16 @@ const EmailConfirmationHandler = () => {
               
               // Redirect to login page after 5 seconds (give user time to see success message)
               redirectTimerRef.current = setTimeout(() => {
-                console.log('🔄 Auto-redirecting to login after 5 seconds...');
                 goToLogin();
               }, 5000);
             } else {
-              console.warn('Session set but no user found');
             }
           } else {
-            console.warn('Missing access_token or refresh_token in hash');
           }
         }
 
         // Handle OTP-based token (alternative flow)
         if (tokenHash || token) {
-          console.log('Processing OTP-based email confirmation...');
-          
           const { data, error: verifyError } = await supabase.auth.verifyOtp({
             token_hash: tokenHash || token,
             type: 'signup',
@@ -118,13 +102,8 @@ const EmailConfirmationHandler = () => {
           });
 
           if (verifyError) {
-            console.error('Error verifying OTP:', verifyError);
             // Don't set error yet, try other methods first
-            console.log('OTP verification failed, trying alternative methods...');
           } else if (data?.user) {
-            console.log('✅ Email confirmed successfully via OTP, user:', data.user.email);
-            console.log('✅ Setting confirmed=true and checking=false to show success screen');
-            
             // Set confirmed state FIRST to show success message
             setConfirmed(true);
             setChecking(false);
@@ -136,7 +115,6 @@ const EmailConfirmationHandler = () => {
             
             // Redirect to login page after 5 seconds (give user time to see success message)
             redirectTimerRef.current = setTimeout(() => {
-              console.log('🔄 Auto-redirecting to login after 5 seconds...');
               goToLogin();
             }, 5000);
             return;
@@ -149,8 +127,6 @@ const EmailConfirmationHandler = () => {
           await new Promise(resolve => setTimeout(resolve, 300));
           const { data: { session } } = await supabase.auth.getSession();
           if (session?.user) {
-            console.log(`✅ Session found (attempt ${attempt + 1}):`, session.user.email, 'Confirmed:', !!session.user.email_confirmed_at);
-            
             // Consider any valid session as success (email_confirmed_at can lag)
             setConfirmed(true);
             setChecking(false);
@@ -162,7 +138,6 @@ const EmailConfirmationHandler = () => {
             
             // Redirect to login page after 5 seconds (give user time to see success message)
             redirectTimerRef.current = setTimeout(() => {
-              console.log('🔄 Auto-redirecting to login after 5 seconds...');
               goToLogin();
             }, 5000);
             return;
@@ -173,41 +148,34 @@ const EmailConfirmationHandler = () => {
         const hasAnyParams = accessToken || tokenHash || token || type;
         
         if (hasAnyParams) {
-          console.log('Confirmation params found but processing failed');
           setError('E-Mail-Bestätigung konnte nicht abgeschlossen werden. Ihr Konto könnte bereits bestätigt sein. Bitte versuchen Sie sich anzumelden.');
         } else {
-          console.log('No confirmation params found in URL');
           setError('Keine Bestätigungsparameter gefunden. Bitte verwenden Sie den Link aus Ihrer E-Mail.');
         }
         
         setChecking(false);
       } catch (err) {
-        console.error('Error in email confirmation:', err);
         setError(err.message || 'Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie sich anzumelden.');
         setChecking(false);
       }
     };
 
     // Also react to auth state changes (covers cases without URL params)
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state change:', event)
-      if (event === 'SIGNED_IN' && session?.user) {
-        console.log('✅ SIGNED_IN detected via auth listener, showing success screen')
-        setConfirmed(true)
-        setChecking(false)
-        setTimeout(() => {
-          window.history.replaceState({}, document.title, window.location.pathname)
-        }, 100)
-        redirectTimerRef.current = setTimeout(() => {
-          goToLogin()
-        }, 5000)
+    // Fix Bug 2: Correct destructuring pattern - use { data: { subscription } }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        setConfirmed(true);
+        // Fix Bug 1: Don't manually update ref here - let the useEffect sync it
+        // This prevents race conditions where the ref gets overwritten immediately after
+        setChecking(false);
       }
-    })
+    });
 
-    // Set a timeout to prevent infinite loading (shortened to 5 seconds)
-    timeoutId = setTimeout(() => {
-      if (checking) {
-        console.warn('Email confirmation timeout');
+    // Fix Bug 1 & 3: Set timeout for error handling - use refs to avoid stale closure
+    const timeoutId = setTimeout(() => {
+      // Use refs to get current values, avoiding stale closure
+      // Refs are synced via separate useEffect above, so they always have current state
+      if (!confirmedRef.current && !errorRef.current) {
         setError('Die Bestätigung dauert länger als erwartet. Bitte versuchen Sie sich anzumelden oder kontaktieren Sie den Administrator.');
         setChecking(false);
       }
@@ -219,9 +187,10 @@ const EmailConfirmationHandler = () => {
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
       if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
-      if (authListener?.subscription) authListener.subscription.unsubscribe()
+      // Fix Bug 2: Use subscription directly
+      if (subscription) subscription.unsubscribe();
     };
-  }, [navigate, checking]);
+  }, [navigate]); // Fix Bug 4: Removed 'checking' from dependencies to prevent unnecessary re-executions
 
   if (checking) {
     return (
@@ -297,7 +266,6 @@ const EmailConfirmationHandler = () => {
 
   // Show success message when confirmed
   if (confirmed) {
-    console.log('✅ Rendering success screen - Email Aktivierung erfolgreich!');
     return (
       <div className={`min-h-screen bg-[#F4F1E8] ${isDarkMode ? 'dark:bg-[#252422]' : ''} flex items-center justify-center p-4`}>
         <div className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-2xl shadow-xl p-12 max-w-md w-full text-center border-2 border-green-500 ${isDarkMode ? 'dark:border-green-400' : ''}`}>
@@ -316,7 +284,6 @@ const EmailConfirmationHandler = () => {
           </p>
           <button
             onClick={() => {
-              console.log('🔘 User clicked "Jetzt zur Anmeldung" button');
               if (redirectTimerRef.current) {
                 clearTimeout(redirectTimerRef.current);
                 redirectTimerRef.current = null;

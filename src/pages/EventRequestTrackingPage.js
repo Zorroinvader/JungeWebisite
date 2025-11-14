@@ -32,17 +32,9 @@ const EventRequestTrackingPage = () => {
     setSearched(true);
 
     try {
-      console.log('Searching for requests with email:', email);
       const data = await eventRequestsAPI.getByEmail(email);
-      console.log('Search results:', data);
       setRequests(data || []);
     } catch (err) {
-      console.error('Error fetching requests:', err);
-      console.error('Error details:', {
-        message: err.message,
-        stack: err.stack,
-        name: err.name
-      });
       setError('Fehler beim Laden der Anfragen: ' + err.message);
     } finally {
       setLoading(false);
@@ -99,7 +91,6 @@ const EventRequestTrackingPage = () => {
         handleSearch({ preventDefault: () => {} });
       }
     } catch (err) {
-      console.error('Error cancelling request:', err);
       setError('Fehler beim Stornieren der Anfrage');
     } finally {
       setCancellingId(null);

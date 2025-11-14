@@ -39,7 +39,6 @@ const DSGVOCompliance = ({ userId, userEmail }) => {
       
       showMessage('Your data has been exported successfully', 'success')
     } catch (error) {
-      console.error('Error exporting data:', error)
       showMessage('Error exporting your data. Please try again.', 'error')
     } finally {
       setLoading(false)
@@ -65,7 +64,6 @@ const DSGVOCompliance = ({ userId, userEmail }) => {
       await dsgvoAPI.updateUserData(userId, newEmail || null, newName || null)
       showMessage('Your data has been updated successfully', 'success')
     } catch (error) {
-      console.error('Error updating data:', error)
       showMessage('Error updating your data. Please try again.', 'error')
     } finally {
       setLoading(false)
@@ -104,7 +102,6 @@ const DSGVOCompliance = ({ userId, userEmail }) => {
         window.location.href = '/'
       }, 2000)
     } catch (error) {
-      console.error('Error deleting data:', error)
       showMessage('Error deleting your data. Please try again.', 'error')
     } finally {
       setLoading(false)
@@ -125,7 +122,6 @@ const DSGVOCompliance = ({ userId, userEmail }) => {
       await dsgvoAPI.withdrawConsent(consentId)
       showMessage('Consent has been withdrawn successfully', 'success')
     } catch (error) {
-      console.error('Error withdrawing consent:', error)
       showMessage('Error withdrawing consent. Please try again.', 'error')
     } finally {
       setLoading(false)

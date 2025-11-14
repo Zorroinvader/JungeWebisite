@@ -140,7 +140,6 @@ const MuseumGallery = ({ images = [], title = "Unser Clubhaus - Eine visuelle En
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
     } catch (error) {
-      console.error('Download failed:', error)
     } finally {
       setIsLoading(false)
     }

@@ -21,24 +21,17 @@ const UserManagement = () => {
       setLoading(true)
       setError('')
       
-      console.log('👥 User Management: Loading users...')
       let data = []
       
       try {
         data = await profilesAPI.getAll()
-        console.log('👥 User Management: Primary API success:', data?.length || 0, 'users')
       } catch (error) {
-        console.error('👥 User Management: Primary API failed, trying fallback:', error)
         try {
           data = await profilesAPI.getAllDirect()
-          console.log('👥 User Management: Fallback API success:', data?.length || 0, 'users')
         } catch (fallbackError) {
-          console.error('👥 User Management: Direct API failed, trying ultra-simple:', fallbackError)
           try {
             data = await profilesAPI.getAllSimple()
-            console.log('👥 User Management: Ultra-simple API success:', data?.length || 0, 'users')
           } catch (simpleError) {
-            console.error('👥 User Management: All API methods failed:', simpleError)
             data = []
           }
         }
@@ -46,7 +39,6 @@ const UserManagement = () => {
       
       setUsers(data || [])
     } catch (err) {
-      console.error('👥 User Management: Error loading users:', err)
       setError('Fehler beim Laden der Benutzer')
     } finally {
       setLoading(false)
@@ -95,7 +87,6 @@ const UserManagement = () => {
       setShowDeleteAllConfirm(false)
       
     } catch (err) {
-      console.error('Error deleting all users:', err)
       setError(`Fehler beim Löschen: ${err.message}`)
     } finally {
       setIsDeletingAll(false)
@@ -131,7 +122,6 @@ const UserManagement = () => {
         try {
           await loadUsers()
         } catch (error) {
-          console.error('Error loading users:', error)
           if (mounted) {
             setLoading(false)
             setError('Fehler beim Laden der Benutzer')
@@ -437,7 +427,6 @@ const RoleChangeModal = ({ user, onClose, onUpdateRole }) => {
     try {
       await onUpdateRole(user.id, selectedRole)
     } catch (err) {
-      console.error('Error updating role:', err)
     } finally {
       setLoading(false)
     }
@@ -576,13 +565,7 @@ const SuperAdminUserForm = ({ onClose, onSuccess }) => {
       // Use Supabase auth signUp (same as normal registration)
       const { supabase } = await import('../../lib/supabase')
       
-      console.log('🔄 Creating user via Supabase Auth:', {
-        email: formData.email,
-        role: formData.role
-      })
-      
       // Create user with signUp and immediately confirm email
-      console.log('🔄 Creating user via signUp:', { email: formData.email, role: formData.role })
       
       // Use site origin as redirect URL to match Supabase allow list
       const redirectTo = typeof window !== 'undefined' 
@@ -602,10 +585,8 @@ const SuperAdminUserForm = ({ onClose, onSuccess }) => {
         }
       })
 
-      console.log('📥 SignUp Response:', { authData, authError })
 
       if (authError) {
-        console.error('❌ SignUp Error:', authError)
         throw new Error(authError.message || 'Fehler beim Erstellen des Benutzers')
       }
       if (!authData.user) throw new Error('Benutzer konnte nicht erstellt werden')
@@ -613,7 +594,6 @@ const SuperAdminUserForm = ({ onClose, onSuccess }) => {
       const user = authData.user
       
       // Set up complete user (confirm email + create profile) using database function
-      console.log('🔄 Setting up complete user (email confirmation + profile creation)...')
       
       try {
         const { error } = await supabase.rpc('setup_complete_user', {
@@ -625,21 +605,16 @@ const SuperAdminUserForm = ({ onClose, onSuccess }) => {
         })
         
         if (error) {
-          console.warn('⚠️ Complete user setup failed:', error)
           throw error
         } else {
-          console.log('✅ Complete user setup successful - email confirmed and profile created')
         }
         
       } catch (setupError) {
-        console.warn('⚠️ Complete user setup failed, trying fallback methods:', setupError.message)
         
         // Fallback 1: Try to confirm email
         try {
           await supabase.rpc('confirm_user_email', { user_id: user.id })
-          console.log('✅ Email confirmed via fallback')
         } catch (emailError) {
-          console.warn('⚠️ Email confirmation fallback failed:', emailError.message)
         }
         
         // Fallback 2: Try to create profile
@@ -651,19 +626,15 @@ const SuperAdminUserForm = ({ onClose, onSuccess }) => {
             user_role: formData.role,
             username: formData.username
           })
-          console.log('✅ Profile created via fallback')
         } catch (profileError) {
-          console.warn('⚠️ Profile creation fallback failed:', profileError.message)
         }
       }
 
       // Success!
-      console.log('✅ User created successfully:', user)
       setSuccess(true)
       setError('') // Clear any previous errors
       
       // Trigger parent component to refresh user list
-      console.log('🔄 Triggering user list refresh...')
       if (onSuccess) {
         onSuccess() // This will trigger the parent to refresh
       }
@@ -674,7 +645,6 @@ const SuperAdminUserForm = ({ onClose, onSuccess }) => {
       }, 3000)
 
     } catch (err) {
-      console.error('Error creating user:', err)
       setError(err.message || 'Fehler beim Erstellen des Benutzers')
       setSuccess(false) // Ensure success is false on error
     } finally {

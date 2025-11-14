@@ -5,9 +5,9 @@ import { eventRequestsAPI, profileAPI } from '../../services/httpApi';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDarkMode } from '../../contexts/DarkModeContext';
 import { sendAdminNotification, sendUserNotification, areNotificationsEnabled } from '../../utils/settingsHelper';
+import { supabase } from '../../lib/supabase';
 
 const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, userData }) => {
-  const UNDER_CONSTRUCTION = true; // Visual overlay to inform users
   const { user } = useAuth();
   const { isDarkMode } = useDarkMode();
   
@@ -51,7 +51,6 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
             }));
           }
         } catch (error) {
-          console.error('Error fetching profile data:', error);
           // Fallback to basic user data
           setFormData(prev => ({
             ...prev,
@@ -152,20 +151,13 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('🚀 Form submit button clicked!');
-    
     if (!validateForm()) {
-      console.log('❌ Form validation failed');
       return;
     }
-
-    console.log('✅ Form validation passed, starting submission...');
     setLoading(true);
     setError('');
 
     try {
-      console.log('📝 Preparing request data...')
-      
       // Generate date range array
       const dateRange = [];
       const startDate = new Date(formData.start_date);
@@ -176,9 +168,7 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
         dateRange.push(currentDate.toISOString().split('T')[0]);
         currentDate.setDate(currentDate.getDate() + 1);
       }
-
-      console.log('📅 Date range:', dateRange);
-
+      
       // Create request data matching existing structure
       const requestData = {
         title: formData.title,
@@ -201,124 +191,141 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
         created_by: user?.id || null
       };
 
-      console.log('📤 Calling eventRequestsAPI.createInitialRequest...')
+      // Create the event request using Supabase client (official method)
+      console.log('Creating event request in database...');
       
-      // Try the API with a short timeout (3 seconds)
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Request timeout after 3 seconds')), 3000)
-      )
-      
-      const requestPromise = eventRequestsAPI.createInitialRequest(requestData)
-      
-      console.log('⏳ Waiting for API response...')
-      let result
-      try {
-        result = await Promise.race([requestPromise, timeoutPromise])
-        console.log('✅ Event request created successfully:', result)
-      } catch (apiError) {
-        // If API fails, use fallback immediately
-        throw new Error('API_TIMEOUT')
+      // Prepare the data for insertion
+      const insertData = {
+        title: formData.title,
+        event_name: formData.title,
+        description: formData.additional_notes || '',
+        requester_name: formData.requester_name,
+        requester_email: formData.requester_email,
+        requester_phone: formData.requester_phone || null,
+        start_date: formData.start_date,
+        end_date: formData.end_date,
+        requested_days: JSON.stringify(dateRange),
+        is_private: formData.event_type === 'Privates Event',
+        event_type: formData.event_type,
+        initial_notes: formData.additional_notes || '',
+        status: 'pending',
+        request_stage: 'initial',
+        created_at: new Date().toISOString(),
+        requested_by: user?.id || null,
+        created_by: user?.id || null
+      };
+
+      console.log('Inserting data:', insertData);
+      console.log('Supabase URL:', process.env.REACT_APP_SUPABASE_URL);
+      console.log('User:', user);
+
+      // Try direct REST API call first (more reliable, bypasses client issues)
+      const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+      const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !supabaseKey) {
+        throw new Error('Supabase configuration missing. Please check your environment variables.');
       }
 
-      // Send notifications asynchronously without blocking the success message
-      setSubmissionResult(result);
+      console.log('Using direct REST API call to:', `${supabaseUrl}/rest/v1/event_requests`);
+
+      // Use fetch with AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      let created;
+      try {
+        const response = await fetch(`${supabaseUrl}/rest/v1/event_requests`, {
+          method: 'POST',
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify(insertData),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        console.log('Response status:', response.status);
+        console.log('Response ok:', response.ok);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('REST API error response:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorText
+          });
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+
+        const result = await response.json();
+        console.log('Response data:', result);
+        
+        created = Array.isArray(result) ? result[0] : result;
+        
+        if (!created || !created.id) {
+          console.error('No ID in response:', created);
+          throw new Error('Event request was created but no ID was returned');
+        }
+
+        console.log('✅ Event request created successfully via REST API:', created);
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        
+        if (fetchError.name === 'AbortError') {
+          console.error('Request aborted (timeout)');
+          throw new Error('Request timeout. The database might be slow or there might be a network issue.');
+        }
+        
+        console.error('Fetch error:', fetchError);
+        throw fetchError;
+      }
+
+      // Success - set the result and show success message
+      setSubmissionResult(created);
       setSuccess(true);
       setLoading(false);
-
-      // Send notification to admins about new initial request (async, don't wait)
-      if (areNotificationsEnabled()) {
-        console.log('📧 Scheduling admin notification...')
-        sendAdminNotification(result, 'initial_request').catch(err => {
-          console.error('❌ Admin notification failed (non-blocking):', err);
-        });
-      }
-
-      // Send confirmation email to the user (async, don't wait)
-      console.log('📧 Scheduling user notification...')
-      sendUserNotification(formData.requester_email, result, 'initial_request_received').catch(err => {
-        console.error('❌ User notification failed (non-blocking):', err);
-      });
       
-      // Don't auto-close - let user close manually when ready
+      // Fire notifications asynchronously (don't wait for them)
+      if (areNotificationsEnabled()) {
+        sendAdminNotification(created, 'initial_request').catch(() => {});
+      }
+      sendUserNotification(formData.requester_email, {
+        ...created,
+        requester_name: formData.requester_name,
+        event_name: formData.title,
+        event_type: formData.event_type
+      }, 'initial_request_received').catch(() => {});
 
     } catch (err) {
-      console.error('Error submitting request:', err);
-      // Fallback: use HTTP REST API for insert (more reliable)
-      if (err.message === 'API_TIMEOUT' || true) {
-        try {
-          console.log('🛟 Using fast HTTP REST API for insert...')
-          const supabaseUrl = process.env.REACT_APP_SUPABASE_URL
-          const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY
-
-          const fallbackData = {
-            title: formData.title,
-            description: formData.additional_notes || '',
-            requester_name: formData.requester_name,
-            requester_email: formData.requester_email,
-            start_date: formData.start_date,
-            end_date: formData.end_date,
-            is_private: formData.event_type === 'Privates Event',
-            event_type: formData.event_type,
-            status: 'pending',
-            created_at: new Date().toISOString(),
-            event_name: formData.title,
-            requester_phone: formData.requester_phone || null,
-            requested_days: JSON.stringify([formData.start_date, formData.end_date]),
-            initial_notes: formData.additional_notes || '',
-            request_stage: 'initial',
-            requested_by: user?.id || null,
-            created_by: user?.id || null
-          }
-
-          console.log('📤 POSTing to Supabase REST API...')
-          const response = await fetch(`${supabaseUrl}/rest/v1/event_requests`, {
-            method: 'POST',
-            headers: {
-              'apikey': supabaseKey,
-              'Authorization': `Bearer ${supabaseKey}`,
-              'Content-Type': 'application/json',
-              'Prefer': 'return=representation'
-            },
-            body: JSON.stringify(fallbackData)
-          })
-
-          if (!response.ok) {
-            const text = await response.text()
-            console.error('❌ HTTP error:', text)
-            throw new Error(`HTTP ${response.status}: ${text}`)
-          }
-
-          const result = await response.json()
-          const created = Array.isArray(result) ? result[0] : result
-          console.log('✅ HTTP REST API insert success:', created)
-
-          // Show success immediately
-          setSubmissionResult(created)
-          setSuccess(true)
-          setLoading(false)
-
-          // Fire notifications asynchronously (don't wait for them)
-          if (areNotificationsEnabled()) {
-            console.log('📧 Scheduling admin notification...')
-            sendAdminNotification(created, 'initial_request').catch(err => {
-              console.error('❌ Admin notification failed (non-blocking):', err)
-            })
-          }
-          console.log('📧 Scheduling user notification...')
-          sendUserNotification(formData.requester_email, {
-            ...created,
-            requester_name: formData.requester_name,
-            event_name: formData.title,
-            event_type: formData.event_type
-          }, 'initial_request_received').catch(err => {
-            console.error('❌ User notification failed (non-blocking):', err)
-          })
-        } catch (fallbackError) {
-          console.error('❌ Fallback insert failed:', fallbackError)
-          setError(err.message || 'Fehler beim Senden der Anfrage')
-          setLoading(false)
+      console.error('❌ All methods failed to create event request:', err);
+      console.error('Error details:', {
+        message: err.message,
+        stack: err.stack,
+        name: err.name
+      });
+      
+      // Provide more helpful error message
+      let errorMessage = 'Fehler beim Senden der Anfrage. ';
+      if (err.message) {
+        if (err.message.includes('permission') || err.message.includes('RLS')) {
+          errorMessage += 'Berechtigungsfehler. Bitte kontaktieren Sie den Administrator.';
+        } else if (err.message.includes('network') || err.message.includes('fetch')) {
+          errorMessage += 'Netzwerkfehler. Bitte überprüfen Sie Ihre Internetverbindung.';
+        } else {
+          errorMessage += err.message;
         }
+      } else {
+        errorMessage += 'Bitte versuchen Sie es erneut oder kontaktieren Sie den Support.';
       }
+      
+      setError(errorMessage);
+      setLoading(false);
+      setSuccess(false);
     }
   };
 
@@ -346,27 +353,6 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
         </div>
 
         <form onSubmit={handleSubmit} className="p-8 space-y-8 relative">
-          {UNDER_CONSTRUCTION && !success && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center">
-              <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
-              <div className={`relative z-10 mx-4 w-full max-w-md rounded-2xl border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} p-6 text-center shadow-2xl`} role="status" aria-live="polite">
-                <h3 className={`text-xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} mb-2`}>
-                  Buchungsanfrage im Aufbau
-                </h3>
-                <p className={`text-sm text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mb-4`}>
-                  Dieser Bereich wird gerade entwickelt und ist in Kürze verfügbar.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <button type="button" onClick={onClose} className={`inline-flex justify-center px-5 py-2.5 text-sm font-medium rounded-lg border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} bg-transparent hover:bg-gray-50 ${isDarkMode ? 'dark:hover:bg-[#1a1a1a]' : ''}`}>
-                    Schließen
-                  </button>
-                  <Link to="/contact" className="inline-flex justify-center px-5 py-2.5 text-sm font-semibold text-white rounded-lg bg-[#6054d9] hover:bg-[#4f44c7]">
-                    Kontakt
-                  </Link>
-                </div>
-              </div>
-            </div>
-          )}
           {error && (
             <div className={`rounded-lg p-4 bg-red-50 ${isDarkMode ? 'dark:bg-red-900/20' : ''} border border-red-200 ${isDarkMode ? 'dark:border-red-800' : ''}`}>
               <p className={`text-sm text-red-600 ${isDarkMode ? 'dark:text-red-400' : ''}`}>{error}</p>

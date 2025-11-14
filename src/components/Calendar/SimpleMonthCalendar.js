@@ -29,12 +29,6 @@ const SimpleMonthCalendar = ({
   const [lastLoadedMonth, setLastLoadedMonth] = useState(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
 
-  // Debug authentication state
-  console.log('📅 Calendar: Auth state:', { 
-    user: user?.email, 
-    isAdmin: isAdmin(), 
-    authLoading 
-  })
 
   // Load all events and requests - Optimized for calendar view
   const loadAllEvents = useCallback(async () => {
@@ -47,45 +41,26 @@ const SimpleMonthCalendar = ({
     try {
       setLoading(true)
       
-      console.log('📅 Calendar: Loading events...')
-      console.log('📅 Calendar: User:', user?.email, 'isAdmin:', isAdmin())
-      
       // Load all events (not just current month) to show all available events
       let allEvents = []
       
       try {
-        console.log('📅 Calendar: Calling httpAPI.events.getAll()...')
         const apiEvents = await httpAPI.events.getAll()
-        console.log('📅 Calendar: API response:', apiEvents)
-        console.log('📅 Calendar: Loaded events count:', apiEvents.length)
-        
         if (apiEvents.length > 0) {
-          console.log('📅 Calendar: First event sample:', apiEvents[0])
           allEvents = [...allEvents, ...apiEvents]
         }
       } catch (error) {
-        console.error('📅 Calendar: Primary API failed, trying fallback:', error)
         try {
-          console.log('📅 Calendar: Trying getAllDirect()...')
           const directEvents = await httpAPI.events.getAllDirect()
-          console.log('📅 Calendar: Fallback API success:', directEvents.length, 'events')
           allEvents = [...allEvents, ...directEvents]
         } catch (fallbackError) {
-          console.error('📅 Calendar: Direct API failed, trying ultra-simple:', fallbackError)
           try {
-            console.log('📅 Calendar: Trying getAllSimple()...')
             const simpleEvents = await httpAPI.events.getAllSimple()
-            console.log('📅 Calendar: Ultra-simple API success:', simpleEvents.length, 'events')
             allEvents = [...allEvents, ...simpleEvents]
           } catch (simpleError) {
-            console.error('📅 Calendar: All API methods failed:', simpleError)
-            console.log('📅 Calendar: No events available from API methods')
           }
         }
       }
-      
-      console.log('📅 Calendar: Final events array:', allEvents.length, 'events')
-      console.log('📅 Calendar: Sample events:', allEvents.slice(0, 3))
       
       // Load pending requests (admin only) - DISABLED to remove requests from calendar
       let pendingRequests = []
@@ -99,16 +74,13 @@ const SimpleMonthCalendar = ({
       // }
       
       // Load temporarily blocked dates (these show as orange blockers in calendar) - DISABLED for speed
-      console.log('📅 Calendar: Skipping temporarily blocked dates for faster loading...')
       const temporarilyBlocked = []
       
       const calendarEvents = []
-      console.log('📅 Calendar: Created empty calendarEvents array')
       
       // Process approved events
       try {
         if (allEvents && allEvents.length > 0) {
-        console.log('📅 Calendar: Processing', allEvents.length, 'events')
         allEvents.forEach((event, index) => {
           // Check if this is a public event that should be visible
           const isPublicEvent = !event.is_private && event.status === 'approved'
@@ -183,12 +155,8 @@ const SimpleMonthCalendar = ({
             // Skip events with invalid dates
           }
         })
-        } else {
-          console.log('📅 Calendar: No events to process. allEvents:', allEvents)
         }
       } catch (processingError) {
-        console.error('📅 Calendar: Error processing events:', processingError)
-        console.log('📅 Calendar: allEvents at error:', allEvents)
       }
 
       // Process pending requests (admin only) - DISABLED
@@ -240,7 +208,6 @@ const SimpleMonthCalendar = ({
               blockedEndDate = new Date(blocked.end_date || blocked.start_date)
             }
           } catch (e) {
-            console.error('Error parsing dates for blocked event:', e, blocked)
           }
           
           if (blockedStartDate && !isNaN(blockedStartDate.getTime())) {
@@ -276,9 +243,7 @@ const SimpleMonthCalendar = ({
       }
 
       setEvents(calendarEvents)
-      console.log('📅 Calendar: Loaded', calendarEvents.length, 'events')
     } catch (error) {
-      console.error('Error loading events:', error)
     } finally {
       setLoading(false)
       setIsRefreshing(false)
@@ -293,11 +258,9 @@ const SimpleMonthCalendar = ({
       // Load events regardless of authentication status
       // Events should be visible to all users (logged in or not)
       if (mounted) {
-        console.log('📅 Calendar: Loading events (auth status:', authLoading ? 'loading' : 'complete', ')')
         try {
           await loadAllEvents()
         } catch (error) {
-          console.error('Error loading events:', error)
           if (mounted) {
             setLoading(false)
             setIsRefreshing(false)

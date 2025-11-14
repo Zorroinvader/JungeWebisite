@@ -61,22 +61,18 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    console.log('Form submitted!', formData)
     setIsSubmitting(true)
     setError('')
 
     if (!validateForm()) {
-      console.log('Form validation failed')
       setIsSubmitting(false)
       return
     }
     
-    console.log('Form validation passed, proceeding with registration')
 
     try {
       if (isModal) {
         // Admin panel mode - create user without signing in
-        console.log('Creating user via admin panel (no sign-in)')
         const result = await profilesAPI.createUser({
           email: formData.email,
           password: formData.password,
@@ -84,7 +80,6 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
           role: 'member' // Default role for admin-created users
         })
         
-        console.log('User created successfully:', result)
         setSuccess(true)
         
         // Use callback to close modal and refresh user list
@@ -93,14 +88,11 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
         }, 500)
       } else {
         // Public registration mode - sign up and sign in
-        console.log('Calling signUp with:', { email: formData.email, password: formData.password, fullName: formData.fullName })
         
         // Call signup without timeout - let it complete naturally
         const { data, error } = await signUp(formData.email, formData.password, formData.fullName)
-        console.log('SignUp response:', { data, error })
         
         if (error) {
-          console.log('SignUp error:', error)
           
           // Handle email sending errors
           if (error.message && error.message.includes('Error sending confirmation email')) {
@@ -109,7 +101,6 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
             setError(error.message)
           }
         } else {
-          console.log('SignUp successful')
           setSuccess(true)
           
           // Don't auto-redirect - let user see the email verification message
@@ -117,7 +108,6 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
         }
       }
     } catch (err) {
-      console.error('Registration error:', err)
       
       if (isModal) {
         // Admin panel error handling
@@ -136,7 +126,6 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
   }
 
   if (success) {
-    console.log('Success screen is being rendered!')
     
     if (isModal) {
       // Modal success screen
@@ -561,7 +550,6 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  onClick={() => console.log('Register button clicked!')}
                   className="w-full flex justify-center py-3 px-4 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity bg-[#2E07D4] hover:bg-[#2506B8]"
                 >
                   {isSubmitting ? (

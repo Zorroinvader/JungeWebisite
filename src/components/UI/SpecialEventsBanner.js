@@ -31,7 +31,7 @@ const SpecialEventsBanner = () => {
 
     getActiveSpecialEvents({ useCache: true })
       .then(events => { if (mounted && events) setActiveEvents(events) })
-      .catch(err => console.error('Error loading special events:', err))
+      .catch(err => {})
       .finally(() => { if (mounted) setLoading(false) })
     return () => { mounted = false; clearTimeout(t); clearTimeout(hardStop) }
   }, [])

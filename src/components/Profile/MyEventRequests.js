@@ -30,7 +30,6 @@ const MyEventRequests = () => {
       
       setRequests(data || []);
     } catch (err) {
-      console.error('Error loading my requests:', err);
     } finally {
       setLoading(false);
     }
@@ -67,7 +66,6 @@ const MyEventRequests = () => {
       setRequestToCancel(null);
       loadMyRequests();
     } catch (err) {
-      console.error('Error cancelling request:', err);
       alert('Fehler beim Stornieren der Anfrage');
     } finally {
       setCancellingId(null);
