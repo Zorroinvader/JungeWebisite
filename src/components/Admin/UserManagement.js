@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { profilesAPI } from '../../services/databaseApi'
+import { secureLog, sanitizeError } from '../../utils/secureConfig'
 import { User, Shield, Mail, Calendar, AlertCircle, X, Plus, Eye, EyeOff, CheckCircle, Trash2 } from 'lucide-react'
 import moment from 'moment'
 import RegisterForm from '../Auth/RegisterForm'
@@ -32,7 +33,7 @@ const UserManagement = () => {
       try {
         data = await profilesAPI.getAll()
       } catch (error) {
-        console.error('Failed to load profiles:', error)
+        secureLog('error', 'Failed to load profiles', sanitizeError(error))
         data = []
       }
       

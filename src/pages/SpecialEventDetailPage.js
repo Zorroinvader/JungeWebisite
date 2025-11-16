@@ -4,7 +4,7 @@
 // - Notes: Production page. Handles image uploads, voting, and displays public results sorted by vote count.
 
 import React, { useEffect, useMemo, useState, useRef } from 'react'
-import { Upload, ImagePlus, Trash2, RefreshCw } from 'lucide-react'
+import { Trash2, RefreshCw } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
@@ -21,30 +21,24 @@ import {
 } from '../services/specialEventsApi'
 
 const SpecialEventDetailPage = () => {
-  const { user, isAdmin } = useAuth()
+  const { isAdmin } = useAuth()
   const { slug } = useParams()
   const [event, setEvent] = useState(null)
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [uploading, setUploading] = useState(false)
   const [file, setFile] = useState(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [contact, setContact] = useState('')
   const [voting, setVoting] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [alreadyUploaded, setAlreadyUploaded] = useState(false)
   const [userEntry, setUserEntry] = useState(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteSuccess, setDeleteSuccess] = useState(false)
-  const [currentVoteEntryId, setCurrentVoteEntryId] = useState('')
   const [notification, setNotification] = useState(null) // { type: 'success'|'error'|'info'|'warning', text: string }
-  const [showMoveLikeConfirm, setShowMoveLikeConfirm] = useState(false)
-  const [pendingLikeEntryId, setPendingLikeEntryId] = useState('')
-  const [previewUrl, setPreviewUrl] = useState('')
   const [userLikes, setUserLikes] = useState({}) // {entryId: true/false}
-  const fileInputCameraRef = useRef(null)
-  const fileInputGalleryRef = useRef(null)
   const [refreshingEntries, setRefreshingEntries] = useState(false)
   const [showVotePrompt, setShowVotePrompt] = useState(false)
   const [voteStats, setVoteStats] = useState([])
@@ -70,7 +64,7 @@ const SpecialEventDetailPage = () => {
         let ev = null
         try {
           // Try REST first (simplest path, anon-friendly)
-          const { getSpecialEventBySlugREST } = await import('../services/specialEvents')
+          const { getSpecialEventBySlugREST } = await import('../services/specialEventsApi')
           ev = await getSpecialEventBySlugREST(slug)
           if (!ev) {
             ev = await getSpecialEventBySlug(slug)
@@ -79,7 +73,7 @@ const SpecialEventDetailPage = () => {
         }
         if (!ev) {
           // Fallback: load the first available event regardless of status
-          const { getFirstSpecialEventAny } = await import('../services/specialEvents')
+          const { getFirstSpecialEventAny } = await import('../services/specialEventsApi')
           ev = await getFirstSpecialEventAny()
         }
         if (!ev) {
@@ -141,7 +135,7 @@ const SpecialEventDetailPage = () => {
             if (isMounted) setVoteStats(Array.isArray(stats) ? stats : [])
           } catch {}
         }
-        setCurrentVoteEntryId('') // No longer needed for event-wide voting
+        // Vote entry ID tracking removed - using event-wide voting
       } catch (e) {
         if (!isMounted) return
         setError(e.message || String(e))
@@ -337,7 +331,7 @@ const SpecialEventDetailPage = () => {
                   if (!event) return
                   setRefreshingEntries(true)
                   try {
-                    const { listApprovedEntriesREST } = await import('../services/specialEvents')
+                    const { listApprovedEntriesREST } = await import('../services/specialEventsApi')
                     const fresh = await listApprovedEntriesREST(event.id)
                     setEntries(fresh)
                   } finally {
@@ -440,7 +434,7 @@ const SpecialEventDetailPage = () => {
                   if (!event) return
                   setRefreshingEntries(true)
                   try {
-                    const { listApprovedEntriesREST } = await import('../services/specialEvents')
+                    const { listApprovedEntriesREST } = await import('../services/specialEventsApi')
                     const fresh = await listApprovedEntriesREST(event.id)
                     setEntries(fresh)
                   } finally {

@@ -12,6 +12,7 @@ import { useDarkMode } from '../../contexts/DarkModeContext'
 import httpAPI from '../../services/databaseApi'
 import EventDetailsModal from './EventDetailsModal'
 import PublicEventRequestForm from './PublicEventRequestForm'
+import { secureLog, sanitizeError } from '../../utils/secureConfig'
 
 // Set up moment.js for react-big-calendar
 moment.locale('de')
@@ -31,8 +32,8 @@ const SimpleMonthCalendar = ({
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [showEventRequestForm, setShowEventRequestForm] = useState(false)
   const [selectedDate, setSelectedDate] = useState(null)
-  const [lastLoadedMonth, setLastLoadedMonth] = useState(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [calendarDate, setCalendarDate] = useState(currentDate || new Date())
 
 
   // Load all events and requests - Optimized for calendar view
@@ -52,11 +53,12 @@ const SimpleMonthCalendar = ({
       try {
         // getAll() now uses Supabase client as primary with HTTP fallback built-in
         const apiEvents = await httpAPI.events.getAll()
-        if (apiEvents && apiEvents.length > 0) {
+        
+        if (apiEvents && Array.isArray(apiEvents) && apiEvents.length > 0) {
           allEvents = [...allEvents, ...apiEvents]
         }
       } catch (error) {
-        console.error('Failed to load events:', error)
+        secureLog('error', 'Failed to load events', sanitizeError(error))
       }
       
       // Load pending requests (admin only) - DISABLED to remove requests from calendar
@@ -65,7 +67,6 @@ const SimpleMonthCalendar = ({
       //   try {
       //     pendingRequests = await httpAPI.eventRequests.getCalendarRequests(startOfMonth, endOfMonth)
       //   } catch (dateError) {
-      //     console.warn('Date range optimization failed for requests, falling back to all requests:', dateError)
       //     pendingRequests = await httpAPI.eventRequests.getAll()
       //   }
       // }
@@ -79,14 +80,10 @@ const SimpleMonthCalendar = ({
       try {
         if (allEvents && allEvents.length > 0) {
         allEvents.forEach((event, index) => {
-          // Check if this is a public event that should be visible
-          const isPublicEvent = !event.is_private && event.status === 'approved'
-          
           const isPrivate = event.is_private || false
           // Check if user owns this event (check multiple possible ID fields)
           const isOwnEvent = user && (
-            event.requester_id === user.id || 
-            event.user_id === user.id ||
+            event.requested_by === user.id || 
             event.created_by === user.id
           )
           
@@ -120,9 +117,37 @@ const SimpleMonthCalendar = ({
             isBlocked = false
           }
 
-          // Parse dates
-          let startDate = new Date(event.start_date)
-          let endDate = event.end_date ? new Date(event.end_date) : new Date(event.start_date)
+          // Parse dates - handle different formats
+          let startDate = null
+          let endDate = null
+          
+          try {
+            // Handle different date formats
+            if (event.start_date) {
+              startDate = new Date(event.start_date)
+              // If date is invalid, try parsing as ISO string
+              if (isNaN(startDate.getTime())) {
+                startDate = new Date(event.start_date + (event.start_date.includes('T') ? '' : 'T00:00:00'))
+              }
+            }
+            
+            if (event.end_date) {
+              endDate = new Date(event.end_date)
+              if (isNaN(endDate.getTime())) {
+                endDate = new Date(event.end_date + (event.end_date.includes('T') ? '' : 'T23:59:59'))
+              }
+            } else if (startDate) {
+              endDate = new Date(startDate)
+            }
+          } catch (dateError) {
+            secureLog('warn', 'Failed to parse event dates', { 
+              eventId: event.id, 
+              start_date: event.start_date, 
+              end_date: event.end_date,
+              error: sanitizeError(dateError)
+            })
+            return // Skip this event if dates can't be parsed (return from forEach callback)
+          }
 
           // Check if event has time information
           const hasTimeInfo = event.start_date && event.start_date.includes('T')
@@ -130,7 +155,7 @@ const SimpleMonthCalendar = ({
           // Time is NOT shown in calendar title - only in event details modal
           // Keep event title clean without time display
 
-          if (!isNaN(startDate.getTime())) {
+          if (startDate && !isNaN(startDate.getTime()) && endDate && !isNaN(endDate.getTime())) {
             const calendarEvent = {
               id: event.id,
               title: eventTitle,
@@ -150,10 +175,19 @@ const SimpleMonthCalendar = ({
             calendarEvents.push(calendarEvent)
           } else {
             // Skip events with invalid dates
+            secureLog('warn', 'Skipping event with invalid dates', { 
+              eventId: event.id, 
+              title: event.title,
+              start_date: event.start_date,
+              end_date: event.end_date,
+              startDateValid: startDate && !isNaN(startDate.getTime()),
+              endDateValid: endDate && !isNaN(endDate.getTime())
+            })
           }
         })
         }
       } catch (processingError) {
+        secureLog('error', 'Error processing events for calendar', sanitizeError(processingError))
       }
 
       // Process pending requests (admin only) - DISABLED
@@ -240,12 +274,15 @@ const SimpleMonthCalendar = ({
       }
 
       setEvents(calendarEvents)
+      
     } catch (error) {
+      secureLog('error', 'Failed to load calendar events', sanitizeError(error))
+      setEvents([]) // Set empty array on error to prevent stale data
     } finally {
       setLoading(false)
       setIsRefreshing(false)
     }
-  }, [isAdmin, currentDate, user])
+  }, [isAdmin, calendarDate, user, isRefreshing])
 
   // Load events on component mount only - wait for auth to complete
   useEffect(() => {
@@ -284,6 +321,13 @@ const SimpleMonthCalendar = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Update calendar date when currentDate prop changes
+  useEffect(() => {
+    if (currentDate) {
+      setCalendarDate(new Date(currentDate))
+    }
+  }, [currentDate])
+
   // Handle date selection
   const handleSelectSlot = useCallback((slotInfo) => {
     if (onDateClick) {
@@ -308,7 +352,7 @@ const SimpleMonthCalendar = ({
     
     setSelectedEvent(event)
     setShowEventDetails(true)
-  }, [isAdmin, user])
+  }, [isAdmin])
 
   // Handle event update from details modal
   const handleEventUpdate = useCallback(async () => {
@@ -373,6 +417,7 @@ const SimpleMonthCalendar = ({
   }
 
 
+
   if (loading) {
     return (
       <div style={{
@@ -417,18 +462,44 @@ const SimpleMonthCalendar = ({
         
         .rbc-day-bg {
           min-height: 100px !important;
+          cursor: pointer !important;
+          position: relative !important;
+          z-index: 1 !important;
         }
         
-        /* Make date numbers more visible */
+        .rbc-day-bg:not(.rbc-off-range-bg):hover {
+          background-color: ${isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)'} !important;
+        }
+        
+        /* Make date cells clickable */
         .rbc-date-cell {
           font-size: 16px !important;
           font-weight: 700 !important;
           padding: 6px 10px !important;
           color: #252422 !important;
+          cursor: pointer !important;
+          position: relative !important;
+          z-index: 2 !important;
         }
         
         .rbc-off-range .rbc-date-cell {
           color: #999999 !important;
+          cursor: default !important;
+        }
+        
+        /* Make sure event segments don't block clicks on empty dates */
+        .rbc-row-segment {
+          pointer-events: none !important;
+        }
+        
+        /* Ensure day cells are above row segments and clickable */
+        .rbc-day-bg:not(.rbc-off-range-bg) {
+          pointer-events: auto !important;
+        }
+        
+        /* Make sure events don't block date clicks - only allow clicks on events themselves */
+        .rbc-event {
+          pointer-events: auto !important;
         }
       `}</style>
 
@@ -441,6 +512,36 @@ const SimpleMonthCalendar = ({
           style={{ height: '750px' }}
           defaultView="month"
           views={['month']}
+          date={calendarDate}
+          onNavigate={(action) => {
+            if (onNavigate) {
+              // Calculate new date based on action
+              const newDate = new Date(calendarDate)
+              if (action === 'PREV') {
+                newDate.setMonth(newDate.getMonth() - 1)
+              } else if (action === 'NEXT') {
+                newDate.setMonth(newDate.getMonth() + 1)
+              } else if (action instanceof Date) {
+                setCalendarDate(action)
+                if (onNavigate) onNavigate(action)
+                return
+              }
+              setCalendarDate(newDate)
+              onNavigate(newDate)
+            } else {
+              // Default navigation if no callback provided
+              const newDate = new Date(calendarDate)
+              if (action === 'PREV') {
+                newDate.setMonth(newDate.getMonth() - 1)
+              } else if (action === 'NEXT') {
+                newDate.setMonth(newDate.getMonth() + 1)
+              } else if (action instanceof Date) {
+                setCalendarDate(action)
+                return
+              }
+              setCalendarDate(newDate)
+            }
+          }}
           onSelectSlot={handleSelectSlot}
           onSelectEvent={handleSelectEvent}
           selectable
@@ -462,7 +563,13 @@ const SimpleMonthCalendar = ({
                   gap: '12px'
                 }}>
                   <button
-                    onClick={() => props.onNavigate('PREV')}
+                    onClick={() => {
+                      const newDate = new Date(calendarDate)
+                      newDate.setMonth(newDate.getMonth() - 1)
+                      setCalendarDate(newDate)
+                      if (onNavigate) onNavigate(newDate)
+                      props.onNavigate('PREV')
+                    }}
                     style={{
                       background: 'none',
                       border: 'none',
@@ -497,7 +604,13 @@ const SimpleMonthCalendar = ({
                   </h2>
                   
                   <button
-                    onClick={() => props.onNavigate('NEXT')}
+                    onClick={() => {
+                      const newDate = new Date(calendarDate)
+                      newDate.setMonth(newDate.getMonth() + 1)
+                      setCalendarDate(newDate)
+                      if (onNavigate) onNavigate(newDate)
+                      props.onNavigate('NEXT')
+                    }}
                     style={{
                       background: 'none',
                       border: 'none',

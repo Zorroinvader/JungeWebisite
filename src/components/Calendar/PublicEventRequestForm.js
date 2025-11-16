@@ -4,13 +4,12 @@
 // - Notes: Production component. Creates initial event request via eventRequestsAPI.createInitialRequest; pre-fills data for logged-in users. This is the currently used event request form. A legacy alternative EventRequestModalHTTP exists in Non-PROD/components/Calendar/ but is not used.
 
 import React, { useState, useEffect } from 'react';
-import { X, CheckCircle, Mail } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { X, CheckCircle } from 'lucide-react';
 import { eventRequestsAPI, profileAPI } from '../../services/databaseApi';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDarkMode } from '../../contexts/DarkModeContext';
 import { sendAdminNotification, sendUserNotification, areNotificationsEnabled } from '../../utils/settingsHelper';
-import { supabase } from '../../lib/supabase';
+import { secureLog, sanitizeError } from '../../utils/secureConfig';
 
 const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, userData }) => {
   const { user } = useAuth();
@@ -174,30 +173,8 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
         currentDate.setDate(currentDate.getDate() + 1);
       }
       
-      // Create request data matching existing structure
-      const requestData = {
-        title: formData.title,
-        event_name: formData.title, // Also store in event_name for new workflow
-        description: formData.additional_notes || '',
-        requester_name: formData.requester_name,
-        requester_email: formData.requester_email,
-        requester_phone: formData.requester_phone || null,
-        start_date: formData.start_date,
-        end_date: formData.end_date,
-        requested_days: JSON.stringify(dateRange), // New field
-        is_private: formData.event_type === 'Privates Event',
-        event_type: formData.event_type,
-        initial_notes: formData.additional_notes || '', // New field
-        status: 'pending',
-        request_stage: 'initial', // New field for 3-step workflow
-        created_at: new Date().toISOString(),
-        // Add user ID for logged-in users
-        requested_by: user?.id || null,
-        created_by: user?.id || null
-      };
-
       // Create the event request using Supabase client (official method)
-      console.log('Creating event request in database...');
+      secureLog('log', 'Creating event request in database...');
       
       // Prepare the data for insertion
       const insertData = {
@@ -252,39 +229,38 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
 
         clearTimeout(timeoutId);
 
-        console.log('Response status:', response.status);
-        console.log('Response ok:', response.ok);
+        secureLog('log', 'Response status', { status: response.status, ok: response.ok });
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error('REST API error response:', {
+          secureLog('error', 'REST API error response', {
             status: response.status,
             statusText: response.statusText,
-            error: errorText
+            error: sanitizeError(errorText)
           });
-          throw new Error(`HTTP ${response.status}: ${errorText}`);
+          throw new Error(`HTTP ${response.status}: ${sanitizeError(errorText)}`);
         }
 
         const result = await response.json();
-        console.log('Response data:', result);
+        secureLog('log', 'Response data received', result);
         
         created = Array.isArray(result) ? result[0] : result;
         
         if (!created || !created.id) {
-          console.error('No ID in response:', created);
+          secureLog('error', 'No ID in response', created);
           throw new Error('Event request was created but no ID was returned');
         }
 
-        console.log('✅ Event request created successfully via REST API:', created);
+        secureLog('log', 'Event request created successfully via REST API', { id: created.id });
       } catch (fetchError) {
         clearTimeout(timeoutId);
         
         if (fetchError.name === 'AbortError') {
-          console.error('Request aborted (timeout)');
+          secureLog('error', 'Request aborted (timeout)');
           throw new Error('Request timeout. The database might be slow or there might be a network issue.');
         }
         
-        console.error('Fetch error:', fetchError);
+        secureLog('error', 'Fetch error', sanitizeError(fetchError));
         throw fetchError;
       }
 
@@ -305,10 +281,9 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
       }, 'initial_request_received').catch(() => {});
 
     } catch (err) {
-      console.error('❌ All methods failed to create event request:', err);
-      console.error('Error details:', {
-        message: err.message,
-        stack: err.stack,
+      secureLog('error', 'All methods failed to create event request', sanitizeError(err));
+      secureLog('error', 'Error details', {
+        message: sanitizeError(err.message),
         name: err.name
       });
       

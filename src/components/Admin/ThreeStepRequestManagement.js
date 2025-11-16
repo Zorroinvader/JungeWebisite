@@ -19,13 +19,11 @@ const ThreeStepRequestManagement = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [hasMoreRequests, setHasMoreRequests] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
 
   const loadRequests = async () => {
     try {
       setLoading(true);
       setError('');
-      const session = await supabase.auth.getSession();
       // Load only the most recent 50 requests for faster loading
       const data = await eventRequestsAPI.getAdminPanelData(50, 0);
       // Show all requests, but prioritize 3-step workflow ones

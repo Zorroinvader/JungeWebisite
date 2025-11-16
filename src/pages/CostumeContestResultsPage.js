@@ -126,7 +126,7 @@ const CostumeContestResultsPage = () => {
     
     load()
     return () => { isMounted = false }
-  }, [])
+  }, [event])
 
   // Show loading only if we have no cached data
   if (loading && !voteStats.length && !event) {

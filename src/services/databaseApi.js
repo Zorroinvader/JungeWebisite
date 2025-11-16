@@ -142,7 +142,7 @@ export const eventsAPI = {
       async () => {
         return await supabase
           .from('events')
-          .select('id,title,description,start_date,end_date,created_by,is_private,status')
+          .select('id,title,description,start_date,end_date,created_by,is_private,status,requested_by')
           .order('start_date', { ascending: true })
       },
       // FALLBACK: HTTP REST API (only used when Supabase client fails)
@@ -152,7 +152,7 @@ export const eventsAPI = {
         
         try {
           const response = await fetch(
-            `${SUPABASE_URL}/rest/v1/events?select=id,title,description,start_date,end_date,created_by,is_private,status&order=start_date.asc`,
+            `${SUPABASE_URL}/rest/v1/events?select=id,title,description,start_date,end_date,created_by,is_private,status,requested_by&order=start_date.asc`,
             {
               method: 'GET',
               headers: {
@@ -541,7 +541,7 @@ export const eventRequestsAPI = {
       try {
         rateLimitOk = await securityAPI.checkRateLimit(data.requester_email, 'event_request_create', 5, 60)
       } catch (rateLimitError) {
-        console.warn('Rate limit check failed, allowing request:', rateLimitError)
+        secureLog('warn', 'Rate limit check failed, allowing request', sanitizeError(rateLimitError))
         rateLimitOk = true // Allow request if rate limiting check fails
       }
       
@@ -578,7 +578,7 @@ export const eventRequestsAPI = {
       try {
         headers = await getHeaders(data.requester_email)
       } catch (headerError) {
-        console.warn('Failed to get auth headers, using anon key:', headerError)
+        secureLog('warn', 'Failed to get auth headers, using anon key', sanitizeError(headerError))
         // Fallback to anon key for anonymous users
         headers = {
           'apikey': SUPABASE_KEY,
@@ -600,13 +600,12 @@ export const eventRequestsAPI = {
 
       if (!response.ok) {
         const errorText = await response.text()
-        console.error('Event request creation failed:', {
+        secureLog('error', 'Event request creation failed', {
           status: response.status,
           statusText: response.statusText,
-          error: errorText,
-          data: requestData
+          error: sanitizeError(errorText)
         })
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
+        throw new Error(`HTTP ${response.status}: ${sanitizeError(errorText)}`)
       }
 
       const result = await response.json()
@@ -626,12 +625,12 @@ export const eventRequestsAPI = {
         // Send notification email to admins
         sendAdminNotification(created, 'initial_request').catch(() => {})
       } catch (emailError) {
-        console.warn('Email sending failed (non-critical):', emailError)
+        secureLog('warn', 'Email sending failed (non-critical)', sanitizeError(emailError))
       }
       
       return created
     } catch (error) {
-      console.error('createInitialRequest error:', error)
+      secureLog('error', 'createInitialRequest error', sanitizeError(error))
       throw error
     }
   },
@@ -1002,12 +1001,12 @@ export const eventRequestsAPI = {
       try {
         await sendAdminNotification(updated, 'detailed_info_submitted')
       } catch (emailError) {
-        console.warn('Email notification failed (non-critical):', emailError)
+        secureLog('warn', 'Email notification failed (non-critical)', sanitizeError(emailError))
       }
       
       return updated
     } catch (error) {
-      console.error('submitDetailedRequest error:', error)
+      secureLog('error', 'submitDetailedRequest error', sanitizeError(error))
       throw error
     }
   },
@@ -1043,12 +1042,12 @@ export const eventRequestsAPI = {
       try {
         await sendUserNotification(rejected.requester_email, rejected, 'request_rejected')
       } catch (emailError) {
-        console.warn('Email notification failed (non-critical):', emailError)
+        secureLog('warn', 'Email notification failed (non-critical)', sanitizeError(emailError))
       }
       
       return rejected
     } catch (error) {
-      console.error('rejectRequest error:', error)
+      secureLog('error', 'rejectRequest error', sanitizeError(error))
       throw error
     }
   }
@@ -1497,10 +1496,7 @@ export const blockedDatesAPI = {
   }
 }
 
-// Profile API alias for easier access
-export const profileAPI = {
-  getProfile: profilesAPI.getById
-};
+// Profile API alias removed - merged with compatibility wrapper below
 
 // DSGVO Compliance API
 export const dsgvoAPI = {
@@ -1907,6 +1903,8 @@ export const eventRequestAPI = {
 
 // Profile API compatibility wrapper
 export const profileAPI = {
+  getProfile: profilesAPI.getById,
+  
   getProfiles: async () => {
     try {
       const data = await profilesAPI.getAll()

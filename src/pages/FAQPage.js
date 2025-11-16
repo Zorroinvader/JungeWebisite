@@ -4,7 +4,7 @@
 // - Notes: Production content page; text here explains the basic usage and rules of the venue.
 
 import React, { useState } from 'react'
-import { ChevronDown, ChevronUp, MapPin, Mail, Clock, Users, FileText, Calendar } from 'lucide-react'
+import { ChevronDown, ChevronUp, MapPin, Mail, Clock, FileText, Calendar } from 'lucide-react'
 
 const FAQPage = () => {
   const [openItems, setOpenItems] = useState({})

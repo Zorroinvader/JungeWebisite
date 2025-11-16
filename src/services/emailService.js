@@ -16,7 +16,7 @@
  * @param {string} htmlContent - HTML formatted message
  * @returns {Promise<boolean>} Success status
  */
-import { getSupabaseUrl, getSupabaseAnonKey, sanitizeError } from '../utils/secureConfig'
+import { getSupabaseUrl, getSupabaseAnonKey, sanitizeError, secureLog } from '../utils/secureConfig'
 
 export const sendEmail = async (recipients, subject, messageText, htmlContent = null) => {
   if (!recipients || recipients.length === 0) {
@@ -30,7 +30,7 @@ export const sendEmail = async (recipients, subject, messageText, htmlContent = 
     supabaseKey = getSupabaseAnonKey()
   } catch (error) {
     // SECURITY: Never expose keys in error messages
-    console.error('Failed to get Supabase configuration:', sanitizeError(error))
+    secureLog('error', 'Failed to get Supabase configuration', sanitizeError(error))
     return false
   }
 

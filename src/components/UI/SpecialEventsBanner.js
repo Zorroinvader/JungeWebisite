@@ -6,11 +6,10 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Sparkles } from 'lucide-react'
-import { getActiveSpecialEvents } from '../../services/specialEvents'
+import { getActiveSpecialEvents } from '../../services/specialEventsApi'
 import { useDarkMode } from '../../contexts/DarkModeContext'
 
 const SpecialEventsBanner = () => {
-  const { isDarkMode } = useDarkMode()
   const [activeEvents, setActiveEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [showPlaceholder, setShowPlaceholder] = useState(false)

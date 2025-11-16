@@ -1,0 +1,80 @@
+name: Event & Request Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'src/services/databaseApi.js'
+      - 'src/services/specialEventsApi.js'
+      - 'src/components/Calendar/**'
+      - 'src/pages/EventRequestTrackingPage.js'
+      - 'src/utils/eventValidation.js'
+      - 'src/__tests__/unit/event/**'
+      - 'src/__tests__/api/event/**'
+      - 'tests/e2e/event-requests.spec.ts'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'src/services/databaseApi.js'
+      - 'src/services/specialEventsApi.js'
+      - 'src/components/Calendar/**'
+      - 'src/pages/EventRequestTrackingPage.js'
+      - 'src/utils/eventValidation.js'
+      - 'src/__tests__/unit/event/**'
+      - 'src/__tests__/api/event/**'
+      - 'tests/e2e/event-requests.spec.ts'
+  workflow_dispatch:
+
+jobs:
+  test-event:
+    name: Event & Request Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+      
+      - name: Run Event Unit Tests
+        env:
+          REACT_APP_SUPABASE_URL: ${{ secrets.REACT_APP_SUPABASE_URL }}
+          REACT_APP_SUPABASE_ANON_KEY: ${{ secrets.REACT_APP_SUPABASE_ANON_KEY }}
+          CI: true
+        run: npm run test:unit:event
+      
+      - name: Run Event API Tests
+        env:
+          REACT_APP_SUPABASE_URL: ${{ secrets.REACT_APP_SUPABASE_URL }}
+          REACT_APP_SUPABASE_ANON_KEY: ${{ secrets.REACT_APP_SUPABASE_ANON_KEY }}
+          CI: true
+        run: npm run test:api:event
+      
+      - name: Run Event E2E Tests
+        env:
+          TEST_BASE_URL: ${{ secrets.TEST_BASE_URL || 'http://localhost:3000' }}
+          REACT_APP_SUPABASE_URL: ${{ secrets.REACT_APP_SUPABASE_URL }}
+          REACT_APP_SUPABASE_ANON_KEY: ${{ secrets.REACT_APP_SUPABASE_ANON_KEY }}
+          CI: true
+        run: npm run test:e2e:event
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: event-test-results
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+

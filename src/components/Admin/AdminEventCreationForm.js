@@ -4,7 +4,7 @@
 // - Notes: Production component. Admin-only; uses eventsAPI.create and eventValidation for conflict checking.
 
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Plus, Copy } from 'lucide-react';
+import { X, Plus, Copy } from 'lucide-react';
 import { eventsAPI } from '../../services/databaseApi';
 import { useDarkMode } from '../../contexts/DarkModeContext';
 import { checkEventConflicts, formatConflictMessage, validateEventTimes } from '../../utils/eventValidation';

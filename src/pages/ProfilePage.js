@@ -15,7 +15,6 @@ const ProfilePage = () => {
   const { user, profile, loading: authLoading } = useAuth()
   const [loading, setLoading] = useState(true)
   const [isLoadingRequests, setIsLoadingRequests] = useState(false)
-  const [profileError, setProfileError] = useState(null)
 
   const loadEventRequests = useCallback(async () => {
     if (isLoadingRequests || !user?.id) {

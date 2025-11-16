@@ -4,8 +4,8 @@
 // - Notes: Production component. Admin-only; uses specialEvents service for entry management and vote statistics.
 
 import React, { useEffect, useState } from 'react'
-import { Trophy, Vote, TrendingUp, Users, RefreshCw } from 'lucide-react'
-import { getActiveSpecialEvents, listPendingEntries, approveEntry, rejectEntry, getPublicImageUrl, listApprovedEntries, deleteUserUpload, getVoteStatsForEvent } from '../../services/specialEvents'
+import { Trophy, Vote, Users, RefreshCw } from 'lucide-react'
+import { getActiveSpecialEvents, listPendingEntries, approveEntry, rejectEntry, getPublicImageUrl, listApprovedEntries, deleteUserUpload, getVoteStatsForEvent } from '../../services/specialEventsApi'
 
 const SpecialEventModeration = () => {
   const [events, setEvents] = useState([])
