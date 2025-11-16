@@ -1,0 +1,52 @@
+[
+  {
+    "name": "All API Tests",
+    "command": "npm",
+    "args": [
+      "run",
+      "test:api"
+    ],
+    "category": "api",
+    "severity": "high"
+  },
+  {
+    "name": "All E2E Tests",
+    "command": "npm",
+    "args": [
+      "run",
+      "test:e2e"
+    ],
+    "category": "security",
+    "severity": "critical"
+  },
+  {
+    "name": "Accessibility Tests",
+    "command": "npm",
+    "args": [
+      "run",
+      "test:e2e:a11y"
+    ],
+    "category": "e2e",
+    "severity": "high"
+  },
+  {
+    "name": "Email API Tests",
+    "command": "npm",
+    "args": [
+      "run",
+      "test:api:email"
+    ],
+    "category": "api",
+    "severity": "high"
+  },
+  {
+    "name": "Visual Regression Tests",
+    "command": "npm",
+    "args": [
+      "run",
+      "test:visual"
+    ],
+    "category": "e2e",
+    "severity": "low"
+  }
+]
