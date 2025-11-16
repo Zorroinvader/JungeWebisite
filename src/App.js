@@ -15,8 +15,6 @@ import ContactPage from './pages/ContactPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import ProfilePage from './pages/ProfilePage'
-// ProfilePageSimple moved to Non-PROD - test route disabled
-// import ProfilePageSimple from './Non-PROD/pages/ProfilePageSimple'
 import EventRequestTrackingPage from './pages/EventRequestTrackingPage'
 import EmailConfirmationHandler from './components/Auth/EmailConfirmationHandler'
 import AdminPanelClean from './components/Admin/AdminPanelClean'
@@ -106,8 +104,6 @@ const AppContent = () => {
         
         {/* Test Route */}
         <Route path="/test" element={<div>Test Route Works!</div>} />
-        {/* ProfilePageSimple moved to Non-PROD - test route disabled */}
-        {/* <Route path="/profile-test" element={<Layout><ProfilePageSimple /></Layout>} /> */}
         <Route path="/admin-test" element={<Layout><AdminPanelClean /></Layout>} />
         
         {/* Auth Routes */}

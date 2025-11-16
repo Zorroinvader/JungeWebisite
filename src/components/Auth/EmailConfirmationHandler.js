@@ -3,15 +3,13 @@
 // - Used by: App.js when URL contains confirmation tokens (token, type, or access_token in hash); shown before normal routing.
 // - Notes: Production component. Critical for user registration flow; handles Supabase auth token exchange and session setup.
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
 import { useDarkMode } from '../../contexts/DarkModeContext';
 import { CheckCircle, Mail, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 const EmailConfirmationHandler = () => {
-  const { user } = useAuth();
   const { isDarkMode } = useDarkMode();
   const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
@@ -29,7 +27,7 @@ const EmailConfirmationHandler = () => {
   }, [confirmed, error]);
 
   // Navigate to login and force reload if already on /login
-  const goToLogin = () => {
+  const goToLogin = useCallback(() => {
     try {
       if (typeof window !== 'undefined') {
         if (window.location.pathname === '/login') {
@@ -43,7 +41,7 @@ const EmailConfirmationHandler = () => {
     } catch (e) {
       navigate('/login', { replace: true });
     }
-  };
+  }, [navigate]);
 
   useEffect(() => {
     const handleEmailConfirmation = async () => {
@@ -62,8 +60,6 @@ const EmailConfirmationHandler = () => {
           // Extract token and type from hash
           const access_token = hashParams.get('access_token');
           const refresh_token = hashParams.get('refresh_token');
-          const expires_in = hashParams.get('expires_in');
-          const token_type = hashParams.get('token_type') || 'bearer';
 
           if (access_token && refresh_token) {
             // Set the session directly with the tokens from the hash
@@ -195,7 +191,7 @@ const EmailConfirmationHandler = () => {
       // Fix Bug 2: Use subscription directly
       if (subscription) subscription.unsubscribe();
     };
-  }, [navigate]); // Fix Bug 4: Removed 'checking' from dependencies to prevent unnecessary re-executions
+  }, [navigate, goToLogin]); // Include goToLogin in dependencies
 
   if (checking) {
     return (

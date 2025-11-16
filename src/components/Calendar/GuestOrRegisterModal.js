@@ -4,7 +4,7 @@
 // - Notes: Production UI component. It sets sessionStorage flags so the event request can continue after login/registration.
 
 import React from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { UserPlus, Users } from 'lucide-react';
 import { useDarkMode } from '../../contexts/DarkModeContext';
 

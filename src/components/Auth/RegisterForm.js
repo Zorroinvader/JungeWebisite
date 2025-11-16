@@ -13,7 +13,6 @@ import { Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle, Moon, Sun } fr
 const RegisterForm = ({ onSuccess, isModal = false }) => {
   const { signUp } = useAuth()
   const { isDarkMode, toggleDarkMode } = useDarkMode()
-  const navigate = useNavigate()
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -78,7 +77,7 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
     try {
       if (isModal) {
         // Admin panel mode - create user without signing in
-        const result = await profilesAPI.createUser({
+        await profilesAPI.createUser({
           email: formData.email,
           password: formData.password,
           full_name: formData.fullName,
@@ -95,7 +94,7 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
         // Public registration mode - sign up and sign in
         
         // Call signup without timeout - let it complete naturally
-        const { data, error } = await signUp(formData.email, formData.password, formData.fullName)
+        const { error } = await signUp(formData.email, formData.password, formData.fullName)
         
         if (error) {
           

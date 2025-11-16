@@ -125,7 +125,7 @@ const QuickEventEditModal = ({ isOpen, onClose, onSuccess, event }) => {
         throw new Error('Das Enddatum muss nach dem Startdatum liegen');
       }
       // Update title and date/time
-      const result = await eventsAPI.update(event.id, {
+      await eventsAPI.update(event.id, {
         title: formData.title.trim(),
         start_date: startDatetime,
         end_date: endDatetime

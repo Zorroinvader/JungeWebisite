@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useDarkMode } from '../contexts/DarkModeContext'
-import { Calendar, Users, FileText, Search } from 'lucide-react'
+import { Calendar, Users, FileText } from 'lucide-react'
 import SimpleMonthCalendar from '../components/Calendar/SimpleMonthCalendar'
 import TypewriterText from '../components/UI/TypewriterText'
 import NextEventInfo from '../components/UI/NextEventInfo'
@@ -17,13 +17,13 @@ import GuestOrRegisterModal from '../components/Calendar/GuestOrRegisterModal'
 
 const HomePage = () => {
   const { user } = useAuth()
-  const { isDarkMode } = useDarkMode()
   const navigate = useNavigate()
   const [showSubtitle, setShowSubtitle] = useState(false)
   const [showPublicRequestForm, setShowPublicRequestForm] = useState(false)
   const [showGuestOrRegister, setShowGuestOrRegister] = useState(false)
   const [selectedDate, setSelectedDate] = useState(null)
   const [specialEvents, setSpecialEvents] = useState([])
+  const [currentDate, setCurrentDate] = useState(new Date())
 
   const handleFirstTextComplete = () => {
     setShowSubtitle(true)
@@ -207,7 +207,11 @@ const HomePage = () => {
           <div className="bg-white dark:bg-[#252422] rounded-2xl shadow-xl p-[2vw] sm:p-[1.5vw] md:p-[1vw] lg:p-[0.8vw] xl:p-[0.6vw] 2xl:p-[0.5vw] relative border-2 border-[#A58C81] dark:border-[#EBE9E9]">
             {/* Make calendar header usable on small screens */}
             <div className="w-full touch-pan-x">
-              <SimpleMonthCalendar onDateClick={handleEventRequest} />
+              <SimpleMonthCalendar 
+                currentDate={currentDate}
+                onNavigate={(date) => setCurrentDate(date)}
+                onDateClick={handleEventRequest}
+              />
             </div>
           </div>
         </div>

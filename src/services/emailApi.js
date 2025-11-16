@@ -3,6 +3,9 @@
 // - Used by: settingsHelper.js, admin settings, and email configuration flows for sending emails and managing admin recipient lists.
 // - Notes: Production service file. Consolidates email sending and admin email management. Uses secureConfig for safe key access.
 
+import { getSupabaseUrl, getSupabaseAnonKey, sanitizeError, secureLog } from '../utils/secureConfig'
+import { supabase } from '../lib/supabase'
+
 /**
  * Email Service using Supabase Edge Function with Resend
  * This service sends emails to both users and admins for event notifications
@@ -16,7 +19,6 @@
  * @param {string} htmlContent - HTML formatted message
  * @returns {Promise<boolean>} Success status
  */
-import { getSupabaseUrl, getSupabaseAnonKey, sanitizeError } from '../utils/secureConfig'
 
 export const sendEmail = async (recipients, subject, messageText, htmlContent = null) => {
   if (!recipients || recipients.length === 0) {
@@ -30,7 +32,7 @@ export const sendEmail = async (recipients, subject, messageText, htmlContent = 
     supabaseKey = getSupabaseAnonKey()
   } catch (error) {
     // SECURITY: Never expose keys in error messages
-    console.error('Failed to get Supabase configuration:', sanitizeError(error))
+    secureLog('error', 'Failed to get Supabase configuration', sanitizeError(error))
     return false
   }
 
@@ -217,9 +219,6 @@ export const sendTestEmail = async (testEmail) => {
 // ADMIN EMAIL MANAGEMENT - Functions for managing admin notification emails
 // ============================================================================
 
-import { supabase } from '../lib/supabase'
-import { getSupabaseUrl, getSupabaseAnonKey } from '../utils/secureConfig'
-
 // SECURITY: Use secure getters to prevent key exposure
 const getSupabaseConfig = () => ({
   url: getSupabaseUrl(),
@@ -246,7 +245,7 @@ export async function getAdminNotificationEmails() {
     })
 
     if (!response.ok) {
-      const text = await response.text()
+      await response.text()
       return []
     }
 

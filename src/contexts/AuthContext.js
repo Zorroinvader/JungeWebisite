@@ -225,7 +225,7 @@ export const AuthProvider = ({ children }) => {
           // User is coming back from email confirmation - let Supabase handle it
           
           // Get the current session (Supabase will auto-exchange the token)
-          const { data: { session }, error } = await supabase.auth.getSession()
+          const { data: { session } } = await supabase.auth.getSession()
           
           if (session?.user) {
             setUser(session.user)
@@ -237,7 +237,7 @@ export const AuthProvider = ({ children }) => {
           }
         } else {
           // Normal page load - check for existing session
-          const { data: { session }, error } = await supabase.auth.getSession()
+          const { data: { session } } = await supabase.auth.getSession()
           
           if (session?.user) {
             setUser(session.user)

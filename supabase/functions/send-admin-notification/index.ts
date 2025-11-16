@@ -13,6 +13,7 @@ declare global {
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
@@ -23,11 +24,34 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Get Resend API key
+    // Get Resend API key - SECURITY: Validate required environment variables
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
     
     if (!RESEND_API_KEY) {
-      throw new Error('RESEND_API_KEY not configured')
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'RESEND_API_KEY not configured. Please set this environment variable in Supabase Dashboard.',
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      )
+    }
+    
+    // Validate key format (basic check - Resend keys typically start with 're_')
+    if (!RESEND_API_KEY.startsWith('re_') && RESEND_API_KEY.length < 20) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Invalid RESEND_API_KEY format.',
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      )
     }
 
     // Parse request body

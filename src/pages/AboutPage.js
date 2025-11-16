@@ -4,7 +4,7 @@
 // - Notes: Production content page; changes affect public information about the club.
 
 import React from 'react'
-import { MapPin, Mail, Heart, Crown, UserCheck, Shield, Users, Target, Camera } from 'lucide-react'
+import { Heart, Crown, UserCheck, Target, Users } from 'lucide-react'
 import MuseumGallery from '../components/UI/MuseumGallery'
 
 const AboutPage = () => {

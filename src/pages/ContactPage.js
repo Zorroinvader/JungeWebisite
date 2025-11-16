@@ -4,7 +4,7 @@
 // - Notes: Production page; submitting the form opens the user’s email client via mailto:.
 
 import React, { useState } from 'react'
-import { MapPin, Mail, Clock, Users, FileText, Calendar, Crown, UserCheck, Heart, Target, Send, MessageSquare } from 'lucide-react'
+import { MapPin, Mail, Clock, FileText, Crown, UserCheck, Heart, Target, Send, MessageSquare } from 'lucide-react'
 
 const ContactPage = () => {
   const [formData, setFormData] = useState({

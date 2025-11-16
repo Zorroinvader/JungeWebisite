@@ -7,9 +7,9 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDarkMode } from '../../contexts/DarkModeContext'
-import { Calendar, Users, FileText, Settings, AlertCircle, Check, X, Clock, Eye, Download, ArrowLeft, Workflow, Plus, Edit, RefreshCw } from 'lucide-react'
-import { eventRequestsAPI, eventsAPI } from '../../services/databaseApi'
-import eventBus from '../../utils/eventBus'
+import { Calendar, Users, FileText, Settings, AlertCircle, Check, X, Eye, Download, ArrowLeft, Workflow, Plus, Edit, RefreshCw } from 'lucide-react'
+import { eventsAPI } from '../../services/databaseApi'
+import { secureLog, sanitizeError } from '../../utils/secureConfig'
 import UserManagement from './UserManagement'
 import ThreeStepRequestManagement from './ThreeStepRequestManagement'
 import AdminEventCreationForm from './AdminEventCreationForm'
@@ -238,7 +238,7 @@ const EventsTab = () => {
       try {
         data = await eventsAPI.getAll()
       } catch (error) {
-        console.error('Failed to load events:', error)
+        secureLog('error', 'Failed to load events', sanitizeError(error))
         data = []
       }
       
@@ -428,7 +428,6 @@ const UsersTab = () => {
 }
 
 const SettingsTab = () => {
-  const { isDarkMode } = useDarkMode()
   const [notificationsEnabled, setNotificationsEnabled] = useState(true)
   const [autoApprovePublic, setAutoApprovePublic] = useState(false)
   const [showPrivateEvents, setShowPrivateEvents] = useState(true)
@@ -465,7 +464,7 @@ const SettingsTab = () => {
   useEffect(() => {
     async function loadEmails() {
       try {
-        const { getAdminNotificationEmails } = await import('../../services/adminEmails')
+        const { getAdminNotificationEmails } = await import('../../services/emailApi')
         const emails = await getAdminNotificationEmails()
         setAdminEmailsFull(emails)
         setAdminEmails(emails.map(e => e.email))
@@ -572,10 +571,8 @@ const SettingsTab = () => {
       alert('Import wird gestartet...\n\nBitte warten Sie, während die Events importiert werden.\n\nÖffnen Sie die Browser-Konsole (F12) für Live-Logs!')
       
       // Fetch and parse ICS feed
-      const startFetch = Date.now()
       const supabaseKey = getSupabaseAnonKey()
       const parsedEvents = await fetchAndParseICS(ICS_FEED_URL, supabaseKey)
-      const fetchTime = Date.now() - startFetch
       
       
       // Show sample of first few events
@@ -595,7 +592,6 @@ const SettingsTab = () => {
       
       for (let i = 0; i < parsedEvents.length; i++) {
         const icsEvent = parsedEvents[i]
-        const progress = `[${i + 1}/${parsedEvents.length}]`
         
         try {
           const dbEvent = convertToDBEvent(icsEvent)
@@ -618,8 +614,6 @@ const SettingsTab = () => {
           errors.push({ event: icsEvent.SUMMARY, error: error.message })
         }
       }
-      
-      const importTime = Date.now() - startImport
       
       // Show results
       
@@ -711,7 +705,6 @@ const SettingsTab = () => {
 
       for (let i = 0; i < allEvents.length; i++) {
         const event = allEvents[i]
-        const progress = `[${i + 1}/${allEvents.length}]`
 
         try {
           await eventsAPI.delete(event.id)
@@ -767,7 +760,7 @@ const SettingsTab = () => {
       if (pendingEmails.length > 0 || emailsToRemove.length > 0) {
         
         // Save admin emails to database
-        const { addAdminNotificationEmail, removeAdminNotificationEmail } = await import('../../services/adminEmails')
+        const { addAdminNotificationEmail, removeAdminNotificationEmail } = await import('../../services/emailApi')
         
         // Add pending emails
         for (const email of pendingEmails) {
@@ -780,7 +773,7 @@ const SettingsTab = () => {
         }
         
         // Reload emails from database
-        const { getAdminNotificationEmails } = await import('../../services/adminEmails')
+        const { getAdminNotificationEmails } = await import('../../services/emailApi')
         const updatedEmails = await getAdminNotificationEmails()
         setAdminEmailsFull(updatedEmails)
         setAdminEmails(updatedEmails.map(e => e.email))
