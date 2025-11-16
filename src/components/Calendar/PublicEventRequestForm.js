@@ -1,7 +1,12 @@
+// FILE OVERVIEW
+// - Purpose: Modal form for submitting initial event requests (step 1 of 3-step workflow); handles both logged-in and guest users.
+// - Used by: HomePage when user clicks "Event anfragen" or selects a date; opened after GuestOrRegisterModal if user chooses guest flow. Also used by SimpleMonthCalendar for date-based event requests.
+// - Notes: Production component. Creates initial event request via eventRequestsAPI.createInitialRequest; pre-fills data for logged-in users. This is the currently used event request form. A legacy alternative EventRequestModalHTTP exists in Non-PROD/components/Calendar/ but is not used.
+
 import React, { useState, useEffect } from 'react';
 import { X, CheckCircle, Mail } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { eventRequestsAPI, profileAPI } from '../../services/httpApi';
+import { eventRequestsAPI, profileAPI } from '../../services/databaseApi';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDarkMode } from '../../contexts/DarkModeContext';
 import { sendAdminNotification, sendUserNotification, areNotificationsEnabled } from '../../utils/settingsHelper';
@@ -215,19 +220,17 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
         created_by: user?.id || null
       };
 
-      console.log('Inserting data:', insertData);
-      console.log('Supabase URL:', process.env.REACT_APP_SUPABASE_URL);
-      console.log('User:', user);
-
+      // SECURITY: Never log sensitive data or keys
       // Try direct REST API call first (more reliable, bypasses client issues)
-      const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
-      const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+      const { getSupabaseUrl, getSupabaseAnonKey } = await import('../../utils/secureConfig')
+      const supabaseUrl = getSupabaseUrl()
+      const supabaseKey = getSupabaseAnonKey()
 
       if (!supabaseUrl || !supabaseKey) {
         throw new Error('Supabase configuration missing. Please check your environment variables.');
       }
 
-      console.log('Using direct REST API call to:', `${supabaseUrl}/rest/v1/event_requests`);
+      // SECURITY: Never log URLs that might expose keys
 
       // Use fetch with AbortController for timeout
       const controller = new AbortController();

@@ -1,9 +1,14 @@
+// FILE OVERVIEW
+// - Purpose: Modal showing detailed event information with edit/delete actions for admins; displays event metadata and contract links.
+// - Used by: SimpleMonthCalendar and admin panels when clicking on events; allows quick editing via QuickEventEditModal.
+// - Notes: Production component. Admin-only actions (edit/delete) are shown based on AuthContext.isAdmin().
+
 import React, { useState } from 'react'
 import { X, MapPin, Clock, Users, FileText, Calendar, Lock, Edit, Trash2 } from 'lucide-react'
 import moment from 'moment'
 import { useAuth } from '../../contexts/AuthContext'
 import QuickEventEditModal from './QuickEventEditModal'
-import { eventsAPI, eventRequestsAPI } from '../../services/httpApi'
+import { eventsAPI, eventRequestsAPI } from '../../services/databaseApi'
 
 const EventDetailsModal = ({ event, onClose, onEventUpdated }) => {
   const { isAdmin } = useAuth()

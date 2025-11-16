@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Site footer with contact info, links to About/FAQ/Contact pages, and copyright information.
+// - Used by: Layout component on all public pages; provides consistent footer navigation and contact details.
+// - Notes: Production component. Simple static footer with navigation links and contact email.
+
 import React from 'react'
 import { Link } from 'react-router-dom'
 

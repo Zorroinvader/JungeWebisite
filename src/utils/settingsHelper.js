@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Helper utilities for reading, writing, and interpreting admin settings and for generating email content/links.
+// - Used by: Admin UI components and email/notification services when sending user or admin emails and reading settings.
+// - Notes: Production helper file. Relies on localStorage and Supabase Edge Functions; edits can affect email behavior. Uses secureConfig for safe key access.
+
 // Helper functions for reading and managing admin settings
 
 /**
@@ -183,13 +188,11 @@ export const sendUserNotification = async (userEmail, eventData, type) => {
   const htmlContent = generateUserEmailHTML(subject, message, eventData, type)
 
   // Send via Supabase Edge Function
+  // SECURITY: Use secure getters to prevent key exposure
   try {
-    const supabaseUrl = process.env.REACT_APP_SUPABASE_URL
-    const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY
-
-    if (!supabaseUrl || !supabaseKey) {
-      return
-    }
+    const { getSupabaseUrl, getSupabaseAnonKey } = await import('../utils/secureConfig')
+    const supabaseUrl = getSupabaseUrl()
+    const supabaseKey = getSupabaseAnonKey()
 
     const response = await fetch(`${supabaseUrl}/functions/v1/send-admin-notification`, {
       method: 'POST',
@@ -305,8 +308,10 @@ export const sendAdminNotification = async (eventData, type = 'initial_request')
   
   // Send email via Supabase Edge Function
   try {
-    const supabaseUrl = process.env.REACT_APP_SUPABASE_URL
-    const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY
+    // SECURITY: Use secure getters to prevent key exposure
+    const { getSupabaseUrl, getSupabaseAnonKey } = await import('../utils/secureConfig')
+    const supabaseUrl = getSupabaseUrl()
+    const supabaseKey = getSupabaseAnonKey()
     
     if (!supabaseUrl || !supabaseKey) {
       alert(`E-MAIL BENACHRICHTIGUNG\n\n` +

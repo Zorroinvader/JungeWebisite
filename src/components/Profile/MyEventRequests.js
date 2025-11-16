@@ -1,7 +1,12 @@
+// FILE OVERVIEW
+// - Purpose: Component displaying user's event requests with timeline, status, and action buttons (fill details, cancel).
+// - Used by: ProfilePage to show all event requests for the logged-in user; displays RequestTimeline for each request.
+// - Notes: Production component. Loads requests via eventRequestsAPI.getByUser; handles cancellation and detail submission flows.
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDarkMode } from '../../contexts/DarkModeContext';
-import { eventRequestsAPI } from '../../services/httpApi';
+import { eventRequestsAPI } from '../../services/databaseApi';
 import RequestTimeline from '../Calendar/RequestTimeline';
 import DetailedEventForm from '../Calendar/DetailedEventForm';
 import { Clock, CheckCircle, XCircle } from 'lucide-react';

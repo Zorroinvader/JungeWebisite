@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Alternative event request modal using HTTP API; legacy component that has been replaced by PublicEventRequestForm.
+// - Used by: Currently NOT USED IN PRODUCTION - This file is in Non-PROD folder. SimpleMonthCalendar now uses PublicEventRequestForm instead.
+// - Notes: NOT USED IN PRODUCTION - The currently used event request form is PublicEventRequestForm (src/components/Calendar/PublicEventRequestForm.js) which implements the 3-step workflow (initial → accepted → details submitted → final accepted). This legacy component is kept for reference but should not be used.
+
 import React, { useState, useEffect } from 'react'
 import { X, Upload, CheckCircle } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'

@@ -1,8 +1,13 @@
+// FILE OVERVIEW
+// - Purpose: Registration form component with email/password/full name fields, validation, password visibility toggle, and email confirmation handling.
+// - Used by: RegisterPage (route '/register') and can be used as modal; handles pending event requests after registration.
+// - Notes: Production component. Uses AuthContext.signUp and creates profile via profilesAPI; checks for pending event requests from sessionStorage.
+
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDarkMode } from '../../contexts/DarkModeContext'
-import { profilesAPI } from '../../services/httpApi'
+import { profilesAPI } from '../../services/databaseApi'
 import { Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle, Moon, Sun } from 'lucide-react'
 
 const RegisterForm = ({ onSuccess, isModal = false }) => {

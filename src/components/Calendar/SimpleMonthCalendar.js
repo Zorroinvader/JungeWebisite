@@ -1,10 +1,15 @@
+// FILE OVERVIEW
+// - Purpose: Small month calendar component showing events and blocked dates; allows clicking dates to request events.
+// - Used by: HomePage as the main calendar display; shows events from eventsAPI and temporarily blocked dates.
+// - Notes: Production component. Uses react-big-calendar with moment; handles date clicks to trigger event request flow.
+
 import React, { useState, useEffect, useCallback } from 'react'
 import { Calendar, momentLocalizer } from 'react-big-calendar'
 import moment from 'moment'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDarkMode } from '../../contexts/DarkModeContext'
-import httpAPI from '../../services/httpApi'
+import httpAPI from '../../services/databaseApi'
 import EventDetailsModal from './EventDetailsModal'
 import PublicEventRequestForm from './PublicEventRequestForm'
 
@@ -45,21 +50,13 @@ const SimpleMonthCalendar = ({
       let allEvents = []
       
       try {
+        // getAll() now uses Supabase client as primary with HTTP fallback built-in
         const apiEvents = await httpAPI.events.getAll()
-        if (apiEvents.length > 0) {
+        if (apiEvents && apiEvents.length > 0) {
           allEvents = [...allEvents, ...apiEvents]
         }
       } catch (error) {
-        try {
-          const directEvents = await httpAPI.events.getAllDirect()
-          allEvents = [...allEvents, ...directEvents]
-        } catch (fallbackError) {
-          try {
-            const simpleEvents = await httpAPI.events.getAllSimple()
-            allEvents = [...allEvents, ...simpleEvents]
-          } catch (simpleError) {
-          }
-        }
+        console.error('Failed to load events:', error)
       }
       
       // Load pending requests (admin only) - DISABLED to remove requests from calendar

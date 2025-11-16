@@ -1,6 +1,11 @@
+// FILE OVERVIEW
+// - Purpose: Admin form for creating new events directly in the calendar; includes conflict checking and validation.
+// - Used by: AdminPanelClean when admin clicks "Event erstellen"; allows direct event creation without request workflow.
+// - Notes: Production component. Admin-only; uses eventsAPI.create and eventValidation for conflict checking.
+
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, Plus, Copy } from 'lucide-react';
-import { eventsAPI } from '../../services/httpApi';
+import { eventsAPI } from '../../services/databaseApi';
 import { useDarkMode } from '../../contexts/DarkModeContext';
 import { checkEventConflicts, formatConflictMessage, validateEventTimes } from '../../utils/eventValidation';
 

@@ -1,5 +1,10 @@
+// FILE OVERVIEW
+// - Purpose: Admin-Ansicht zur Übersicht und Bewertung aller Event-Anfragen inkl. Mietvertrags-Download.
+// - Used by: Eingebettet im Admin-Dashboard (AdminPanelClean) für die Verwaltung der Anfragen.
+// - Notes: Production admin tool. Nutzt eventRequestsAPI; Änderungen betreffen Admin-Workflow und Freigaben.
+
 import React, { useState, useEffect } from 'react'
-import { eventRequestsAPI } from '../../services/httpApi'
+import { eventRequestsAPI } from '../../services/databaseApi'
 import { CheckCircle, XCircle, Clock, User, Calendar, MapPin, AlertCircle, X, Download, FileText, Mail } from 'lucide-react'
 import moment from 'moment'
 

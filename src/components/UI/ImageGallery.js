@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Generic image gallery component with lightbox, navigation arrows, zoom, and download functionality.
+// - Used by: Can be used anywhere images need to be displayed in a gallery format; similar to MuseumGallery but more generic.
+// - Notes: Production component. Provides standard gallery features; may be used for event photos or other image collections.
+
 import React, { useState, useRef, useEffect } from 'react'
 import { X, ChevronLeft, ChevronRight, ZoomIn, Download } from 'lucide-react'
 

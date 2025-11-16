@@ -1,9 +1,14 @@
+// FILE OVERVIEW
+// - Purpose: Main admin dashboard component that provides tabs for event management, request management, user management, settings, and special events.
+// - Used by: Route '/admin' in App.js (protected, admin-only); central hub for all admin operations.
+// - Notes: Production component. Admin-only access; includes ThreeStepRequestManagement, EventRequestManagement, UserManagement, AdminSettings, SpecialEventModeration.
+
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDarkMode } from '../../contexts/DarkModeContext'
 import { Calendar, Users, FileText, Settings, AlertCircle, Check, X, Clock, Eye, Download, ArrowLeft, Workflow, Plus, Edit, RefreshCw } from 'lucide-react'
-import { eventRequestsAPI, eventsAPI } from '../../services/httpApi'
+import { eventRequestsAPI, eventsAPI } from '../../services/databaseApi'
 import eventBus from '../../utils/eventBus'
 import UserManagement from './UserManagement'
 import ThreeStepRequestManagement from './ThreeStepRequestManagement'
@@ -228,19 +233,13 @@ const EventsTab = () => {
       setError(null)
       
       // Get all events directly from events table
+      // getAll() now uses Supabase client as primary with HTTP fallback built-in
       let data = []
       try {
         data = await eventsAPI.getAll()
       } catch (error) {
-        try {
-          data = await eventsAPI.getAllDirect()
-        } catch (fallbackError) {
-          try {
-            data = await eventsAPI.getAllSimple()
-          } catch (simpleError) {
-            data = []
-          }
-        }
+        console.error('Failed to load events:', error)
+        data = []
       }
       
       // Filter out past events - only show future events
@@ -557,7 +556,10 @@ const SettingsTab = () => {
 
   const handleImportOldCalendar = async () => {
     // Use Supabase Edge Function as proxy to bypass CORS
-    const ICS_FEED_URL = `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/fetch-ics`
+    // SECURITY: Use secure getters to prevent key exposure
+    const { getSupabaseUrl, getSupabaseAnonKey } = await import('../../utils/secureConfig')
+    const supabaseUrl = getSupabaseUrl()
+    const ICS_FEED_URL = `${supabaseUrl}/functions/v1/fetch-ics`
     
     
     if (!window.confirm('Möchten Sie Events aus dem alten Kalender importieren?\n\nDies kann einige Minuten dauern.')) {
@@ -571,7 +573,7 @@ const SettingsTab = () => {
       
       // Fetch and parse ICS feed
       const startFetch = Date.now()
-      const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY
+      const supabaseKey = getSupabaseAnonKey()
       const parsedEvents = await fetchAndParseICS(ICS_FEED_URL, supabaseKey)
       const fetchTime = Date.now() - startFetch
       

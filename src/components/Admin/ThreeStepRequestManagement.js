@@ -1,5 +1,10 @@
+// FILE OVERVIEW
+// - Purpose: Admin component for managing the 3-step event request workflow (initial → accepted → details submitted → final accepted).
+// - Used by: AdminPanelClean as the main request management interface; handles all stages of event request approval.
+// - Notes: Production component. Core admin tool; manages request stages, PDF downloads, and sends email notifications.
+
 import React, { useState, useEffect } from 'react';
-import { eventRequestsAPI } from '../../services/httpApi';
+import { eventRequestsAPI } from '../../services/databaseApi';
 import { CheckCircle, XCircle, Clock, Download, X } from 'lucide-react';
 import { useDarkMode } from '../../contexts/DarkModeContext';
 import { sendUserNotification } from '../../utils/settingsHelper';

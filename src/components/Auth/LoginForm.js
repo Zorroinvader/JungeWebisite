@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Login form component with email/password fields, password visibility toggle, dark mode toggle, and redirect handling.
+// - Used by: LoginPage (route '/login') and can be used as modal in other contexts.
+// - Notes: Production component. Handles authentication via AuthContext.signIn and redirects after successful login.
+
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'

@@ -1,6 +1,11 @@
+// FILE OVERVIEW
+// - Purpose: Quick edit modal for updating event details (title, dates, times, notes) without full form; admin-only.
+// - Used by: EventDetailsModal when admin clicks edit button; provides fast inline editing of event properties.
+// - Notes: Production component. Uses eventsAPI.update for saving changes; validates date ranges and required fields.
+
 import React, { useState, useEffect } from 'react';
 import { X, Save } from 'lucide-react';
-import { eventsAPI } from '../../services/httpApi';
+import { eventsAPI } from '../../services/databaseApi';
 import { useDarkMode } from '../../contexts/DarkModeContext';
 
 const QuickEventEditModal = ({ isOpen, onClose, onSuccess, event }) => {

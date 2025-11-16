@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: ICS (iCalendar) file parser that converts .ics format to event objects for calendar import.
+// - Used by: Currently NOT USED IN PRODUCTION - may be used for future calendar import feature.
+// - Notes: NOT USED IN PRODUCTION - This file is in Non-PROD folder. Currently, calendar import functionality is not implemented in production. If needed in the future, this utility can be moved back to src/utils/ and integrated.
+
 /**
  * ICS Calendar Parser
  * Parses ICS (iCalendar) format and converts to event objects

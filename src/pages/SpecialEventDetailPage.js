@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Detail page for a special event (e.g., costume contest) showing approved entries, voting results, and upload form.
+// - Used by: Route '/special-events/:slug' in App.js, linked from SpecialEventsPage and banners.
+// - Notes: Production page. Handles image uploads, voting, and displays public results sorted by vote count.
+
 import React, { useEffect, useMemo, useState, useRef } from 'react'
 import { Upload, ImagePlus, Trash2, RefreshCw } from 'lucide-react'
 import { useParams } from 'react-router-dom'
@@ -13,7 +18,7 @@ import {
   deleteUserUpload,
   getUserVoteForEntry,
   getVoteStatsForEvent
-} from '../services/specialEvents'
+} from '../services/specialEventsApi'
 
 const SpecialEventDetailPage = () => {
   const { user, isAdmin } = useAuth()

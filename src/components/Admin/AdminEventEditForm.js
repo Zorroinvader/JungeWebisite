@@ -1,6 +1,11 @@
+// FILE OVERVIEW
+// - Purpose: Admin form for editing existing events; includes conflict checking, validation, and event duplication.
+// - Used by: AdminPanelClean when admin clicks edit on an event; allows full event property updates.
+// - Notes: Production component. Admin-only; uses eventsAPI.update and eventValidation; supports event duplication.
+
 import React, { useState, useEffect } from 'react';
 import { X, Save, Trash2, Copy } from 'lucide-react';
-import { eventsAPI } from '../../services/httpApi';
+import { eventsAPI } from '../../services/databaseApi';
 import { useDarkMode } from '../../contexts/DarkModeContext';
 import { checkEventConflicts, formatConflictMessage, validateEventTimes } from '../../utils/eventValidation';
 

@@ -1,5 +1,10 @@
+// FILE OVERVIEW
+// - Purpose: Public results page for costume contest showing vote rankings and images in a grid layout.
+// - Used by: Route '/kostuemwettbewerb-ergebnisse' in App.js, linked from HomePage and special event banners.
+// - Notes: Production page. Uses cached data for fast loading; displays vote stats sorted by rank.
+
 import React, { useState, useEffect } from 'react'
-import { getPublicImageUrl, getActiveSpecialEvents, getVoteStatsForEvent } from '../services/specialEvents'
+import { getPublicImageUrl, getActiveSpecialEvents, getVoteStatsForEvent } from '../services/specialEventsApi'
 
 const CostumeContestResultsPage = () => {
   const [event, setEvent] = useState(null)
@@ -53,10 +58,12 @@ const CostumeContestResultsPage = () => {
         setEvent(activeEvent)
         
         // Load vote stats for this event - use REST for faster loading
+        // SECURITY: Use secure getters to prevent key exposure
         try {
           // Try REST first for faster loading
-          const url = process.env.REACT_APP_SUPABASE_URL
-          const key = process.env.REACT_APP_SUPABASE_ANON_KEY
+          const { getSupabaseUrl, getSupabaseAnonKey } = await import('../utils/secureConfig')
+          const url = getSupabaseUrl()
+          const key = getSupabaseAnonKey()
           
           let stats = []
           if (url && key) {

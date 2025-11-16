@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Security middleware for API calls that adds security headers, rate limiting, and input validation.
+// - Used by: Currently NOT USED IN PRODUCTION - security features are implemented directly in httpApi.js.
+// - Notes: NOT USED IN PRODUCTION - This file is in Non-PROD folder. The currently used security implementation is in src/services/httpApi.js which includes security validation, rate limiting, SQL injection detection, and input validation inline. This middleware file is legacy and not imported anywhere.
+
 // Security Middleware for API calls
 // This middleware adds security headers, rate limiting, and input validation to all API requests
 

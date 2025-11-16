@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Admin component for moderating special event entries (e.g., costume contest submissions): approve/reject entries and view vote stats.
+// - Used by: AdminPanelClean in the special events tab; manages pending entries and displays voting results.
+// - Notes: Production component. Admin-only; uses specialEvents service for entry management and vote statistics.
+
 import React, { useEffect, useState } from 'react'
 import { Trophy, Vote, TrendingUp, Users, RefreshCw } from 'lucide-react'
 import { getActiveSpecialEvents, listPendingEntries, approveEntry, rejectEntry, getPublicImageUrl, listApprovedEntries, deleteUserUpload, getVoteStatsForEvent } from '../../services/specialEvents'

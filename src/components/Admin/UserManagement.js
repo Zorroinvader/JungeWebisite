@@ -1,5 +1,10 @@
+// FILE OVERVIEW
+// - Purpose: Admin component for managing users: viewing profiles, updating roles, creating users, and viewing user activity.
+// - Used by: AdminPanelClean in the users tab; provides user list, role management, and user creation via RegisterForm.
+// - Notes: Production component. Admin-only; uses profilesAPI for user operations; includes user creation and role updates.
+
 import React, { useState, useEffect } from 'react'
-import { profilesAPI } from '../../services/httpApi'
+import { profilesAPI } from '../../services/databaseApi'
 import { User, Shield, Mail, Calendar, AlertCircle, X, Plus, Eye, EyeOff, CheckCircle, Trash2 } from 'lucide-react'
 import moment from 'moment'
 import RegisterForm from '../Auth/RegisterForm'
@@ -23,18 +28,12 @@ const UserManagement = () => {
       
       let data = []
       
+      // getAll() now uses Supabase client as primary with HTTP fallback built-in
       try {
         data = await profilesAPI.getAll()
       } catch (error) {
-        try {
-          data = await profilesAPI.getAllDirect()
-        } catch (fallbackError) {
-          try {
-            data = await profilesAPI.getAllSimple()
-          } catch (simpleError) {
-            data = []
-          }
-        }
+        console.error('Failed to load profiles:', error)
+        data = []
       }
       
       setUsers(data || [])

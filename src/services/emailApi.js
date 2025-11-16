@@ -217,6 +217,9 @@ export const sendTestEmail = async (testEmail) => {
 // ADMIN EMAIL MANAGEMENT - Functions for managing admin notification emails
 // ============================================================================
 
+import { supabase } from '../lib/supabase'
+import { getSupabaseUrl, getSupabaseAnonKey } from '../utils/secureConfig'
+
 // SECURITY: Use secure getters to prevent key exposure
 const getSupabaseConfig = () => ({
   url: getSupabaseUrl(),

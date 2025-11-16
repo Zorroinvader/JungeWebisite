@@ -1,12 +1,14 @@
+// FILE OVERVIEW
+// - Purpose: Supabase client initialization and configuration; exports supabase client, table names, and user roles.
+// - Used by: Entire app for database access; imported by AuthContext, databaseApi, specialEventsApi, and many components.
+// - Notes: Production library file. Core dependency; uses secureConfig for safe key access.
+
 import { createClient } from '@supabase/supabase-js'
+import { getSupabaseUrl, getSupabaseAnonKey } from '../utils/secureConfig'
 
-// Supabase configuration
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL
-const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables. Please check your .env file.')
-}
+// SECURITY: Use secure getters to prevent key exposure
+const supabaseUrl = getSupabaseUrl()
+const supabaseAnonKey = getSupabaseAnonKey()
 
 // Create Supabase client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {

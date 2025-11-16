@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Handles email confirmation flow when users click confirmation links; exchanges tokens and redirects appropriately.
+// - Used by: App.js when URL contains confirmation tokens (token, type, or access_token in hash); shown before normal routing.
+// - Notes: Production component. Critical for user registration flow; handles Supabase auth token exchange and session setup.
+
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';

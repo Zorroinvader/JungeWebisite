@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Global authentication and authorization context (user session, profile, roles, sign-in/out, admin checks).
+// - Used by: Entire app via useAuth() hook and AuthProvider in App.js.
+// - Notes: Production file. Changes affect login flow, email confirmation handling, and admin/member permissions.
+
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase, USER_ROLES } from '../lib/supabase'

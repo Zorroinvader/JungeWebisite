@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Vereinfachte/Debug-Profilseite zum schnellen Testen der Event-Anfragen-Übersicht ohne komplexes Layout.
+// - Used by: Currently NOT USED IN PRODUCTION - This file is in Non-PROD folder. The test route '/profile-test' in App.js may still reference this, but it should be updated.
+// - Notes: NOT USED IN PRODUCTION - The currently used profile page is ProfilePage (src/pages/ProfilePage.js) which provides full production functionality including user info, event requests, and DSGVO compliance. This simple version was only for testing/debugging.
+
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { eventRequestsAPI } from '../services/httpApi'

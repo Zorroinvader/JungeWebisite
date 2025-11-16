@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Banner component displaying active special events (e.g., costume contest) with link to detail page.
+// - Used by: HomePage and other pages to promote special events; shows event title, description, and CTA link.
+// - Notes: Production component. Uses getActiveSpecialEvents service with caching; links to /special-events/:slug.
+
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Sparkles } from 'lucide-react'

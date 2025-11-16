@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Visual timeline component for a single event request, showing stages like requested, accepted, details, and final approval.
+// - Used by: Event request tracking / profile views to show the current status of a user’s request.
+// - Notes: Production UI component. Styling depends on dark mode and request.request_stage values.
+
 import React from 'react';
 import { useDarkMode } from '../../contexts/DarkModeContext';
 

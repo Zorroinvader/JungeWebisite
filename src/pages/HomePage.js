@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Main public landing page that shows hero, next event info, CTA buttons, and the small month calendar.
+// - Used by: Route component for path '/', rendered from the main router (see App.js).
+// - Notes: Core production page. Changes here affect the first impression for all visitors.
+
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
@@ -6,7 +11,7 @@ import { Calendar, Users, FileText, Search } from 'lucide-react'
 import SimpleMonthCalendar from '../components/Calendar/SimpleMonthCalendar'
 import TypewriterText from '../components/UI/TypewriterText'
 import NextEventInfo from '../components/UI/NextEventInfo'
-import { getActiveSpecialEvents } from '../services/specialEvents'
+import { getActiveSpecialEvents } from '../services/specialEventsApi'
 import PublicEventRequestForm from '../components/Calendar/PublicEventRequestForm'
 import GuestOrRegisterModal from '../components/Calendar/GuestOrRegisterModal'
 

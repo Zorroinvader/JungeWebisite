@@ -1,6 +1,11 @@
+// FILE OVERVIEW
+// - Purpose: Public/self-service page where users can look up, track, update, and cancel their event requests via email or logged-in user ID.
+// - Used by: Route '/event-tracking' in App.js and email links in notification templates.
+// - Notes: Production page. Uses Layout, DetailedEventForm, RequestTimeline and eventRequestsAPI; changes affect core user flow.
+
 import React, { useEffect, useState } from 'react';
 import Layout from '../components/Layout/Layout';
-import { eventRequestsAPI } from '../services/httpApi';
+import { eventRequestsAPI } from '../services/databaseApi';
 import RequestTimeline from '../components/Calendar/RequestTimeline';
 import DetailedEventForm from '../components/Calendar/DetailedEventForm';
 import { useDarkMode } from '../contexts/DarkModeContext';

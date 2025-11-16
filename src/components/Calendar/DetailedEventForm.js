@@ -1,6 +1,11 @@
+// FILE OVERVIEW
+// - Purpose: Modal form for submitting detailed event information (step 2 of 3-step workflow) after initial request is accepted; includes PDF upload.
+// - Used by: EventRequestTrackingPage when user clicks "Details ausfüllen" for an accepted request; also used in admin flows.
+// - Notes: Production component. Submits via eventRequestsAPI.submitDetailedRequest; handles file uploads for signed contracts.
+
 import React, { useState, useEffect } from 'react';
 import { X, Upload, CheckCircle } from 'lucide-react';
-import { eventRequestsAPI, storageAPI } from '../../services/httpApi';
+import { eventRequestsAPI, storageAPI } from '../../services/databaseApi';
 import { useDarkMode } from '../../contexts/DarkModeContext';
 import { sendAdminNotification, areNotificationsEnabled } from '../../utils/settingsHelper';
 

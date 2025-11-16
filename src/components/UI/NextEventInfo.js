@@ -1,5 +1,10 @@
+// FILE OVERVIEW
+// - Purpose: Component displaying the next upcoming event with date, title, and link; shown on homepage hero section.
+// - Used by: HomePage in the hero section; loads next event from eventsAPI and displays it prominently.
+// - Notes: Production component. Uses eventsAPI.getAll to find next event; shows "Keine Events" if none found.
+
 import React, { useState, useEffect } from 'react'
-import { eventsAPI } from '../../services/httpApi'
+import { eventsAPI } from '../../services/databaseApi'
 
 const NextEventInfo = () => {
   const [nextEvent, setNextEvent] = useState(null)

@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Main React entry for all routes; wires Router, layout, pages, and protected/admin routes.
+// - Used by: Root React render in index.js as the top-level application component.
+// - Notes: Production file. Any new page or route should be registered here.
+
 import React from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
@@ -10,7 +15,8 @@ import ContactPage from './pages/ContactPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import ProfilePage from './pages/ProfilePage'
-import ProfilePageSimple from './pages/ProfilePageSimple'
+// ProfilePageSimple moved to Non-PROD - test route disabled
+// import ProfilePageSimple from './Non-PROD/pages/ProfilePageSimple'
 import EventRequestTrackingPage from './pages/EventRequestTrackingPage'
 import EmailConfirmationHandler from './components/Auth/EmailConfirmationHandler'
 import AdminPanelClean from './components/Admin/AdminPanelClean'
@@ -19,7 +25,7 @@ import SpecialEventDetailPage from './pages/SpecialEventDetailPage'
 import CostumeContestResultsPage from './pages/CostumeContestResultsPage'
 import './index.css'
 // import { Analytics } from '@vercel/analytics/react' // Commented out - package not installed
-import { prefetchActiveSpecialEvents } from './services/specialEvents'
+import { prefetchActiveSpecialEvents } from './services/specialEventsApi'
 
 // Protected Route Component
 const ProtectedRoute = ({ children, requireAuth = true, requireAdmin = false }) => {
@@ -100,7 +106,8 @@ const AppContent = () => {
         
         {/* Test Route */}
         <Route path="/test" element={<div>Test Route Works!</div>} />
-        <Route path="/profile-test" element={<Layout><ProfilePageSimple /></Layout>} />
+        {/* ProfilePageSimple moved to Non-PROD - test route disabled */}
+        {/* <Route path="/profile-test" element={<Layout><ProfilePageSimple /></Layout>} /> */}
         <Route path="/admin-test" element={<Layout><AdminPanelClean /></Layout>} />
         
         {/* Auth Routes */}

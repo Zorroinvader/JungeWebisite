@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Security monitoring configuration for dashboards, alerts, and monitoring intervals.
+// - Used by: Currently NOT USED IN PRODUCTION - may be used by SecurityDashboard or future monitoring features.
+// - Notes: NOT USED IN PRODUCTION - This file is in Non-PROD folder. Currently, security monitoring is not implemented in production. If needed, this config can be moved back to src/config/ and used with SecurityDashboard (also in Non-PROD).
+
 // Security Monitoring Configuration
 // This file configures monitoring dashboards and alerts for the security system
 

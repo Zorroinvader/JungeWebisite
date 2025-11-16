@@ -1,6 +1,11 @@
+// FILE OVERVIEW
+// - Purpose: DSGVO compliance component allowing users to export their data, request deletion, and manage consent.
+// - Used by: ProfilePage to provide data protection rights (Article 15, 16, 17 GDPR); uses dsgvoAPI for operations.
+// - Notes: Production component. Critical for legal compliance; handles user data export and deletion requests.
+
 import React, { useState } from 'react'
 import { Download, Trash2, Edit, Shield, CheckCircle, AlertTriangle } from 'lucide-react'
-import { dsgvoAPI } from '../../services/httpApi'
+import { dsgvoAPI } from '../../services/databaseApi'
 
 const DSGVOCompliance = ({ userId, userEmail }) => {
   const [loading, setLoading] = useState(false)

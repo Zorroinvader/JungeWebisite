@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Image gallery component for displaying clubhouse photos with lightbox, navigation, and download features.
+// - Used by: AboutPage to show clubhouse images; provides full-screen viewing and image navigation.
+// - Notes: Production component. Supports keyboard navigation, zoom, and download; shows image metadata and location info.
+
 import React, { useState, useRef, useEffect } from 'react'
 import { X, ChevronLeft, ChevronRight, ZoomIn, Download, Eye, Info, MapPin, Users, Calendar } from 'lucide-react'
 

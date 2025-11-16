@@ -1,6 +1,11 @@
+// FILE OVERVIEW
+// - Purpose: Haupt-Profilseite für eingeloggte Nutzer mit Übersicht zu persönlichen Daten, Event-Anfragen und DSGVO/Fußnotenaktionen.
+// - Used by: Route '/profile' (geschützt) in App.js; aufgerufen nach erfolgreicher Anmeldung/Registrierung.
+// - Notes: Production member/admin page. Nutzt AuthContext, eventRequestsAPI, MyEventRequests, DSGVOCompliance und eventBus. This is the currently used profile page. A simplified test version ProfilePageSimple exists in Non-PROD/pages/ but is not used in production.
+
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { eventRequestsAPI } from '../services/httpApi'
+import { eventRequestsAPI } from '../services/databaseApi'
 import { User, Mail } from 'lucide-react'
 import eventBus from '../utils/eventBus'
 import MyEventRequests from '../components/Profile/MyEventRequests'

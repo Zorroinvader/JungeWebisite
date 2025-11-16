@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Experimental admin dashboard to visualise security metrics and DSGVO operations (exports/deletions).
+// - Used by: Currently NOT USED IN PRODUCTION - This file is in Non-PROD folder. It was previously linked from AdminPanelClean but is no longer imported.
+// - Notes: NOT USED IN PRODUCTION - This is an experimental/demo component with simulated data. The currently used admin dashboard is AdminPanelClean (src/components/Admin/AdminPanelClean.js) which provides production admin functionality.
+
 import React, { useState, useEffect } from 'react'
 import { Shield, AlertTriangle, CheckCircle, Clock, Users, Database, Eye, Trash2, Download } from 'lucide-react'
 import { securityAPI, dsgvoAPI } from '../../services/httpApi'

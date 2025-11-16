@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Main site header with navigation links, logo, user menu, dark mode toggle, and admin access.
+// - Used by: Layout component on all public pages; provides navigation to About, FAQ, Contact, Profile, Admin.
+// - Notes: Production component. Shows user menu when logged in; admin link visible only to admins; includes dark mode toggle.
+
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'

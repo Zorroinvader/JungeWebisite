@@ -1,4 +1,10 @@
+// FILE OVERVIEW
+// - Purpose: Handle all data access, caching, and helper logic for "special events" (e.g. contests, special pages).
+// - Used by: Special event pages/components like SpecialEventsPage, CostumeContestResultsPage, banners, and upload/voting UIs.
+// - Notes: Production service file. Be careful, changes can impact Supabase queries, caching, and voting logic.
+
 import { supabase } from '../lib/supabase'
+import { getSupabaseUrl, getSupabaseAnonKey } from '../utils/secureConfig'
 
 const BUCKET = 'special-event-images'
 
@@ -69,9 +75,10 @@ export async function getActiveSpecialEvents({ useCache = true } = {}) {
     return list
   } catch (e) {
     // Try REST fallback with anon key
+    // SECURITY: Use secure getters to prevent key exposure
     try {
-      const url = process.env.REACT_APP_SUPABASE_URL
-      const key = process.env.REACT_APP_SUPABASE_ANON_KEY
+      const url = getSupabaseUrl()
+      const key = getSupabaseAnonKey()
       if (url && key) {
         const controller = new AbortController()
         const to = setTimeout(() => controller.abort(), timeoutMs)
@@ -150,8 +157,9 @@ export async function getSpecialEventBySlug(slug) {
 
 export async function getSpecialEventBySlugREST(slug) {
   try {
-    const url = process.env.REACT_APP_SUPABASE_URL
-    const key = process.env.REACT_APP_SUPABASE_ANON_KEY
+    // SECURITY: Use secure getters to prevent key exposure
+    const url = getSupabaseUrl()
+    const key = getSupabaseAnonKey()
     if (!url || !key) return null
     const resp = await fetch(`${url}/rest/v1/special_events?slug=eq.${encodeURIComponent(slug)}&select=id,title,slug,description,starts_at,is_active&limit=1`, {
       headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
@@ -177,9 +185,10 @@ export async function getFirstSpecialEventAny() {
   } catch {}
 
   // REST fallback
+  // SECURITY: Use secure getters to prevent key exposure
   try {
-    const url = process.env.REACT_APP_SUPABASE_URL
-    const key = process.env.REACT_APP_SUPABASE_ANON_KEY
+    const url = getSupabaseUrl()
+    const key = getSupabaseAnonKey()
     if (url && key) {
       const resp = await fetch(`${url}/rest/v1/special_events?select=id,title,slug,description,starts_at,is_active&limit=1`, {
         headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
@@ -229,8 +238,9 @@ export async function listApprovedEntries(eventId) {
 
 export async function listApprovedEntriesREST(eventId) {
   try {
-    const url = process.env.REACT_APP_SUPABASE_URL
-    const key = process.env.REACT_APP_SUPABASE_ANON_KEY
+    // SECURITY: Use secure getters to prevent key exposure
+    const url = getSupabaseUrl()
+    const key = getSupabaseAnonKey()
     if (!url || !key) return []
     const resp = await fetch(`${url}/rest/v1/special_event_entries?event_id=eq.${encodeURIComponent(eventId)}&status=eq.approved&select=id,event_id,title,description,image_path,status,approved_at&order=approved_at.desc`, {
       headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
@@ -371,8 +381,9 @@ export async function listPendingEntries(eventId) {
 
 export async function listPendingEntriesREST(eventId) {
   try {
-    const url = process.env.REACT_APP_SUPABASE_URL
-    const key = process.env.REACT_APP_SUPABASE_ANON_KEY
+    // SECURITY: Use secure getters to prevent key exposure
+    const url = getSupabaseUrl()
+    const key = getSupabaseAnonKey()
     if (!url || !key) return []
     const resp = await fetch(`${url}/rest/v1/special_event_entries?event_id=eq.${encodeURIComponent(eventId)}&status=eq.pending&select=id,event_id,title,description,image_path,submitter_contact,status,created_at&order=created_at.asc`, {
       headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
@@ -399,8 +410,9 @@ export async function approveEntry(entryId) {
 
 export async function approveEntryREST(entryId) {
   try {
-    const url = process.env.REACT_APP_SUPABASE_URL
-    const key = process.env.REACT_APP_SUPABASE_ANON_KEY
+    // SECURITY: Use secure getters to prevent key exposure
+    const url = getSupabaseUrl()
+    const key = getSupabaseAnonKey()
     if (!url || !key) throw new Error('Missing Supabase env')
     const resp = await fetch(`${url}/rest/v1/special_event_entries?id=eq.${encodeURIComponent(entryId)}`, {
       method: 'PATCH',
@@ -434,8 +446,9 @@ export async function rejectEntry(entryId) {
 
 export async function rejectEntryREST(entryId) {
   try {
-    const url = process.env.REACT_APP_SUPABASE_URL
-    const key = process.env.REACT_APP_SUPABASE_ANON_KEY
+    // SECURITY: Use secure getters to prevent key exposure
+    const url = getSupabaseUrl()
+    const key = getSupabaseAnonKey()
     if (!url || !key) throw new Error('Missing Supabase env')
     const resp = await fetch(`${url}/rest/v1/special_event_entries?id=eq.${encodeURIComponent(entryId)}`, {
       method: 'PATCH',
