@@ -18,13 +18,10 @@ serve(async (req) => {
   }
 
   try {
-    console.log('📥 Fetching ICS feed from:', ICS_FEED_URL)
-    
     // Fetch the ICS feed
     const response = await fetch(ICS_FEED_URL)
     
     if (!response.ok) {
-      console.error('❌ Failed to fetch ICS:', response.status, response.statusText)
       return new Response(
         JSON.stringify({ 
           error: `Failed to fetch ICS: ${response.statusText}`,
@@ -43,9 +40,6 @@ serve(async (req) => {
     // Get the ICS content
     const icsContent = await response.text()
     
-    console.log('✅ Successfully fetched ICS')
-    console.log('📊 Content length:', icsContent.length, 'characters')
-    
     // Return the ICS content with CORS headers
     return new Response(icsContent, {
       status: 200,
@@ -57,8 +51,6 @@ serve(async (req) => {
     })
 
   } catch (error) {
-    console.error('❌ Error:', error)
-    
     return new Response(
       JSON.stringify({ 
         error: error.message,

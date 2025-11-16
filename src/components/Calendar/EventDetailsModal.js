@@ -1,9 +1,14 @@
+// FILE OVERVIEW
+// - Purpose: Modal showing detailed event information with edit/delete actions for admins; displays event metadata and contract links.
+// - Used by: SimpleMonthCalendar and admin panels when clicking on events; allows quick editing via QuickEventEditModal.
+// - Notes: Production component. Admin-only actions (edit/delete) are shown based on AuthContext.isAdmin().
+
 import React, { useState } from 'react'
 import { X, MapPin, Clock, Users, FileText, Calendar, Lock, Edit, Trash2 } from 'lucide-react'
 import moment from 'moment'
 import { useAuth } from '../../contexts/AuthContext'
 import QuickEventEditModal from './QuickEventEditModal'
-import { eventsAPI, eventRequestsAPI } from '../../services/httpApi'
+import { eventsAPI, eventRequestsAPI } from '../../services/databaseApi'
 
 const EventDetailsModal = ({ event, onClose, onEventUpdated }) => {
   const { isAdmin } = useAuth()
@@ -14,111 +19,39 @@ const EventDetailsModal = ({ event, onClose, onEventUpdated }) => {
   
   if (!event) return null
 
-  // Debug logging
-  console.log('EventDetailsModal - Event data:', event)
-  console.log('EventDetailsModal - isPrivate:', event.isPrivate)
-  console.log('EventDetailsModal - is_private:', event.is_private)
-  console.log('EventDetailsModal - isAdmin:', isAdmin())
-  console.log('EventDetailsModal - Admin check:', isAdmin())
+  // Determine event type for deletion
+  const isTemporaryBlocker = event.is_temporary
+  const isRequest = event.request_stage
+  const isRequestById = event.request_id
+  const isAcceptedRequest = event.request_stage === 'initial_accepted' || event.request_stage === 'final_accepted'
+  const hasLinkedRequest = event.request_id || event.id
 
-  const formatDate = (dateString) => {
-    return moment(dateString).format('dddd, DD. MMMM YYYY [um] HH:mm')
-  }
-
-  const formatDuration = (startDate, endDate) => {
-    if (!endDate) return 'Keine Endzeit angegeben'
-    
-    const start = moment(startDate)
-    const end = moment(endDate)
-    const duration = moment.duration(end.diff(start))
-    
-    const hours = Math.floor(duration.asHours())
-    const minutes = duration.minutes()
-    
-    if (hours > 0) {
-      return `${hours}h ${minutes > 0 ? `${minutes}m` : ''}`
-    } else {
-      return `${minutes}m`
-    }
-  }
-
-
-  // Check if this is a blocked event for non-admin users
-  const isPrivate = event.isPrivate || event.is_private || false
-  const isBlocked = event.isBlocked || (isPrivate && !isAdmin())
-  const isRequest = event.isRequest || false
-  
-  // Check if event ID starts with "request-" (it's a request)
-  const isRequestById = typeof event.id === 'string' && event.id.startsWith('request-')
-  
-  // Check if it's a temporary blocker (temp-blocked-XXX)
-  const isTemporaryBlocker = typeof event.id === 'string' && event.id.startsWith('temp-blocked-')
-  
-  const isAcceptedRequest = event.resource?.isRequest || event.resource?.status === 'pending' || false
-  
-  // Check if this event has a linked request ID
-  const hasLinkedRequest = event.resource?.request_id || event.request_id || false
-  
-  console.log('Event details:', {
-    id: event.id,
-    isRequest,
-    isRequestById,
-    isTemporaryBlocker,
-    isAcceptedRequest,
-    hasLinkedRequest,
-    resource: event.resource
-  })
-
-  // Handle delete event
   const handleDelete = async () => {
     setDeleting(true)
-    
-    // Close modal immediately for better UX
-    setShowDeleteConfirm(false)
-    onClose()
-    
     try {
-      console.log('🗑️ Deleting event:', event.id, 'Is request:', isRequest, 'Is request by ID:', isRequestById, 'Is temporary blocker:', isTemporaryBlocker, 'Has linked request:', hasLinkedRequest)
-      
-      // Extract actual request ID based on event ID format
-      let actualRequestId = event.id
-      if (isRequestById) {
-        actualRequestId = event.id.replace('request-', '')
-      } else if (isTemporaryBlocker) {
-        actualRequestId = event.id.replace('temp-blocked-', '')
-      }
-      
       if (isTemporaryBlocker || isRequest || isRequestById || isAcceptedRequest) {
-        // This is a temporary blocker or event request - decline it
-        console.log('Declining request/blocker:', actualRequestId)
-        await eventRequestsAPI.rejectRequest(actualRequestId, 'Vom Administrator abgelehnt')
-        setDeleteMessage('Event-Anfrage wurde abgelehnt')
-      } else if (hasLinkedRequest) {
-        // This event was created from a request - delete both the event and the request
-        console.log('Deleting event with linked request:', event.id, 'Request ID:', hasLinkedRequest)
-        await eventsAPI.delete(event.id)
-        await eventRequestsAPI.rejectRequest(hasLinkedRequest, 'Vom Administrator gelöscht')
-        setDeleteMessage('Event und Anfrage wurden gelöscht')
+        // Delete request
+        if (event.id) {
+          await eventRequestsAPI.delete(event.id)
+        }
       } else {
-        // Regular event - delete it
-        console.log('Deleting regular event:', event.id)
-        await eventsAPI.delete(event.id)
-        setDeleteMessage('Event wurde gelöscht')
+        // Delete event
+        if (hasLinkedRequest && event.request_id) {
+          await eventRequestsAPI.delete(event.request_id)
+        }
+        if (event.id) {
+          await eventsAPI.delete(event.id)
+        }
       }
-      
-      // Show success message briefly
-      setTimeout(() => setDeleteMessage(''), 3000)
-      
-      // Refresh calendar after successful deletion
-      if (onEventUpdated) {
-        onEventUpdated()
-      }
+      setDeleteMessage('Event erfolgreich gelöscht')
+      setTimeout(() => {
+        setDeleteMessage('')
+        onClose()
+        if (onEventUpdated) onEventUpdated()
+      }, 1500)
     } catch (err) {
-      console.error('Error deleting event:', err)
-      setDeleteMessage('Fehler: ' + err.message)
-      setTimeout(() => setDeleteMessage(''), 5000)
-      // Reopen modal if there was an error
-      setShowDeleteConfirm(true)
+      setDeleteMessage('Fehler beim Löschen: ' + (err.message || 'Unbekannter Fehler'))
+      setTimeout(() => setDeleteMessage(''), 3000)
     } finally {
       setDeleting(false)
     }
@@ -128,183 +61,64 @@ const EventDetailsModal = ({ event, onClose, onEventUpdated }) => {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
-          <div className="flex items-start justify-between mb-6">
-            <div className="flex-1">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                {isBlocked ? 'Blockiert' : event.title}
-              </h2>
-              <div className="flex items-center space-x-2">
-                {isBlocked && (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                    <Lock className="h-3 w-3 mr-1" />
-                    Blocked
-                  </span>
-                )}
-                {isRequest && (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                    <Clock className="h-3 w-3 mr-1" />
-                    Special Event
-                  </span>
-                )}
-                {!isBlocked && !isRequest && (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    Public Event
-                  </span>
-                )}
-              </div>
+          <div className="flex justify-between items-start mb-4">
+            <h2 className="text-2xl font-bold text-gray-900">{event.title}</h2>
+            <div className="flex gap-2">
+              {isAdmin && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowQuickEdit(true)}
+                    disabled={deleting}
+                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center disabled:opacity-50"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Bearbeiten
+                  </button>
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    disabled={deleting}
+                    className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex items-center disabled:opacity-50"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    {(isTemporaryBlocker || isRequest || isRequestById || isAcceptedRequest) ? 'Ablehnen' : hasLinkedRequest ? 'Event & Anfrage löschen' : 'Löschen'}
+                  </button>
+                </div>
+              )}
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors duration-200 ml-4"
-            >
-              <X className="h-6 w-6" />
-            </button>
           </div>
-
-          {/* Event Details */}
-          <div className="space-y-6">
-            {isBlocked ? (
-              /* Blocked Event Message */
-              <div className="text-center py-8">
-                <Lock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Privates Event
-                </h3>
-                <p className="text-gray-600">
-                  Dieses Event ist privat und nur für Administratoren sichtbar.
-                </p>
-              </div>
-            ) : (
-              <>
-                {/* Date and Time */}
-                <div className="flex items-start space-x-3">
-                  <Calendar className="h-5 w-5 text-gray-400 mt-1 flex-shrink-0" />
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-900">Datum und Zeit</h3>
-                    <p className="text-sm text-gray-600">
-                      {formatDate(event.start_date)}
-                    </p>
-                    {event.end_date && (
-                      <p className="text-sm text-gray-500">
-                        Dauer: {formatDuration(event.start_date, event.end_date)}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Location - only show for public events or admin */}
-                {event.location && (isAdmin() || !event.isPrivate) && (
-                  <div className="flex items-start space-x-3">
-                    <MapPin className="h-5 w-5 text-gray-400 mt-1 flex-shrink-0" />
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-900">Ort</h3>
-                      <p className="text-sm text-gray-600">{event.location}</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Max Participants - only show for public events or admin */}
-                {event.max_participants && (isAdmin() || !event.isPrivate) && (
-                  <div className="flex items-start space-x-3">
-                    <Users className="h-5 w-5 text-gray-400 mt-1 flex-shrink-0" />
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-900">Teilnehmer</h3>
-                      <p className="text-sm text-gray-600">
-                        Maximal {event.max_participants} Teilnehmer
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Description - only show for admin or public events */}
-                {event.description && (isAdmin() || !isPrivate) && (
-                  <div className="flex items-start space-x-3">
-                    <FileText className="h-5 w-5 text-gray-400 mt-1 flex-shrink-0" />
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-900">Beschreibung</h3>
-                      <p className="text-sm text-gray-600 whitespace-pre-wrap">
-                        {event.description}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* Event Info - only show for admin */}
-            {isAdmin() && (
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-gray-900 mb-2">Event-Informationen</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-500">Event-ID:</span>
-                    <span className="ml-2 font-mono text-gray-700">{event.id}</span>
-                  </div>
-                  {event.created_at && (
-                    <div>
-                      <span className="text-gray-500">Erstellt am:</span>
-                      <span className="ml-2 text-gray-700">
-                        {moment(event.created_at).format('DD.MM.YYYY HH:mm')}
-                      </span>
-                    </div>
-                  )}
-                  {event.updated_at && event.updated_at !== event.created_at && (
-                    <div>
-                      <span className="text-gray-500">Aktualisiert am:</span>
-                      <span className="ml-2 text-gray-700">
-                        {moment(event.updated_at).format('DD.MM.YYYY HH:mm')}
-                      </span>
-                    </div>
-                  )}
-                  <div>
-                    <span className="text-gray-500">Sichtbarkeit:</span>
-                    <span className="ml-2 text-gray-700">
-                      {isPrivate ? 'Privat' : 'Öffentlich'}
-                    </span>
-                  </div>
-                  {isRequest && (
-                    <div>
-                      <span className="text-gray-500">Status:</span>
-                      <span className="ml-2 text-gray-700">Anfrage</span>
-                    </div>
-                  )}
-                </div>
+          
+          <div className="space-y-4">
+            {event.description && (
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">Beschreibung</h3>
+                <p className="text-gray-600">{event.description}</p>
               </div>
             )}
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex justify-between pt-6 border-t border-gray-200 mt-6">
-            {isAdmin() && (
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowQuickEdit(true)}
-                  className="px-4 py-2 text-sm font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg transition-colors flex items-center"
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Event bearbeiten
-                </button>
-                <button
-                  onClick={() => {
-                    console.log('🗑️ Delete button clicked');
-                    console.log('Is admin:', isAdmin());
-                    console.log('Is request:', isRequest);
-                    setShowDeleteConfirm(true);
-                  }}
-                  disabled={deleting}
-                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex items-center disabled:opacity-50"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  {(isTemporaryBlocker || isRequest || isRequestById || isAcceptedRequest) ? 'Ablehnen' : hasLinkedRequest ? 'Event & Anfrage löschen' : 'Löschen'}
-                </button>
+            
+            <div className="flex items-center text-gray-600">
+              <Calendar className="h-5 w-5 mr-2" />
+              <span>{moment(event.start_date).format('DD.MM.YYYY')} - {moment(event.end_date).format('DD.MM.YYYY')}</span>
+            </div>
+            
+            {event.requester_name && (
+              <div className="flex items-center text-gray-600">
+                <Users className="h-5 w-5 mr-2" />
+                <span>{event.requester_name}</span>
               </div>
             )}
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200 ml-auto"
-            >
-              Schließen
-            </button>
+            
+            {event.is_private && (
+              <div className="flex items-center text-gray-600">
+                <Lock className="h-5 w-5 mr-2" />
+                <span>Privates Event</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

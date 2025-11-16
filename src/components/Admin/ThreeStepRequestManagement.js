@@ -1,5 +1,10 @@
+// FILE OVERVIEW
+// - Purpose: Admin component for managing the 3-step event request workflow (initial → accepted → details submitted → final accepted).
+// - Used by: AdminPanelClean as the main request management interface; handles all stages of event request approval.
+// - Notes: Production component. Core admin tool; manages request stages, PDF downloads, and sends email notifications.
+
 import React, { useState, useEffect } from 'react';
-import { eventRequestsAPI } from '../../services/httpApi';
+import { eventRequestsAPI } from '../../services/databaseApi';
 import { CheckCircle, XCircle, Clock, Download, X } from 'lucide-react';
 import { useDarkMode } from '../../contexts/DarkModeContext';
 import { sendUserNotification } from '../../utils/settingsHelper';
@@ -20,21 +25,11 @@ const ThreeStepRequestManagement = () => {
     try {
       setLoading(true);
       setError('');
-      
-      console.log('Loading event requests...');
       const session = await supabase.auth.getSession();
-      console.log('Current user session:', session);
-      console.log('Current user ID:', session.data.session?.user?.id);
-      console.log('Current user email:', session.data.session?.user?.email);
-      
       // Load only the most recent 50 requests for faster loading
       const data = await eventRequestsAPI.getAdminPanelData(50, 0);
-      console.log('Raw API data:', data);
-      
       // Show all requests, but prioritize 3-step workflow ones
       const allRequests = data || [];
-      console.log('All requests:', allRequests);
-      
       // Sort by created_at, newest first
       allRequests.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       
@@ -42,12 +37,6 @@ const ThreeStepRequestManagement = () => {
       setHasMoreRequests(allRequests.length === 50); // If we got exactly 50, there might be more
       setLastUpdated(new Date());
     } catch (err) {
-      console.error('Error loading requests:', err);
-      console.error('Error details:', {
-        message: err.message,
-        stack: err.stack,
-        name: err.name
-      });
       setError(`Fehler beim Laden der Anfragen: ${err.message}`);
     } finally {
       setLoading(false);
@@ -196,10 +185,7 @@ const ThreeStepRequestManagement = () => {
     const handleLocalAcceptInitial = async () => {
       setLocalLoading(true);
       try {
-        console.log('Accepting request:', request.id, 'with notes:', localNotes);
         await eventRequestsAPI.acceptInitialRequest(request.id, localNotes);
-        console.log('Request accepted successfully');
-        
         // Send email to user informing them to fill detailed form
         try {
           await sendUserNotification(request.requester_email, {
@@ -212,7 +198,6 @@ const ThreeStepRequestManagement = () => {
             event_type: request.event_type
           }, 'initial_request_accepted');
         } catch (emailErr) {
-          console.warn('Failed to send user notification:', emailErr);
         }
         
         await loadRequests();
@@ -220,7 +205,6 @@ const ThreeStepRequestManagement = () => {
         setSelectedRequest(null);
         alert('✅ Initiale Anfrage akzeptiert! Der Benutzer wurde per E-Mail benachrichtigt und kann nun die Details ausfüllen.');
       } catch (err) {
-        console.error('Error accepting initial request:', err);
         alert('Fehler beim Akzeptieren der Anfrage');
       } finally {
         setLocalLoading(false);
@@ -245,7 +229,6 @@ const ThreeStepRequestManagement = () => {
         setSelectedRequest(null);
         alert('❌ Anfrage abgelehnt. Der Benutzer wurde benachrichtigt.');
       } catch (err) {
-        console.error('Error rejecting request:', err);
         alert('Fehler beim Ablehnen der Anfrage');
       } finally {
         setLocalLoading(false);
@@ -275,7 +258,6 @@ const ThreeStepRequestManagement = () => {
             event_type: request.event_type
           }, 'final_approval');
         } catch (emailErr) {
-          console.warn('Failed to send user notification:', emailErr);
         }
         
         await loadRequests();
@@ -283,7 +265,6 @@ const ThreeStepRequestManagement = () => {
         setSelectedRequest(null);
         alert('✅ Event endgültig freigegeben! Das Event ist nun im Kalender sichtbar.\n\nDer Benutzer wurde per E-Mail benachrichtigt.');
       } catch (err) {
-        console.error('Error final accepting request:', err);
         alert(`Fehler bei der finalen Freigabe:\n\n${err.message || err.toString()}\n\nBitte überprüfen Sie die Browser-Konsole für Details.`);
       } finally {
         setLocalLoading(false);
@@ -291,35 +272,22 @@ const ThreeStepRequestManagement = () => {
     };
 
     const handleDownloadContract = async () => {
-      console.log('📥 Download attempt - Contract info:', {
-        has_storage_url: !!request.signed_contract_url,
-        has_database_data: !!request.uploaded_file_data,
-        file_name: request.uploaded_file_name,
-        file_size: request.uploaded_file_size,
-        data_length: request.uploaded_file_data ? request.uploaded_file_data.length : 0
-      });
-
       try {
         // METHOD 1: Try Storage Bucket URL
         if (request.signed_contract_url) {
-          console.log('Trying storage URL:', request.signed_contract_url);
           try {
             const response = await fetch(request.signed_contract_url);
             if (response.ok) {
-              console.log('✅ Storage download successful');
               window.open(request.signed_contract_url, '_blank');
               return;
             } else {
-              console.log('⚠️ Storage fetch failed:', response.status, response.statusText);
             }
           } catch (storageError) {
-            console.log('⚠️ Storage error:', storageError.message);
           }
         }
         
         // METHOD 2: Try Database Base64 Data
         if (request.uploaded_file_data) {
-          console.log('✅ Using database fallback - Base64 length:', request.uploaded_file_data.length);
           try {
             const byteCharacters = atob(request.uploaded_file_data);
             const byteNumbers = new Array(byteCharacters.length);
@@ -337,23 +305,19 @@ const ThreeStepRequestManagement = () => {
             link.click();
             document.body.removeChild(link);
             window.URL.revokeObjectURL(url);
-            console.log('✅ Database download successful!');
             return;
           } catch (base64Error) {
-            console.error('❌ Base64 decode error:', base64Error);
             throw new Error('Fehler beim Dekodieren der PDF-Daten: ' + base64Error.message);
           }
         }
         
         // If no data at all
-        console.error('❌ No contract data found!');
         alert(
           '❌ Kein Vertrag verfügbar!\n\n' +
           'Der Benutzer hat noch keinen Vertrag hochgeladen.\n' +
           'Bitte warten Sie, bis der Benutzer die Details eingereicht hat.'
         );
       } catch (error) {
-        console.error('❌ Download error:', error);
         alert('Fehler beim Herunterladen:\n\n' + error.message + '\n\nSiehe Browser-Konsole (F12) für Details.');
       }
     };

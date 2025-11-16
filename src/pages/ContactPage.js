@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Public contact page with address, board contact details, map placeholder and a mailto-based contact form.
+// - Used by: Route '/contact' in App.js, linked from header and footer.
+// - Notes: Production page; submitting the form opens the user’s email client via mailto:.
+
 import React, { useState } from 'react'
 import { MapPin, Mail, Clock, Users, FileText, Calendar, Crown, UserCheck, Heart, Target, Send, MessageSquare } from 'lucide-react'
 

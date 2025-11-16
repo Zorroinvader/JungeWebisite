@@ -1,6 +1,11 @@
+// FILE OVERVIEW
+// - Purpose: Vereinfachte/Debug-Profilseite zum schnellen Testen der Event-Anfragen-Übersicht ohne komplexes Layout.
+// - Used by: Currently NOT USED IN PRODUCTION - This file is in Non-PROD folder. The test route '/profile-test' in App.js may still reference this, but it should be updated.
+// - Notes: NOT USED IN PRODUCTION - The currently used profile page is ProfilePage (src/pages/ProfilePage.js) which provides full production functionality including user info, event requests, and DSGVO compliance. This simple version was only for testing/debugging.
+
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { eventRequestAPI } from '../services/api'
+import { eventRequestsAPI } from '../services/httpApi'
 import { Calendar, Clock, CheckCircle, XCircle, AlertCircle, User, Mail } from 'lucide-react'
 import moment from 'moment'
 
@@ -10,31 +15,19 @@ const ProfilePageSimple = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  console.log('ProfilePageSimple render - user:', user, 'profile:', profile)
 
   const loadEventRequests = useCallback(async () => {
     try {
-      console.log('Loading event requests for user ID:', user?.id)
       setLoading(true)
       if (!user?.id) {
-        console.log('No user ID available')
         setError('Benutzer nicht gefunden')
         setEventRequests([])
         return
       }
-      const { data, error } = await eventRequestAPI.getUserEventRequests(user.id)
-      console.log('Event requests API response:', { data, error })
-      if (error) {
-        console.error('Error loading event requests:', error)
-        setEventRequests([])
-        setError(`Fehler beim Laden der Event-Anfragen: ${error.message || 'Unbekannter Fehler'}`)
-      } else {
-        console.log('Event requests loaded successfully:', data)
-        setEventRequests(data || [])
-        setError('')
-      }
+      const data = await eventRequestsAPI.getByUser(user.id)
+      setEventRequests(data || [])
+      setError('')
     } catch (err) {
-      console.error('Exception loading event requests:', err)
       setEventRequests([])
       setError(`Ein unerwarteter Fehler ist aufgetreten: ${err.message}`)
     } finally {
@@ -43,7 +36,6 @@ const ProfilePageSimple = () => {
   }, [user?.id])
 
   useEffect(() => {
-    console.log('ProfilePageSimple useEffect - loading event requests')
     loadEventRequests()
   }, [loadEventRequests])
 

@@ -1,7 +1,13 @@
+// FILE OVERVIEW
+// - Purpose: Alternative event request modal using HTTP API; legacy component that has been replaced by PublicEventRequestForm.
+// - Used by: Currently NOT USED IN PRODUCTION - This file is in Non-PROD folder. SimpleMonthCalendar now uses PublicEventRequestForm instead.
+// - Notes: NOT USED IN PRODUCTION - The currently used event request form is PublicEventRequestForm (src/components/Calendar/PublicEventRequestForm.js) which implements the 3-step workflow (initial → accepted → details submitted → final accepted). This legacy component is kept for reference but should not be used.
+
 import React, { useState, useEffect } from 'react'
 import { X, Upload, CheckCircle } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDarkMode } from '../../contexts/DarkModeContext'
+import { eventRequestsAPI } from '../../services/httpApi'
 import PDFLink from '../UI/PDFLink'
 
 const EventRequestModalHTTP = ({ isOpen, onClose, selectedDate }) => {
@@ -203,10 +209,20 @@ const EventRequestModalHTTP = ({ isOpen, onClose, selectedDate }) => {
     setError('')
 
     try {
-      // Convert file to base64
-      const arrayBuffer = await uploadedFile.arrayBuffer()
-      const uint8Array = new Uint8Array(arrayBuffer)
-      const base64String = btoa(String.fromCharCode(...uint8Array))
+      // Convert file to base64 safely using FileReader to avoid stack overflows
+      const toBase64 = (file) => new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          const result = reader.result || ''
+          // result is a data URL like: data:<mime>;base64,<data>
+          const commaIndex = result.indexOf(',')
+          resolve(commaIndex >= 0 ? result.substring(commaIndex + 1) : '')
+        }
+        reader.onerror = (e) => reject(e)
+        reader.readAsDataURL(file)
+      })
+
+      const base64String = await toBase64(uploadedFile)
 
       const requestData = {
         title: formData.title,
@@ -236,40 +252,15 @@ const EventRequestModalHTTP = ({ isOpen, onClose, selectedDate }) => {
       }
 
 
-      // Try direct HTTP call to Supabase REST API
-      const supabaseUrl = process.env.REACT_APP_SUPABASE_URL
-      const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY
-
-      const response = await fetch(`${supabaseUrl}/rest/v1/event_requests`, {
-        method: 'POST',
-        headers: {
-          'apikey': supabaseKey,
-          'Authorization': `Bearer ${supabaseKey}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify(requestData)
-      })
-
-      if (response.ok) {
+      // Use the API service to create the event request
+      try {
+        await eventRequestsAPI.createInitialRequest(requestData)
         setSuccess(true)
-      } else {
-        const errorText = await response.text()
-        console.error('HTTP request failed:', response.status, errorText)
-        
-        // Fallback to localStorage
-        const localData = {
-          ...requestData,
-          id: `local_${Date.now()}`,
-          created_at: new Date().toISOString(),
-          saved_locally: true
-        }
-        
-        const existingRequests = JSON.parse(localStorage.getItem('event_requests') || '[]')
-        existingRequests.push(localData)
-        localStorage.setItem('event_requests', JSON.stringify(existingRequests))
-        
-        setSuccess(true)
+      } catch (apiError) {
+        console.error('Failed to create event request:', apiError)
+        setError('Fehler beim Erstellen der Anfrage. Bitte versuchen Sie es erneut.')
+        setLoading(false)
+        return
       }
 
       // Show success and close after delay
@@ -291,8 +282,6 @@ const EventRequestModalHTTP = ({ isOpen, onClose, selectedDate }) => {
       }, 2000)
 
     } catch (error) {
-      console.error('Event request error:', error)
-      
       // Fallback to localStorage
       const localData = {
         id: `local_${Date.now()}`,
@@ -321,7 +310,6 @@ const EventRequestModalHTTP = ({ isOpen, onClose, selectedDate }) => {
       existingRequests.push(localData)
       localStorage.setItem('event_requests', JSON.stringify(existingRequests))
       
-      console.log('✅ Event request saved locally as fallback:', localData)
       setSuccess(true)
       
       setTimeout(() => {

@@ -1,10 +1,15 @@
+// FILE OVERVIEW
+// - Purpose: Small month calendar component showing events and blocked dates; allows clicking dates to request events.
+// - Used by: HomePage as the main calendar display; shows events from eventsAPI and temporarily blocked dates.
+// - Notes: Production component. Uses react-big-calendar with moment; handles date clicks to trigger event request flow.
+
 import React, { useState, useEffect, useCallback } from 'react'
 import { Calendar, momentLocalizer } from 'react-big-calendar'
 import moment from 'moment'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDarkMode } from '../../contexts/DarkModeContext'
-import httpAPI from '../../services/httpApi'
+import httpAPI from '../../services/databaseApi'
 import EventDetailsModal from './EventDetailsModal'
 import PublicEventRequestForm from './PublicEventRequestForm'
 
@@ -29,12 +34,6 @@ const SimpleMonthCalendar = ({
   const [lastLoadedMonth, setLastLoadedMonth] = useState(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
 
-  // Debug authentication state
-  console.log('📅 Calendar: Auth state:', { 
-    user: user?.email, 
-    isAdmin: isAdmin(), 
-    authLoading 
-  })
 
   // Load all events and requests - Optimized for calendar view
   const loadAllEvents = useCallback(async () => {
@@ -47,70 +46,18 @@ const SimpleMonthCalendar = ({
     try {
       setLoading(true)
       
-      console.log('📅 Calendar: Loading events...')
-      console.log('📅 Calendar: User:', user?.email, 'isAdmin:', isAdmin())
-      
       // Load all events (not just current month) to show all available events
       let allEvents = []
       
-      // Add test events first to see if calendar rendering works
-      const testEvents = [
-        {
-          id: 'test-1',
-          title: 'Test Event 1',
-          start_date: new Date().toISOString(),
-          end_date: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(), // 2 hours later
-          is_private: false,
-          status: 'approved',
-          description: 'This is a test event'
-        },
-        {
-          id: 'test-2',
-          title: 'Test Event 2',
-          start_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // tomorrow
-          end_date: new Date(Date.now() + 25 * 60 * 60 * 1000).toISOString(), // tomorrow + 1 hour
-          is_private: false,
-          status: 'approved',
-          description: 'This is another test event'
-        }
-      ]
-      
-      console.log('📅 Calendar: Adding test events first:', testEvents.length)
-      allEvents = [...testEvents]
-      
       try {
-        console.log('📅 Calendar: Calling httpAPI.events.getAll()...')
+        // getAll() now uses Supabase client as primary with HTTP fallback built-in
         const apiEvents = await httpAPI.events.getAll()
-        console.log('📅 Calendar: API response:', apiEvents)
-        console.log('📅 Calendar: Loaded events count:', apiEvents.length)
-        
-        if (apiEvents.length > 0) {
-          console.log('📅 Calendar: First event sample:', apiEvents[0])
+        if (apiEvents && apiEvents.length > 0) {
           allEvents = [...allEvents, ...apiEvents]
         }
       } catch (error) {
-        console.error('📅 Calendar: Primary API failed, trying fallback:', error)
-        try {
-          console.log('📅 Calendar: Trying getAllDirect()...')
-          const directEvents = await httpAPI.events.getAllDirect()
-          console.log('📅 Calendar: Fallback API success:', directEvents.length, 'events')
-          allEvents = [...allEvents, ...directEvents]
-        } catch (fallbackError) {
-          console.error('📅 Calendar: Direct API failed, trying ultra-simple:', fallbackError)
-          try {
-            console.log('📅 Calendar: Trying getAllSimple()...')
-            const simpleEvents = await httpAPI.events.getAllSimple()
-            console.log('📅 Calendar: Ultra-simple API success:', simpleEvents.length, 'events')
-            allEvents = [...allEvents, ...simpleEvents]
-          } catch (simpleError) {
-            console.error('📅 Calendar: All API methods failed:', simpleError)
-            console.log('📅 Calendar: Using only test events')
-          }
-        }
+        console.error('Failed to load events:', error)
       }
-      
-      console.log('📅 Calendar: Final events array:', allEvents.length, 'events')
-      console.log('📅 Calendar: Sample events:', allEvents.slice(0, 3))
       
       // Load pending requests (admin only) - DISABLED to remove requests from calendar
       let pendingRequests = []
@@ -124,22 +71,16 @@ const SimpleMonthCalendar = ({
       // }
       
       // Load temporarily blocked dates (these show as orange blockers in calendar) - DISABLED for speed
-      console.log('📅 Calendar: Skipping temporarily blocked dates for faster loading...')
       const temporarilyBlocked = []
       
       const calendarEvents = []
-      console.log('📅 Calendar: Created empty calendarEvents array')
       
       // Process approved events
       try {
         if (allEvents && allEvents.length > 0) {
-        console.log('📅 Calendar: Processing', allEvents.length, 'events')
         allEvents.forEach((event, index) => {
           // Check if this is a public event that should be visible
           const isPublicEvent = !event.is_private && event.status === 'approved'
-          
-          // For test events, always show them
-          const isTestEvent = event.id.startsWith('test-')
           
           const isPrivate = event.is_private || false
           // Check if user owns this event (check multiple possible ID fields)
@@ -154,7 +95,7 @@ const SimpleMonthCalendar = ({
           let isBlocked = false
 
           // Handle privacy based on user role
-          if (isPrivate && !isTestEvent) {
+          if (isPrivate) {
             
             if (isAdmin()) {
               // Admin sees everything with full details
@@ -173,7 +114,7 @@ const SimpleMonthCalendar = ({
               isBlocked = true
             }
           } else {
-            // Public event or test event - everyone can see
+            // Public event - everyone can see
             eventTitle = event.title
             eventDescription = event.description
             isBlocked = false
@@ -211,12 +152,8 @@ const SimpleMonthCalendar = ({
             // Skip events with invalid dates
           }
         })
-        } else {
-          console.log('📅 Calendar: No events to process. allEvents:', allEvents)
         }
       } catch (processingError) {
-        console.error('📅 Calendar: Error processing events:', processingError)
-        console.log('📅 Calendar: allEvents at error:', allEvents)
       }
 
       // Process pending requests (admin only) - DISABLED
@@ -268,7 +205,6 @@ const SimpleMonthCalendar = ({
               blockedEndDate = new Date(blocked.end_date || blocked.start_date)
             }
           } catch (e) {
-            console.error('Error parsing dates for blocked event:', e, blocked)
           }
           
           if (blockedStartDate && !isNaN(blockedStartDate.getTime())) {
@@ -304,9 +240,7 @@ const SimpleMonthCalendar = ({
       }
 
       setEvents(calendarEvents)
-      console.log('📅 Calendar: Loaded', calendarEvents.length, 'events')
     } catch (error) {
-      console.error('Error loading events:', error)
     } finally {
       setLoading(false)
       setIsRefreshing(false)
@@ -321,11 +255,9 @@ const SimpleMonthCalendar = ({
       // Load events regardless of authentication status
       // Events should be visible to all users (logged in or not)
       if (mounted) {
-        console.log('📅 Calendar: Loading events (auth status:', authLoading ? 'loading' : 'complete', ')')
         try {
           await loadAllEvents()
         } catch (error) {
-          console.error('Error loading events:', error)
           if (mounted) {
             setLoading(false)
             setIsRefreshing(false)

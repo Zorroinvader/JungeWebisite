@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Helper utilities for reading, writing, and interpreting admin settings and for generating email content/links.
+// - Used by: Admin UI components and email/notification services when sending user or admin emails and reading settings.
+// - Notes: Production helper file. Relies on localStorage and Supabase Edge Functions; edits can affect email behavior. Uses secureConfig for safe key access.
+
 // Helper functions for reading and managing admin settings
 
 /**
@@ -11,7 +16,6 @@ export const getAdminSettings = () => {
       return JSON.parse(savedSettings)
     }
   } catch (error) {
-    console.error('Error loading admin settings:', error)
   }
   
   // Return default settings if none exist
@@ -46,8 +50,7 @@ export const getAdminNotificationEmails = () => {
   
   // If no emails configured, use admin@admin.com as default
   if (emails.length === 0) {
-    console.warn('No admin emails configured, using default: zorro.invader@gmail.com')
-    return ['zorro.invader@gmail.com', 'jungegesellschaft@wedelheine.de']
+    return ['zorro.invader@gmail.com']
   }
   
   return emails
@@ -106,12 +109,8 @@ export const getDefaultCalendarView = () => {
  */
 export const sendUserNotification = async (userEmail, eventData, type) => {
   if (!userEmail) {
-    console.warn('No user email provided for notification')
     return
   }
-
-  console.log('[USER NOTIFICATION] Sending to:', userEmail)
-  console.log('[USER NOTIFICATION] Type:', type)
 
   let subject = ''
   let message = ''
@@ -189,14 +188,11 @@ export const sendUserNotification = async (userEmail, eventData, type) => {
   const htmlContent = generateUserEmailHTML(subject, message, eventData, type)
 
   // Send via Supabase Edge Function
+  // SECURITY: Use secure getters to prevent key exposure
   try {
-    const supabaseUrl = process.env.REACT_APP_SUPABASE_URL
-    const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY
-
-    if (!supabaseUrl || !supabaseKey) {
-      console.warn('⚠️ Supabase credentials not found')
-      return
-    }
+    const { getSupabaseUrl, getSupabaseAnonKey } = await import('../utils/secureConfig')
+    const supabaseUrl = getSupabaseUrl()
+    const supabaseKey = getSupabaseAnonKey()
 
     const response = await fetch(`${supabaseUrl}/functions/v1/send-admin-notification`, {
       method: 'POST',
@@ -215,10 +211,8 @@ export const sendUserNotification = async (userEmail, eventData, type) => {
     })
 
     if (response.ok) {
-      console.log('✅ User notification sent successfully!')
     }
   } catch (error) {
-    console.error('❌ Failed to send user notification:', error)
   }
 }
 
@@ -229,20 +223,14 @@ export const sendUserNotification = async (userEmail, eventData, type) => {
  */
 export const sendAdminNotification = async (eventData, type = 'initial_request') => {
   if (!areNotificationsEnabled()) {
-    console.log('Notifications disabled, skipping email')
     return
   }
 
   const adminEmails = getAdminNotificationEmails()
   
   if (adminEmails.length === 0) {
-    console.warn('No admin emails configured for notifications')
     return
   }
-
-  console.log('[NOTIFICATION] Sending to:', adminEmails)
-  console.log('[NOTIFICATION] Event:', eventData)
-  console.log('[NOTIFICATION] Type:', type)
   
   // Format notification message based on type
   let subject = ''
@@ -315,26 +303,17 @@ export const sendAdminNotification = async (eventData, type = 'initial_request')
                 `Ihr Event-Management-System`
   }
   
-  // Log notification details
-  console.log('\n' + '='.repeat(60))
-  console.log('EMAIL NOTIFICATION')
-  console.log('='.repeat(60))
-  console.log('To:', adminEmails.join(', '))
-  console.log('Subject:', subject)
-  console.log('-'.repeat(60))
-  console.log(message)
-  console.log('='.repeat(60) + '\n')
-  
   // Generate HTML email content
   const htmlContent = generateEmailHTML(subject, message, eventData, type)
   
   // Send email via Supabase Edge Function
   try {
-    const supabaseUrl = process.env.REACT_APP_SUPABASE_URL
-    const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY
+    // SECURITY: Use secure getters to prevent key exposure
+    const { getSupabaseUrl, getSupabaseAnonKey } = await import('../utils/secureConfig')
+    const supabaseUrl = getSupabaseUrl()
+    const supabaseKey = getSupabaseAnonKey()
     
     if (!supabaseUrl || !supabaseKey) {
-      console.warn('⚠️ Supabase credentials not found, showing alert instead')
       alert(`E-MAIL BENACHRICHTIGUNG\n\n` +
             `An: ${adminEmails.join(', ')}\n` +
             `Betreff: ${subject}\n\n` +
@@ -366,14 +345,12 @@ export const sendAdminNotification = async (eventData, type = 'initial_request')
     const result = await response.json()
     
     if (result.success) {
-      console.log('✅ Email sent successfully!')
       // Optionally show a subtle success notification
     } else {
       throw new Error(result.error || 'Unknown error')
     }
     
   } catch (error) {
-    console.error('❌ Failed to send email:', error)
     // Show alert as fallback
     alert(`E-MAIL BENACHRICHTIGUNG (Versand fehlgeschlagen)\n\n` +
           `An: ${adminEmails.join(', ')}\n` +
@@ -628,7 +605,6 @@ export const saveAdminSettings = (settings) => {
     localStorage.setItem('adminSettings', JSON.stringify(settingsWithTimestamp))
     return true
   } catch (error) {
-    console.error('Error saving admin settings:', error)
     return false
   }
 }

@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Main layout wrapper component that provides Header and Footer around page content; used for consistent page structure.
+// - Used by: All public pages via App.js routes (HomePage, AboutPage, FAQPage, ContactPage, etc.) wrapped in <Layout>.
+// - Notes: Production component. Provides consistent navigation and footer across all pages; children are the page content.
+
 import React from 'react'
 import Header from './Header'
 import Footer from './Footer'

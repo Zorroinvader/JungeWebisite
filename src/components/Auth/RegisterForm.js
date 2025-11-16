@@ -1,8 +1,13 @@
+// FILE OVERVIEW
+// - Purpose: Registration form component with email/password/full name fields, validation, password visibility toggle, and email confirmation handling.
+// - Used by: RegisterPage (route '/register') and can be used as modal; handles pending event requests after registration.
+// - Notes: Production component. Uses AuthContext.signUp and creates profile via profilesAPI; checks for pending event requests from sessionStorage.
+
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDarkMode } from '../../contexts/DarkModeContext'
-import { profilesAPI } from '../../services/httpApi'
+import { profilesAPI } from '../../services/databaseApi'
 import { Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle, Moon, Sun } from 'lucide-react'
 
 const RegisterForm = ({ onSuccess, isModal = false }) => {
@@ -61,22 +66,18 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    console.log('Form submitted!', formData)
     setIsSubmitting(true)
     setError('')
 
     if (!validateForm()) {
-      console.log('Form validation failed')
       setIsSubmitting(false)
       return
     }
     
-    console.log('Form validation passed, proceeding with registration')
 
     try {
       if (isModal) {
         // Admin panel mode - create user without signing in
-        console.log('Creating user via admin panel (no sign-in)')
         const result = await profilesAPI.createUser({
           email: formData.email,
           password: formData.password,
@@ -84,7 +85,6 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
           role: 'member' // Default role for admin-created users
         })
         
-        console.log('User created successfully:', result)
         setSuccess(true)
         
         // Use callback to close modal and refresh user list
@@ -93,17 +93,19 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
         }, 500)
       } else {
         // Public registration mode - sign up and sign in
-        console.log('Calling signUp with:', { email: formData.email, password: formData.password, fullName: formData.fullName })
         
         // Call signup without timeout - let it complete naturally
         const { data, error } = await signUp(formData.email, formData.password, formData.fullName)
-        console.log('SignUp response:', { data, error })
         
         if (error) {
-          console.log('SignUp error:', error)
-          setError(error.message)
+          
+          // Handle email sending errors
+          if (error.message && error.message.includes('Error sending confirmation email')) {
+            setError('Es gab ein Problem beim Senden der Bestätigungs-E-Mail. Bitte versuchen Sie sich anzumelden, um zu überprüfen, ob Ihr Konto existiert. Falls das Problem weiterhin besteht, kontaktieren Sie bitte den Administrator.')
+          } else {
+            setError(error.message)
+          }
         } else {
-          console.log('SignUp successful')
           setSuccess(true)
           
           // Don't auto-redirect - let user see the email verification message
@@ -111,14 +113,17 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
         }
       }
     } catch (err) {
-      console.error('Registration error:', err)
       
       if (isModal) {
         // Admin panel error handling
         setError(`Fehler beim Erstellen des Benutzers: ${err.message}`)
       } else {
-        // Public registration error handling
-        setError('Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.')
+        // Handle email sending errors
+        if (err.message && err.message.includes('Error sending confirmation email')) {
+          setError('Es gab ein Problem beim Senden der Bestätigungs-E-Mail. Bitte versuchen Sie sich anzumelden, um zu überprüfen, ob Ihr Konto existiert. Falls das Problem weiterhin besteht, kontaktieren Sie bitte den Administrator.')
+        } else {
+          setError('Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.')
+        }
       }
     } finally {
       setIsSubmitting(false)
@@ -126,7 +131,6 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
   }
 
   if (success) {
-    console.log('Success screen is being rendered!')
     
     if (isModal) {
       // Modal success screen
@@ -551,7 +555,6 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  onClick={() => console.log('Register button clicked!')}
                   className="w-full flex justify-center py-3 px-4 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity bg-[#2E07D4] hover:bg-[#2506B8]"
                 >
                   {isSubmitting ? (

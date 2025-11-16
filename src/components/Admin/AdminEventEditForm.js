@@ -1,6 +1,11 @@
+// FILE OVERVIEW
+// - Purpose: Admin form for editing existing events; includes conflict checking, validation, and event duplication.
+// - Used by: AdminPanelClean when admin clicks edit on an event; allows full event property updates.
+// - Notes: Production component. Admin-only; uses eventsAPI.update and eventValidation; supports event duplication.
+
 import React, { useState, useEffect } from 'react';
 import { X, Save, Trash2, Copy } from 'lucide-react';
-import { eventsAPI } from '../../services/httpApi';
+import { eventsAPI } from '../../services/databaseApi';
 import { useDarkMode } from '../../contexts/DarkModeContext';
 import { checkEventConflicts, formatConflictMessage, validateEventTimes } from '../../utils/eventValidation';
 
@@ -68,7 +73,6 @@ const AdminEventEditForm = ({ isOpen, onClose, onSuccess, event, onSaveAsTemplat
             );
             setSeriesEvents(relatedEvents);
           } catch (error) {
-            console.error('Error loading series events:', error);
           }
         } else {
           setSeriesId(null);
@@ -170,7 +174,6 @@ const AdminEventEditForm = ({ isOpen, onClose, onSuccess, event, onSaveAsTemplat
       if (onClose) onClose();
 
     } catch (err) {
-      console.error('Error updating event:', err);
       setError(err.message || 'Fehler beim Aktualisieren des Events');
     } finally {
       setLoading(false);
@@ -185,7 +188,6 @@ const AdminEventEditForm = ({ isOpen, onClose, onSuccess, event, onSaveAsTemplat
       if (onSuccess) onSuccess();
       if (onClose) onClose();
     } catch (err) {
-      console.error('Error deleting event:', err);
       setError(err.message || 'Fehler beim Löschen des Events');
       setShowDeleteConfirm(false);
     } finally {

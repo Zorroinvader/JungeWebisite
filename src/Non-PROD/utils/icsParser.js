@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: ICS (iCalendar) file parser that converts .ics format to event objects for calendar import.
+// - Used by: Currently NOT USED IN PRODUCTION - may be used for future calendar import feature.
+// - Notes: NOT USED IN PRODUCTION - This file is in Non-PROD folder. Currently, calendar import functionality is not implemented in production. If needed in the future, this utility can be moved back to src/utils/ and integrated.
+
 /**
  * ICS Calendar Parser
  * Parses ICS (iCalendar) format and converts to event objects
@@ -148,7 +153,6 @@ export const convertToDBEvent = (icsEvent) => {
     endDateStr = endDate.toISOString()
     isAllDay = false
     
-    console.log(`   ⏰ Preserving time info: ${startDate.toLocaleTimeString('de-DE')} - ${endDate.toLocaleTimeString('de-DE')}`)
   } else {
     // Event is all-day - store as date-only string (YYYY-MM-DD)
     const formatDateOnly = (date) => {
@@ -166,7 +170,6 @@ export const convertToDBEvent = (icsEvent) => {
     endDateStr = formatDateOnly(endDate)
     isAllDay = true
     
-    console.log(`   📅 All-day event: ${startDateStr} - ${endDateStr}`)
   }
   
   return {
@@ -194,7 +197,6 @@ export const convertToDBEvent = (icsEvent) => {
  */
 export const fetchAndParseICS = async (url, supabaseAnonKey = null) => {
   try {
-    console.log('🌐 Fetching from URL:', url)
     
     // Prepare fetch options with authentication if using Supabase Edge Function
     const fetchOptions = {}
@@ -203,28 +205,20 @@ export const fetchAndParseICS = async (url, supabaseAnonKey = null) => {
         'Authorization': `Bearer ${supabaseAnonKey}`,
         'Content-Type': 'application/json'
       }
-      console.log('🔐 Using authenticated request to Supabase Edge Function')
     }
     
     const response = await fetch(url, fetchOptions)
     
-    console.log('📡 Response status:', response.status, response.statusText)
-    console.log('📋 Content-Type:', response.headers.get('content-type'))
     
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ Response error:', errorText)
       throw new Error(`Failed to fetch ICS: ${response.statusText} - ${errorText}`)
     }
     
     const icsContent = await response.text()
-    console.log('📄 ICS content length:', icsContent.length, 'characters')
-    console.log('🔍 Content preview:', icsContent.substring(0, 200) + '...')
     
-    console.log('⚙️  Parsing ICS content...')
     const events = parseICSContent(icsContent)
     
-    console.log(`✅ Parsed ${events.length} events`)
     
     // Show category breakdown
     const categoryCount = {}
@@ -233,14 +227,11 @@ export const fetchAndParseICS = async (url, supabaseAnonKey = null) => {
       categoryCount[cat] = (categoryCount[cat] || 0) + 1
     })
     
-    console.log('📊 Events by category:')
     Object.entries(categoryCount).forEach(([cat, count]) => {
-      console.log(`   - ${cat}: ${count}`)
     })
     
     return events
   } catch (error) {
-    console.error('❌ Error fetching ICS:', error)
     throw error
   }
 }

@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Main public landing page that shows hero, next event info, CTA buttons, and the small month calendar.
+// - Used by: Route component for path '/', rendered from the main router (see App.js).
+// - Notes: Core production page. Changes here affect the first impression for all visitors.
+
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
@@ -6,6 +11,7 @@ import { Calendar, Users, FileText, Search } from 'lucide-react'
 import SimpleMonthCalendar from '../components/Calendar/SimpleMonthCalendar'
 import TypewriterText from '../components/UI/TypewriterText'
 import NextEventInfo from '../components/UI/NextEventInfo'
+import { getActiveSpecialEvents } from '../services/specialEventsApi'
 import PublicEventRequestForm from '../components/Calendar/PublicEventRequestForm'
 import GuestOrRegisterModal from '../components/Calendar/GuestOrRegisterModal'
 
@@ -17,6 +23,7 @@ const HomePage = () => {
   const [showPublicRequestForm, setShowPublicRequestForm] = useState(false)
   const [showGuestOrRegister, setShowGuestOrRegister] = useState(false)
   const [selectedDate, setSelectedDate] = useState(null)
+  const [specialEvents, setSpecialEvents] = useState([])
 
   const handleFirstTextComplete = () => {
     setShowSubtitle(true)
@@ -66,6 +73,15 @@ const HomePage = () => {
     }
   }, [user])
 
+  // Load active special events (cached) for CTA target
+  useEffect(() => {
+    let mounted = true
+    getActiveSpecialEvents({ useCache: true })
+      .then(list => { if (mounted) setSpecialEvents(list || []) })
+      .catch(() => {})
+    return () => { mounted = false }
+  }, [])
+
   return (
     <div className="min-h-screen">
 
@@ -113,6 +129,16 @@ const HomePage = () => {
                 </div>
               </div>
             </div>
+
+            {/* Mobile Special Events CTA: always visible on home */}
+            <div className="mt-4 md:hidden">
+              <Link
+                to="/kostuemwettbewerb-ergebnisse"
+                className="inline-flex items-center justify-center px-4 py-3 text-base font-semibold text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg shadow-md w-full"
+              >
+                Kostümwettbewerb Ergebnisse
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -156,6 +182,15 @@ const HomePage = () => {
                 className={`text-[2.5vw] sm:text-[2vw] md:text-[1.6vw] lg:text-[1.3vw] xl:text-[1.1vw] font-medium text-[#252422] dark:text-[#F4F1E8] hover:text-[#A58C81] dark:hover:text-[#EBE9E9] transition-colors underline decoration-2 underline-offset-4 decoration-[#A58C81] dark:decoration-[#EBE9E9]`}
               >
                 Status verfolgen
+              </Link>
+              <span className={`text-[2.2vw] sm:text-[1.8vw] md:text-[1.4vw] lg:text-[1.1vw] xl:text-[0.9vw] text-[#252422] dark:text-[#F4F1E8]`}>
+                oder
+              </span>
+              <Link 
+                to="/kostuemwettbewerb-ergebnisse"
+                className={`text-[2.5vw] sm:text-[2vw] md:text-[1.6vw] lg:text-[1.3vw] xl:text-[1.1vw] font-medium text-[#252422] dark:text-[#F4F1E8] hover:text-[#A58C81] dark:hover:text-[#EBE9E9] transition-colors underline decoration-2 underline-offset-4 decoration-[#A58C81] dark:decoration-[#EBE9E9]`}
+              >
+                Ergebnisse ansehen
               </Link>
             </div>
           </div>

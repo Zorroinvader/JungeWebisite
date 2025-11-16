@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { getActiveSpecialEvents } from '../services/specialEvents'
+import { getActiveSpecialEvents } from '../services/specialEventsApi'
 
 const SpecialEventsPage = () => {
   const [events, setEvents] = useState([])

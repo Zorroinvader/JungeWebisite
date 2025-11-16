@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Main site header with navigation links, logo, user menu, dark mode toggle, and admin access.
+// - Used by: Layout component on all public pages; provides navigation to About, FAQ, Contact, Profile, Admin.
+// - Notes: Production component. Shows user menu when logged in; admin link visible only to admins; includes dark mode toggle.
+
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
@@ -14,8 +19,9 @@ const Header = () => {
 
   return (
     <>
-    <SpecialEventsBanner />
     <nav className="w-full border-b sticky top-0 z-40 bg-[#F4F1E8] dark:bg-[#252422] border-[#A58C81] dark:border-[#EBE9E9]">
+      {/* Special Events banner inside sticky header for mobile visibility */}
+      <SpecialEventsBanner />
       <div className="w-full px-[1vw] sm:px-[1.5vw] md:px-[2vw] lg:px-[2.5vw] xl:px-[3vw] 2xl:px-[3.5vw]">
         <div className="flex justify-between items-center h-[10vh] sm:h-[9vh] md:h-[8vh] lg:h-[7vh] xl:h-[6vh] 2xl:h-[5vh] w-full">
           {/* Logo on the left - Clickable to homepage */}
@@ -267,13 +273,11 @@ const Header = () => {
               <button
                 onClick={async () => {
                   try {
-                    console.log('Logout confirmed')
                     await signOut()
                     setShowLogoutConfirm(false)
                     setMobileOpen(false)
                     // Don't force page reload - let auth state change handle UI update
                   } catch (error) {
-                    console.error('Logout error:', error)
                     setShowLogoutConfirm(false)
                   }
                 }}
