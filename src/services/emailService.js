@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Email API service that handles all email operations: sending notifications (user/admin), managing admin email lists, and test emails via Supabase Edge Function (Resend API).
+// - Used by: settingsHelper.js, admin settings, and email configuration flows for sending emails and managing admin recipient lists.
+// - Notes: Production service file. Consolidates email sending and admin email management. Uses secureConfig for safe key access.
+
 /**
  * Email Service using Supabase Edge Function with Resend
  * This service sends emails to both users and admins for event notifications
@@ -11,18 +16,22 @@
  * @param {string} htmlContent - HTML formatted message
  * @returns {Promise<boolean>} Success status
  */
+import { getSupabaseUrl, getSupabaseAnonKey, sanitizeError, secureLog } from '../utils/secureConfig'
+
 export const sendEmail = async (recipients, subject, messageText, htmlContent = null) => {
   if (!recipients || recipients.length === 0) {
-    console.warn('No recipients provided for email');
     return false;
   }
 
-  const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
-  const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
-    console.warn('⚠️ Supabase credentials not found');
-    return false;
+  // SECURITY: Use secure getters to prevent key exposure
+  let supabaseUrl, supabaseKey
+  try {
+    supabaseUrl = getSupabaseUrl()
+    supabaseKey = getSupabaseAnonKey()
+  } catch (error) {
+    // SECURITY: Never expose keys in error messages
+    secureLog('error', 'Failed to get Supabase configuration', sanitizeError(error))
+    return false
   }
 
   try {
@@ -48,14 +57,12 @@ export const sendEmail = async (recipients, subject, messageText, htmlContent = 
     const result = await response.json();
 
     if (result.success) {
-      console.log('✅ Email sent successfully to:', recipients);
       return true;
     } else {
       throw new Error(result.error || 'Unknown error');
     }
 
   } catch (error) {
-    console.error('❌ Failed to send email:', error);
     return false;
   }
 }
@@ -68,7 +75,6 @@ export const sendEmail = async (recipients, subject, messageText, htmlContent = 
  */
 export const sendUserNotification = async (userEmail, eventData, type = 'initial_request') => {
   if (!userEmail) {
-    console.warn('No user email provided');
     return;
   }
 
@@ -92,7 +98,7 @@ export const sendUserNotification = async (userEmail, eventData, type = 'initial
                 `In Bearbeitung: Ein Administrator prüft Ihre Anfrage\n\n` +
                 `Sie erhalten eine weitere E-Mail, sobald Ihre Anfrage bearbeitet wurde.\n\n` +
                 `Mit freundlichen Grüßen\n` +
-                `Ihr Event-Management-Team`;
+                `Junge Gesellschaft Wedes-Wedel`;
       break;
 
     case 'accepted':
@@ -106,7 +112,7 @@ export const sendUserNotification = async (userEmail, eventData, type = 'initial
                 `Ende: ${eventData.end_datetime ? new Date(eventData.end_datetime).toLocaleString('de-DE') : eventData.end_date}\n\n` +
                 `Ihr Event ist jetzt im Kalender eingetragen.\n\n` +
                 `Mit freundlichen Grüßen\n` +
-                `Ihr Event-Management-Team`;
+                `Junge Gesellschaft Wedes-Wedel`;
       break;
 
     case 'rejected':
@@ -117,7 +123,7 @@ export const sendUserNotification = async (userEmail, eventData, type = 'initial
                 `Zeitraum: ${eventData.start_date ? new Date(eventData.start_date).toLocaleDateString('de-DE') : ''}\n\n` +
                 `Für Rückfragen kontaktieren Sie uns bitte.\n\n` +
                 `Mit freundlichen Grüßen\n` +
-                `Ihr Event-Management-Team`;
+                `Junge Gesellschaft Wedes-Wedel`;
       break;
 
     default:
@@ -144,7 +150,6 @@ export const sendUserNotification = async (userEmail, eventData, type = 'initial
  */
 export const sendAdminNotificationEmail = async (adminEmails, eventData, type = 'new_request') => {
   if (!adminEmails || adminEmails.length === 0) {
-    console.warn('No admin emails configured');
     return;
   }
 
@@ -165,7 +170,7 @@ export const sendAdminNotificationEmail = async (adminEmails, eventData, type = 
                 `Kategorie: ${eventData.event_type || 'N/A'}\n\n` +
                 `Zum Admin-Panel: ${window.location.origin}/admin\n\n` +
                 `Mit freundlichen Grüßen\n` +
-                `Ihr Event-Management-System`;
+                `Das System :D`;
       break;
 
     default:
@@ -196,7 +201,7 @@ export const sendTestEmail = async (testEmail) => {
                   `dies ist eine Test-E-Mail.\n\n` +
                   `Wenn Sie diese E-Mail erhalten, funktioniert Ihr E-Mail-System korrekt.\n\n` +
                   `Mit freundlichen Grüßen\n` +
-                  `Ihr Event-Management-System`;
+                  `Das System :D`;
   
   const htmlContent = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -206,5 +211,123 @@ export const sendTestEmail = async (testEmail) => {
   `;
   
   return await sendEmail([testEmail], subject, message, htmlContent);
+}
+
+// ============================================================================
+// ADMIN EMAIL MANAGEMENT - Functions for managing admin notification emails
+// ============================================================================
+
+// SECURITY: Use secure getters to prevent key exposure
+const getSupabaseConfig = () => ({
+  url: getSupabaseUrl(),
+  key: getSupabaseAnonKey()
+})
+
+/**
+ * Get all active admin notification emails from database
+ * @returns {Promise<Array<{id: string, email: string, added_at: string, notes: string}>>}
+ */
+export async function getAdminNotificationEmails() {
+  try {
+    // SECURITY: Use secure getters to prevent key exposure
+    const { url, key } = getSupabaseConfig()
+
+    const response = await fetch(`${url}/rest/v1/admin_notification_emails?select=id,email,added_at,notes,is_active&is_active=eq.true&order=added_at.desc`, {
+      method: 'GET',
+      headers: {
+        'apikey': key,
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      }
+    })
+
+    if (!response.ok) {
+      const text = await response.text()
+      return []
+    }
+
+    const data = await response.json()
+    return data || []
+  } catch (error) {
+    return []
+  }
+}
+
+/**
+ * Add a new admin notification email
+ * @param {string} email - Email address to add
+ * @param {string} notes - Optional notes
+ * @returns {Promise<Object>}
+ */
+export async function addAdminNotificationEmail(email, notes = '') {
+  const insertData = {
+    email: email.toLowerCase().trim(),
+    notes: notes.trim() || null,
+    is_active: true
+  }
+  
+  try {
+    // SECURITY: Use secure getters to prevent key exposure
+    const { url, key } = getSupabaseConfig()
+    
+    const response = await fetch(`${url}/rest/v1/admin_notification_emails`, {
+      method: 'POST',
+      headers: {
+        'apikey': key,
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify(insertData)
+    })
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Failed to add email: HTTP ${response.status} - ${errorText}`)
+    }
+    
+    const result = await response.json()
+    return result[0] || result
+  } catch (error) {
+    throw error
+  }
+}
+
+/**
+ * Remove an admin notification email
+ * @param {string} id - Email record ID
+ * @returns {Promise<void>}
+ */
+export async function removeAdminNotificationEmail(id) {
+  const { error } = await supabase
+    .from('admin_notification_emails')
+    .delete()
+    .eq('id', id)
+
+  if (error) throw error
+}
+
+/**
+ * Deactivate an admin notification email
+ * @param {string} id - Email record ID
+ * @returns {Promise<void>}
+ */
+export async function deactivateAdminNotificationEmail(id) {
+  const { error } = await supabase
+    .from('admin_notification_emails')
+    .update({ is_active: false })
+    .eq('id', id)
+
+  if (error) throw error
+}
+
+/**
+ * Get admin emails as a simple array of strings
+ * @returns {Promise<Array<string>>}
+ */
+export async function getAdminEmailsList() {
+  const emails = await getAdminNotificationEmails()
+  return emails.map(e => e.email)
 }
 

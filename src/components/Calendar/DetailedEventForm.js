@@ -1,6 +1,11 @@
+// FILE OVERVIEW
+// - Purpose: Modal form for submitting detailed event information (step 2 of 3-step workflow) after initial request is accepted; includes PDF upload.
+// - Used by: EventRequestTrackingPage when user clicks "Details ausfüllen" for an accepted request; also used in admin flows.
+// - Notes: Production component. Submits via eventRequestsAPI.submitDetailedRequest; handles file uploads for signed contracts.
+
 import React, { useState, useEffect } from 'react';
 import { X, Upload, CheckCircle } from 'lucide-react';
-import { eventRequestsAPI, storageAPI } from '../../services/httpApi';
+import { eventRequestsAPI, storageAPI } from '../../services/databaseApi';
 import { useDarkMode } from '../../contexts/DarkModeContext';
 import { sendAdminNotification, areNotificationsEnabled } from '../../utils/settingsHelper';
 
@@ -41,7 +46,6 @@ const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
           }));
         }
       } catch (e) {
-        console.error('Error parsing requested_days:', e);
       }
     } else if (request && request.start_date) {
       const startDate = request.start_date.split('T')[0];
@@ -148,10 +152,8 @@ const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
         const uploadResult = await storageAPI.uploadSignedContract(contractFile, request.id);
         if (uploadResult.success) {
           contractUrl = uploadResult.url;
-          console.log('✅ Storage upload successful:', contractUrl);
         }
       } catch (storageError) {
-        console.log('⚠️ Storage upload failed, will use database fallback:', storageError.message);
       }
 
       setUploadProgress(70);
@@ -171,9 +173,6 @@ const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
         uploaded_file_type: contractFile.type,
         uploaded_file_data: contractBase64
       };
-
-      console.log('📤 Submitting detailed request');
-
       await eventRequestsAPI.submitDetailedRequest(request.id, detailedData);
 
       // Send notification to admins that user has submitted detailed information
@@ -188,7 +187,6 @@ const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
             event_type: request.event_type
           }, 'detailed_info_submitted');
         } catch (notifError) {
-          console.warn('Failed to send notification:', notifError);
           // Don't fail the whole request if notification fails
         }
       }
@@ -202,7 +200,6 @@ const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
       }, 2000);
 
     } catch (err) {
-      console.error('Error submitting detailed request:', err);
       setError(err.message || 'Fehler beim Senden der Details');
     } finally {
       setLoading(false);

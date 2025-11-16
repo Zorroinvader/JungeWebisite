@@ -1,7 +1,12 @@
-import React, { useState, useEffect } from 'react';
+// FILE OVERVIEW
+// - Purpose: Component displaying user's event requests with timeline, status, and action buttons (fill details, cancel).
+// - Used by: ProfilePage to show all event requests for the logged-in user; displays RequestTimeline for each request.
+// - Notes: Production component. Loads requests via eventRequestsAPI.getByUser; handles cancellation and detail submission flows.
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDarkMode } from '../../contexts/DarkModeContext';
-import { eventRequestsAPI } from '../../services/httpApi';
+import { eventRequestsAPI } from '../../services/databaseApi';
 import RequestTimeline from '../Calendar/RequestTimeline';
 import DetailedEventForm from '../Calendar/DetailedEventForm';
 import { Clock, CheckCircle, XCircle } from 'lucide-react';
@@ -17,7 +22,7 @@ const MyEventRequests = () => {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [requestToCancel, setRequestToCancel] = useState(null);
 
-  const loadMyRequests = async () => {
+  const loadMyRequests = useCallback(async () => {
     if (!user) return;
     
     try {
@@ -30,15 +35,14 @@ const MyEventRequests = () => {
       
       setRequests(data || []);
     } catch (err) {
-      console.error('Error loading my requests:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     loadMyRequests();
-  }, [user]);
+  }, [user, loadMyRequests]);
 
   const handleFillDetails = (request) => {
     setSelectedRequest(request);
@@ -67,7 +71,6 @@ const MyEventRequests = () => {
       setRequestToCancel(null);
       loadMyRequests();
     } catch (err) {
-      console.error('Error cancelling request:', err);
       alert('Fehler beim Stornieren der Anfrage');
     } finally {
       setCancellingId(null);
@@ -76,17 +79,6 @@ const MyEventRequests = () => {
 
   const canCancelRequest = (request) => {
     return !['final_accepted', 'rejected', 'cancelled'].includes(request.request_stage);
-  };
-
-  const getStageColor = (stage) => {
-    const colors = {
-      'initial': 'border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/10',
-      'initial_accepted': 'border-l-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/10',
-      'details_submitted': 'border-l-4 border-purple-500 bg-purple-50 dark:bg-purple-900/10',
-      'final_accepted': 'border-l-4 border-green-500 bg-green-50 dark:bg-green-900/10',
-      'rejected': 'border-l-4 border-red-500 bg-red-50 dark:bg-red-900/10'
-    };
-    return colors[stage] || 'border-l-4 border-gray-300';
   };
 
   const getStageIcon = (stage) => {

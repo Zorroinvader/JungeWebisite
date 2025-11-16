@@ -1,12 +1,18 @@
+// FILE OVERVIEW
+// - Purpose: Small month calendar component showing events and blocked dates; allows clicking dates to request events.
+// - Used by: HomePage as the main calendar display; shows events from eventsAPI and temporarily blocked dates.
+// - Notes: Production component. Uses react-big-calendar with moment; handles date clicks to trigger event request flow.
+
 import React, { useState, useEffect, useCallback } from 'react'
 import { Calendar, momentLocalizer } from 'react-big-calendar'
 import moment from 'moment'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDarkMode } from '../../contexts/DarkModeContext'
-import httpAPI from '../../services/httpApi'
+import httpAPI from '../../services/databaseApi'
 import EventDetailsModal from './EventDetailsModal'
 import PublicEventRequestForm from './PublicEventRequestForm'
+import { secureLog, sanitizeError } from '../../utils/secureConfig'
 
 // Set up moment.js for react-big-calendar
 moment.locale('de')
@@ -26,15 +32,9 @@ const SimpleMonthCalendar = ({
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [showEventRequestForm, setShowEventRequestForm] = useState(false)
   const [selectedDate, setSelectedDate] = useState(null)
-  const [lastLoadedMonth, setLastLoadedMonth] = useState(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [calendarDate, setCalendarDate] = useState(currentDate || new Date())
 
-  // Debug authentication state
-  console.log('📅 Calendar: Auth state:', { 
-    user: user?.email, 
-    isAdmin: isAdmin(), 
-    authLoading 
-  })
 
   // Load all events and requests - Optimized for calendar view
   const loadAllEvents = useCallback(async () => {
@@ -47,70 +47,19 @@ const SimpleMonthCalendar = ({
     try {
       setLoading(true)
       
-      console.log('📅 Calendar: Loading events...')
-      console.log('📅 Calendar: User:', user?.email, 'isAdmin:', isAdmin())
-      
       // Load all events (not just current month) to show all available events
       let allEvents = []
       
-      // Add test events first to see if calendar rendering works
-      const testEvents = [
-        {
-          id: 'test-1',
-          title: 'Test Event 1',
-          start_date: new Date().toISOString(),
-          end_date: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(), // 2 hours later
-          is_private: false,
-          status: 'approved',
-          description: 'This is a test event'
-        },
-        {
-          id: 'test-2',
-          title: 'Test Event 2',
-          start_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // tomorrow
-          end_date: new Date(Date.now() + 25 * 60 * 60 * 1000).toISOString(), // tomorrow + 1 hour
-          is_private: false,
-          status: 'approved',
-          description: 'This is another test event'
-        }
-      ]
-      
-      console.log('📅 Calendar: Adding test events first:', testEvents.length)
-      allEvents = [...testEvents]
-      
       try {
-        console.log('📅 Calendar: Calling httpAPI.events.getAll()...')
+        // getAll() now uses Supabase client as primary with HTTP fallback built-in
         const apiEvents = await httpAPI.events.getAll()
-        console.log('📅 Calendar: API response:', apiEvents)
-        console.log('📅 Calendar: Loaded events count:', apiEvents.length)
         
-        if (apiEvents.length > 0) {
-          console.log('📅 Calendar: First event sample:', apiEvents[0])
+        if (apiEvents && Array.isArray(apiEvents) && apiEvents.length > 0) {
           allEvents = [...allEvents, ...apiEvents]
         }
       } catch (error) {
-        console.error('📅 Calendar: Primary API failed, trying fallback:', error)
-        try {
-          console.log('📅 Calendar: Trying getAllDirect()...')
-          const directEvents = await httpAPI.events.getAllDirect()
-          console.log('📅 Calendar: Fallback API success:', directEvents.length, 'events')
-          allEvents = [...allEvents, ...directEvents]
-        } catch (fallbackError) {
-          console.error('📅 Calendar: Direct API failed, trying ultra-simple:', fallbackError)
-          try {
-            console.log('📅 Calendar: Trying getAllSimple()...')
-            const simpleEvents = await httpAPI.events.getAllSimple()
-            console.log('📅 Calendar: Ultra-simple API success:', simpleEvents.length, 'events')
-            allEvents = [...allEvents, ...simpleEvents]
-          } catch (simpleError) {
-            console.error('📅 Calendar: All API methods failed:', simpleError)
-            console.log('📅 Calendar: Using only test events')
-          }
-        }
+        secureLog('error', 'Failed to load events', sanitizeError(error))
       }
-      
-      console.log('📅 Calendar: Final events array:', allEvents.length, 'events')
-      console.log('📅 Calendar: Sample events:', allEvents.slice(0, 3))
       
       // Load pending requests (admin only) - DISABLED to remove requests from calendar
       let pendingRequests = []
@@ -118,34 +67,23 @@ const SimpleMonthCalendar = ({
       //   try {
       //     pendingRequests = await httpAPI.eventRequests.getCalendarRequests(startOfMonth, endOfMonth)
       //   } catch (dateError) {
-      //     console.warn('Date range optimization failed for requests, falling back to all requests:', dateError)
       //     pendingRequests = await httpAPI.eventRequests.getAll()
       //   }
       // }
       
       // Load temporarily blocked dates (these show as orange blockers in calendar) - DISABLED for speed
-      console.log('📅 Calendar: Skipping temporarily blocked dates for faster loading...')
       const temporarilyBlocked = []
       
       const calendarEvents = []
-      console.log('📅 Calendar: Created empty calendarEvents array')
       
       // Process approved events
       try {
         if (allEvents && allEvents.length > 0) {
-        console.log('📅 Calendar: Processing', allEvents.length, 'events')
         allEvents.forEach((event, index) => {
-          // Check if this is a public event that should be visible
-          const isPublicEvent = !event.is_private && event.status === 'approved'
-          
-          // For test events, always show them
-          const isTestEvent = event.id.startsWith('test-')
-          
           const isPrivate = event.is_private || false
           // Check if user owns this event (check multiple possible ID fields)
           const isOwnEvent = user && (
-            event.requester_id === user.id || 
-            event.user_id === user.id ||
+            event.requested_by === user.id || 
             event.created_by === user.id
           )
           
@@ -154,7 +92,7 @@ const SimpleMonthCalendar = ({
           let isBlocked = false
 
           // Handle privacy based on user role
-          if (isPrivate && !isTestEvent) {
+          if (isPrivate) {
             
             if (isAdmin()) {
               // Admin sees everything with full details
@@ -173,15 +111,43 @@ const SimpleMonthCalendar = ({
               isBlocked = true
             }
           } else {
-            // Public event or test event - everyone can see
+            // Public event - everyone can see
             eventTitle = event.title
             eventDescription = event.description
             isBlocked = false
           }
 
-          // Parse dates
-          let startDate = new Date(event.start_date)
-          let endDate = event.end_date ? new Date(event.end_date) : new Date(event.start_date)
+          // Parse dates - handle different formats
+          let startDate = null
+          let endDate = null
+          
+          try {
+            // Handle different date formats
+            if (event.start_date) {
+              startDate = new Date(event.start_date)
+              // If date is invalid, try parsing as ISO string
+              if (isNaN(startDate.getTime())) {
+                startDate = new Date(event.start_date + (event.start_date.includes('T') ? '' : 'T00:00:00'))
+              }
+            }
+            
+            if (event.end_date) {
+              endDate = new Date(event.end_date)
+              if (isNaN(endDate.getTime())) {
+                endDate = new Date(event.end_date + (event.end_date.includes('T') ? '' : 'T23:59:59'))
+              }
+            } else if (startDate) {
+              endDate = new Date(startDate)
+            }
+          } catch (dateError) {
+            secureLog('warn', 'Failed to parse event dates', { 
+              eventId: event.id, 
+              start_date: event.start_date, 
+              end_date: event.end_date,
+              error: sanitizeError(dateError)
+            })
+            return // Skip this event if dates can't be parsed (return from forEach callback)
+          }
 
           // Check if event has time information
           const hasTimeInfo = event.start_date && event.start_date.includes('T')
@@ -189,7 +155,7 @@ const SimpleMonthCalendar = ({
           // Time is NOT shown in calendar title - only in event details modal
           // Keep event title clean without time display
 
-          if (!isNaN(startDate.getTime())) {
+          if (startDate && !isNaN(startDate.getTime()) && endDate && !isNaN(endDate.getTime())) {
             const calendarEvent = {
               id: event.id,
               title: eventTitle,
@@ -209,14 +175,19 @@ const SimpleMonthCalendar = ({
             calendarEvents.push(calendarEvent)
           } else {
             // Skip events with invalid dates
+            secureLog('warn', 'Skipping event with invalid dates', { 
+              eventId: event.id, 
+              title: event.title,
+              start_date: event.start_date,
+              end_date: event.end_date,
+              startDateValid: startDate && !isNaN(startDate.getTime()),
+              endDateValid: endDate && !isNaN(endDate.getTime())
+            })
           }
         })
-        } else {
-          console.log('📅 Calendar: No events to process. allEvents:', allEvents)
         }
       } catch (processingError) {
-        console.error('📅 Calendar: Error processing events:', processingError)
-        console.log('📅 Calendar: allEvents at error:', allEvents)
+        secureLog('error', 'Error processing events for calendar', sanitizeError(processingError))
       }
 
       // Process pending requests (admin only) - DISABLED
@@ -268,7 +239,6 @@ const SimpleMonthCalendar = ({
               blockedEndDate = new Date(blocked.end_date || blocked.start_date)
             }
           } catch (e) {
-            console.error('Error parsing dates for blocked event:', e, blocked)
           }
           
           if (blockedStartDate && !isNaN(blockedStartDate.getTime())) {
@@ -304,14 +274,15 @@ const SimpleMonthCalendar = ({
       }
 
       setEvents(calendarEvents)
-      console.log('📅 Calendar: Loaded', calendarEvents.length, 'events')
+      
     } catch (error) {
-      console.error('Error loading events:', error)
+      secureLog('error', 'Failed to load calendar events', sanitizeError(error))
+      setEvents([]) // Set empty array on error to prevent stale data
     } finally {
       setLoading(false)
       setIsRefreshing(false)
     }
-  }, [isAdmin, currentDate, user])
+  }, [isAdmin, calendarDate, user, isRefreshing])
 
   // Load events on component mount only - wait for auth to complete
   useEffect(() => {
@@ -321,11 +292,9 @@ const SimpleMonthCalendar = ({
       // Load events regardless of authentication status
       // Events should be visible to all users (logged in or not)
       if (mounted) {
-        console.log('📅 Calendar: Loading events (auth status:', authLoading ? 'loading' : 'complete', ')')
         try {
           await loadAllEvents()
         } catch (error) {
-          console.error('Error loading events:', error)
           if (mounted) {
             setLoading(false)
             setIsRefreshing(false)
@@ -352,6 +321,13 @@ const SimpleMonthCalendar = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Update calendar date when currentDate prop changes
+  useEffect(() => {
+    if (currentDate) {
+      setCalendarDate(new Date(currentDate))
+    }
+  }, [currentDate])
+
   // Handle date selection
   const handleSelectSlot = useCallback((slotInfo) => {
     if (onDateClick) {
@@ -376,7 +352,7 @@ const SimpleMonthCalendar = ({
     
     setSelectedEvent(event)
     setShowEventDetails(true)
-  }, [isAdmin, user])
+  }, [isAdmin])
 
   // Handle event update from details modal
   const handleEventUpdate = useCallback(async () => {
@@ -441,6 +417,7 @@ const SimpleMonthCalendar = ({
   }
 
 
+
   if (loading) {
     return (
       <div style={{
@@ -485,18 +462,44 @@ const SimpleMonthCalendar = ({
         
         .rbc-day-bg {
           min-height: 100px !important;
+          cursor: pointer !important;
+          position: relative !important;
+          z-index: 1 !important;
         }
         
-        /* Make date numbers more visible */
+        .rbc-day-bg:not(.rbc-off-range-bg):hover {
+          background-color: ${isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)'} !important;
+        }
+        
+        /* Make date cells clickable */
         .rbc-date-cell {
           font-size: 16px !important;
           font-weight: 700 !important;
           padding: 6px 10px !important;
           color: #252422 !important;
+          cursor: pointer !important;
+          position: relative !important;
+          z-index: 2 !important;
         }
         
         .rbc-off-range .rbc-date-cell {
           color: #999999 !important;
+          cursor: default !important;
+        }
+        
+        /* Make sure event segments don't block clicks on empty dates */
+        .rbc-row-segment {
+          pointer-events: none !important;
+        }
+        
+        /* Ensure day cells are above row segments and clickable */
+        .rbc-day-bg:not(.rbc-off-range-bg) {
+          pointer-events: auto !important;
+        }
+        
+        /* Make sure events don't block date clicks - only allow clicks on events themselves */
+        .rbc-event {
+          pointer-events: auto !important;
         }
       `}</style>
 
@@ -509,6 +512,36 @@ const SimpleMonthCalendar = ({
           style={{ height: '750px' }}
           defaultView="month"
           views={['month']}
+          date={calendarDate}
+          onNavigate={(action) => {
+            if (onNavigate) {
+              // Calculate new date based on action
+              const newDate = new Date(calendarDate)
+              if (action === 'PREV') {
+                newDate.setMonth(newDate.getMonth() - 1)
+              } else if (action === 'NEXT') {
+                newDate.setMonth(newDate.getMonth() + 1)
+              } else if (action instanceof Date) {
+                setCalendarDate(action)
+                if (onNavigate) onNavigate(action)
+                return
+              }
+              setCalendarDate(newDate)
+              onNavigate(newDate)
+            } else {
+              // Default navigation if no callback provided
+              const newDate = new Date(calendarDate)
+              if (action === 'PREV') {
+                newDate.setMonth(newDate.getMonth() - 1)
+              } else if (action === 'NEXT') {
+                newDate.setMonth(newDate.getMonth() + 1)
+              } else if (action instanceof Date) {
+                setCalendarDate(action)
+                return
+              }
+              setCalendarDate(newDate)
+            }
+          }}
           onSelectSlot={handleSelectSlot}
           onSelectEvent={handleSelectEvent}
           selectable
@@ -530,7 +563,13 @@ const SimpleMonthCalendar = ({
                   gap: '12px'
                 }}>
                   <button
-                    onClick={() => props.onNavigate('PREV')}
+                    onClick={() => {
+                      const newDate = new Date(calendarDate)
+                      newDate.setMonth(newDate.getMonth() - 1)
+                      setCalendarDate(newDate)
+                      if (onNavigate) onNavigate(newDate)
+                      props.onNavigate('PREV')
+                    }}
                     style={{
                       background: 'none',
                       border: 'none',
@@ -565,7 +604,13 @@ const SimpleMonthCalendar = ({
                   </h2>
                   
                   <button
-                    onClick={() => props.onNavigate('NEXT')}
+                    onClick={() => {
+                      const newDate = new Date(calendarDate)
+                      newDate.setMonth(newDate.getMonth() + 1)
+                      setCalendarDate(newDate)
+                      if (onNavigate) onNavigate(newDate)
+                      props.onNavigate('NEXT')
+                    }}
                     style={{
                       background: 'none',
                       border: 'none',

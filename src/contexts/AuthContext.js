@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Global authentication and authorization context (user session, profile, roles, sign-in/out, admin checks).
+// - Used by: Entire app via useAuth() hook and AuthProvider in App.js.
+// - Notes: Production file. Changes affect login flow, email confirmation handling, and admin/member permissions.
+
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase, USER_ROLES } from '../lib/supabase'
@@ -30,7 +35,6 @@ export const AuthProvider = ({ children }) => {
         .single()
 
       if (error) {
-        console.error('Error fetching profile:', error)
         // If profile doesn't exist, create it
         if (error.code === 'PGRST116') {
           return await createProfile(userId)
@@ -40,7 +44,6 @@ export const AuthProvider = ({ children }) => {
 
       return data
     } catch (error) {
-      console.error('Error in getProfile:', error)
       return null
     }
   }
@@ -63,13 +66,11 @@ export const AuthProvider = ({ children }) => {
         .single()
 
       if (error) {
-        console.error('Error creating profile:', error)
         return null
       }
 
       return data
     } catch (error) {
-      console.error('Error in createProfile:', error)
       return null
     }
   }
@@ -82,6 +83,11 @@ export const AuthProvider = ({ children }) => {
       // Generate a unique email if none provided
       const userEmail = email || `user_${Date.now()}@temp.local`
       
+      // Use site origin as redirect URL (avoids path mismatches in allow list)
+      const redirectTo = typeof window !== 'undefined' 
+        ? window.location.origin 
+        : undefined
+
       const { data, error } = await supabase.auth.signUp({
         email: userEmail,
         password,
@@ -89,16 +95,21 @@ export const AuthProvider = ({ children }) => {
           data: {
             full_name: fullName,
             original_email: email || null // Store original email if provided
-          }
+          },
+          emailRedirectTo: redirectTo // Explicitly set redirect URL for email confirmation
         }
       })
 
-      if (error) throw error
+      if (error) {
+        // If user already exists, try to handle it gracefully
+        if (error.message && error.message.includes('already registered')) {
+        }
+        throw error
+      }
 
       // Profile will be created automatically by the database trigger
       return { data, error: null }
     } catch (error) {
-      console.error('Sign up error:', error)
       return { data: null, error }
     } finally {
       setLoading(false)
@@ -118,7 +129,6 @@ export const AuthProvider = ({ children }) => {
 
       return { data, error: null }
     } catch (error) {
-      console.error('Sign in error:', error)
       return { data: null, error }
     } finally {
       setLoading(false)
@@ -128,11 +138,9 @@ export const AuthProvider = ({ children }) => {
   // Sign out function
   const signOut = async () => {
     try {
-      console.log('🔴 AuthContext signOut called - starting sign out...')
       setLoading(true)
       
       // Add timeout to prevent hanging
-      console.log('🔴 Calling supabase.auth.signOut() with timeout...')
       const signOutPromise = supabase.auth.signOut()
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('SignOut timeout after 3 seconds')), 3000)
@@ -141,27 +149,20 @@ export const AuthProvider = ({ children }) => {
       const { error } = await Promise.race([signOutPromise, timeoutPromise])
       
       if (error) {
-        console.error('🔴 Supabase signOut error:', error)
         throw error
       }
       
-      console.log('🔴 Supabase sign out successful, clearing local state...')
       // Clear local state
       setUser(null)
       setProfile(null)
-      console.log('🔴 Sign out completed successfully - user and profile cleared')
     } catch (error) {
-      console.error('🔴 Sign out error:', error)
       
       // Even if signOut fails, clear local state
       if (error.message.includes('SignOut timeout')) {
-        console.log('🔴 SignOut timed out, clearing local state anyway...')
         setUser(null)
         setProfile(null)
-        console.log('🔴 Local state cleared despite timeout')
       }
     } finally {
-      console.log('🔴 Setting loading to false')
       setLoading(false)
     }
   }
@@ -183,7 +184,6 @@ export const AuthProvider = ({ children }) => {
       setProfile(data)
       return { data, error: null }
     } catch (error) {
-      console.error('Update profile error:', error)
       return { data: null, error }
     }
   }
@@ -223,13 +223,11 @@ export const AuthProvider = ({ children }) => {
         
         if (hasConfirmation) {
           // User is coming back from email confirmation - let Supabase handle it
-          console.log('Email confirmation detected - preserving session')
           
           // Get the current session (Supabase will auto-exchange the token)
-          const { data: { session }, error } = await supabase.auth.getSession()
+          const { data: { session } } = await supabase.auth.getSession()
           
           if (session?.user) {
-            console.log('User confirmed email and logged in:', session.user.email)
             setUser(session.user)
             const userProfile = await getProfile(session.user.id)
             setProfile(userProfile)
@@ -239,21 +237,18 @@ export const AuthProvider = ({ children }) => {
           }
         } else {
           // Normal page load - check for existing session
-          const { data: { session }, error } = await supabase.auth.getSession()
+          const { data: { session } } = await supabase.auth.getSession()
           
           if (session?.user) {
-            console.log('Existing session found:', session.user.email)
             setUser(session.user)
             const userProfile = await getProfile(session.user.id)
             setProfile(userProfile)
           } else {
-            console.log('No existing session found')
             setUser(null)
             setProfile(null)
           }
         }
       } catch (error) {
-        console.error('Error during auth initialization:', error)
         setUser(null)
         setProfile(null)
       } finally {
@@ -267,18 +262,15 @@ export const AuthProvider = ({ children }) => {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log(`Auth state change:`, event, session?.user?.email)
         
         // Handle sign in events (including email confirmation)
         if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session?.user) {
           setUser(session.user)
           const userProfile = await getProfile(session.user.id)
           setProfile(userProfile)
-          console.log('User authenticated:', session.user.email)
         } else if (event === 'SIGNED_OUT') {
           setUser(null)
           setProfile(null)
-          console.log('User signed out')
         }
       }
     )

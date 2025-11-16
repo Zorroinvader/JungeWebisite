@@ -1,0 +1,84 @@
+name: User & Auth Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'src/contexts/AuthContext.js'
+      - 'src/components/Auth/**'
+      - 'src/pages/LoginPage.js'
+      - 'src/pages/RegisterPage.js'
+      - 'src/pages/ProfilePage.js'
+      - 'src/components/Admin/**'
+      - 'src/__tests__/unit/user/**'
+      - 'src/__tests__/api/user/**'
+      - 'tests/e2e/user-auth.spec.ts'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'src/contexts/AuthContext.js'
+      - 'src/components/Auth/**'
+      - 'src/pages/LoginPage.js'
+      - 'src/pages/RegisterPage.js'
+      - 'src/pages/ProfilePage.js'
+      - 'src/components/Admin/**'
+      - 'src/__tests__/unit/user/**'
+      - 'src/__tests__/api/user/**'
+      - 'tests/e2e/user-auth.spec.ts'
+  workflow_dispatch:
+
+jobs:
+  test-user:
+    name: User & Auth Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+      
+      - name: Run User Unit Tests
+        env:
+          REACT_APP_SUPABASE_URL: ${{ secrets.REACT_APP_SUPABASE_URL }}
+          REACT_APP_SUPABASE_ANON_KEY: ${{ secrets.REACT_APP_SUPABASE_ANON_KEY }}
+          CI: true
+        run: npm run test:unit:user
+      
+      - name: Run User API Tests
+        env:
+          REACT_APP_SUPABASE_URL: ${{ secrets.REACT_APP_SUPABASE_URL }}
+          REACT_APP_SUPABASE_ANON_KEY: ${{ secrets.REACT_APP_SUPABASE_ANON_KEY }}
+          CI: true
+        run: npm run test:api:user
+      
+      - name: Run User E2E Tests
+        env:
+          TEST_BASE_URL: ${{ secrets.TEST_BASE_URL || 'http://localhost:3000' }}
+          REACT_APP_SUPABASE_URL: ${{ secrets.REACT_APP_SUPABASE_URL }}
+          REACT_APP_SUPABASE_ANON_KEY: ${{ secrets.REACT_APP_SUPABASE_ANON_KEY }}
+          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+          CI: true
+        run: npm run test:e2e:user
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: user-test-results
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+

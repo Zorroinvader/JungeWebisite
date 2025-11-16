@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Dark mode context provider that manages theme state (light/dark) and persists preference in localStorage.
+// - Used by: Entire app via useDarkMode() hook; wrapped in App.js; used by Header, LoginForm, RegisterForm, and most components.
+// - Notes: Production context. Provides isDarkMode state and toggleDarkMode function; persists to localStorage.
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const DarkModeContext = createContext();

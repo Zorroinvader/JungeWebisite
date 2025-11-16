@@ -1,13 +1,18 @@
+// FILE OVERVIEW
+// - Purpose: Haupt-Profilseite für eingeloggte Nutzer mit Übersicht zu persönlichen Daten, Event-Anfragen und DSGVO/Fußnotenaktionen.
+// - Used by: Route '/profile' (geschützt) in App.js; aufgerufen nach erfolgreicher Anmeldung/Registrierung.
+// - Notes: Production member/admin page. Nutzt AuthContext, eventRequestsAPI, MyEventRequests, DSGVOCompliance und eventBus. This is the currently used profile page. A simplified test version ProfilePageSimple exists in Non-PROD/pages/ but is not used in production.
+
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { eventRequestsAPI } from '../services/httpApi'
+import { eventRequestsAPI } from '../services/databaseApi'
 import { User, Mail } from 'lucide-react'
 import eventBus from '../utils/eventBus'
 import MyEventRequests from '../components/Profile/MyEventRequests'
 import DSGVOCompliance from '../components/Profile/DSGVOCompliance'
 
 const ProfilePage = () => {
-  const { user, profile } = useAuth()
+  const { user, profile, loading: authLoading } = useAuth()
   const [loading, setLoading] = useState(true)
   const [isLoadingRequests, setIsLoadingRequests] = useState(false)
 
@@ -22,7 +27,6 @@ const ProfilePage = () => {
         setLoading(false)
       }
     } catch (err) {
-      console.error('Error loading event requests:', err)
       setLoading(false)
     } finally {
       setIsLoadingRequests(false)
@@ -30,6 +34,8 @@ const ProfilePage = () => {
   }, [isLoadingRequests, user?.id])
 
   useEffect(() => {
+    if (!user?.id) return // Don't load if no user
+    
     loadEventRequests()
     
     // Set up periodic refresh every 60 seconds
@@ -55,8 +61,36 @@ const ProfilePage = () => {
     }
   }, [user?.id, loadEventRequests])
 
-  // loadEventRequests is memoized above
+  // Show loading if auth is still loading
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#F4F1E8] dark:bg-[#252422] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#A58C81]"></div>
+      </div>
+    )
+  }
 
+  // Show error if no user
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#F4F1E8] dark:bg-[#252422] flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-[#2a2a2a] rounded-2xl shadow-xl p-12 max-w-md w-full text-center border-2 border-red-400">
+          <h2 className="text-3xl font-bold mb-4 text-[#252422] dark:text-[#F4F1E8]">
+            Nicht angemeldet
+          </h2>
+          <p className="text-[#A58C81] dark:text-[#EBE9E9] mb-6">
+            Bitte melden Sie sich an, um Ihr Profil zu sehen.
+          </p>
+          <a
+            href="/login"
+            className="inline-block px-6 py-3 bg-[#A58C81] text-white rounded-lg hover:opacity-90 transition-opacity font-semibold"
+          >
+            Zur Anmeldung
+          </a>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-[#F4F1E8] dark:bg-[#252422]">
@@ -71,15 +105,20 @@ const ProfilePage = () => {
             </div>
             <div>
               <h1 className="text-3xl font-bold mb-2 text-[#252422] dark:text-[#F4F1E8]">
-                {profile?.full_name || 'Benutzer'}
+                {profile?.full_name || user?.email?.split('@')[0] || 'Benutzer'}
               </h1>
               <p className="text-base flex items-center mb-3 text-[#A58C81] dark:text-[#A58C81]">
                 <Mail className="h-5 w-5 mr-2" />
                 {user?.email}
               </p>
               <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium text-white bg-[#A58C81]">
-                {profile?.role === 'admin' ? 'Administrator' : 'Mitglied'}
+                {profile?.role === 'admin' || profile?.role === 'superadmin' ? 'Administrator' : 'Mitglied'}
               </span>
+              {!profile && (
+                <p className="mt-2 text-sm text-yellow-600 dark:text-yellow-400">
+                  ⚠️ Profil wird erstellt...
+                </p>
+              )}
             </div>
           </div>
         </div>

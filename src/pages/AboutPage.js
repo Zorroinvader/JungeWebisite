@@ -1,5 +1,10 @@
+// FILE OVERVIEW
+// - Purpose: Public “Über uns” page with information about the association, board members, and a visual gallery of the club house.
+// - Used by: Route '/about' in App.js, linked from header navigation and footer.
+// - Notes: Production content page; changes affect public information about the club.
+
 import React from 'react'
-import { MapPin, Mail, Heart, Crown, UserCheck, Shield, Users, Target, Camera } from 'lucide-react'
+import { Heart, Crown, UserCheck, Target, Users } from 'lucide-react'
 import MuseumGallery from '../components/UI/MuseumGallery'
 
 const AboutPage = () => {

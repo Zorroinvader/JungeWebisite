@@ -1,10 +1,18 @@
+// FILE OVERVIEW
+// - Purpose: Modal form for submitting initial event requests (step 1 of 3-step workflow); handles both logged-in and guest users.
+// - Used by: HomePage when user clicks "Event anfragen" or selects a date; opened after GuestOrRegisterModal if user chooses guest flow. Also used by SimpleMonthCalendar for date-based event requests.
+// - Notes: Production component. Creates initial event request via eventRequestsAPI.createInitialRequest; pre-fills data for logged-in users. This is the currently used event request form. A legacy alternative EventRequestModalHTTP exists in Non-PROD/components/Calendar/ but is not used.
+
 import React, { useState, useEffect } from 'react';
-import { X, CheckCircle, Mail } from 'lucide-react';
-import { eventRequestsAPI, profileAPI } from '../../services/httpApi';
+import { X, CheckCircle } from 'lucide-react';
+import { eventRequestsAPI, profileAPI } from '../../services/databaseApi';
+import { useAuth } from '../../contexts/AuthContext';
 import { useDarkMode } from '../../contexts/DarkModeContext';
 import { sendAdminNotification, sendUserNotification, areNotificationsEnabled } from '../../utils/settingsHelper';
+import { secureLog, sanitizeError } from '../../utils/secureConfig';
 
 const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, userData }) => {
+  const { user } = useAuth();
   const { isDarkMode } = useDarkMode();
   
   const [formData, setFormData] = useState({
@@ -21,6 +29,7 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [submissionResult, setSubmissionResult] = useState(null);
 
   // Helper function to format date in local timezone (like your old code)
   const formatDateLocal = (date) => {
@@ -46,7 +55,6 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
             }));
           }
         } catch (error) {
-          console.error('Error fetching profile data:', error);
           // Fallback to basic user data
           setFormData(prev => ({
             ...prev,
@@ -104,6 +112,7 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
       });
       setError('');
       setSuccess(false);
+      setSubmissionResult(null);
     }
   }, [isOpen]);
 
@@ -146,9 +155,9 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!validateForm()) return;
-
+    if (!validateForm()) {
+      return;
+    }
     setLoading(true);
     setError('');
 
@@ -163,94 +172,146 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
         dateRange.push(currentDate.toISOString().split('T')[0]);
         currentDate.setDate(currentDate.getDate() + 1);
       }
-
-      // Create request data matching existing structure
-      const requestData = {
+      
+      // Create the event request using Supabase client (official method)
+      secureLog('log', 'Creating event request in database...');
+      
+      // Prepare the data for insertion
+      const insertData = {
         title: formData.title,
-        event_name: formData.title, // Also store in event_name for new workflow
+        event_name: formData.title,
         description: formData.additional_notes || '',
         requester_name: formData.requester_name,
         requester_email: formData.requester_email,
         requester_phone: formData.requester_phone || null,
         start_date: formData.start_date,
         end_date: formData.end_date,
-        requested_days: JSON.stringify(dateRange), // New field
+        requested_days: JSON.stringify(dateRange),
         is_private: formData.event_type === 'Privates Event',
         event_type: formData.event_type,
-        initial_notes: formData.additional_notes || '', // New field
+        initial_notes: formData.additional_notes || '',
         status: 'pending',
-        request_stage: 'initial', // New field for 3-step workflow
-        created_at: new Date().toISOString()
+        request_stage: 'initial',
+        created_at: new Date().toISOString(),
+        requested_by: user?.id || null,
+        created_by: user?.id || null
       };
 
-      const result = await eventRequestsAPI.createInitialRequest(requestData);
+      // SECURITY: Never log sensitive data or keys
+      // Try direct REST API call first (more reliable, bypasses client issues)
+      const { getSupabaseUrl, getSupabaseAnonKey } = await import('../../utils/secureConfig')
+      const supabaseUrl = getSupabaseUrl()
+      const supabaseKey = getSupabaseAnonKey()
 
-      // Send notification to admins about new initial request
-      if (areNotificationsEnabled()) {
-        try {
-          await sendAdminNotification({
-            title: formData.title,
-            requester_name: formData.requester_name,
-            requester_email: formData.requester_email,
-            start_date: formData.start_date,
-            end_date: formData.end_date,
-            event_type: formData.event_type
-          }, 'initial_request');
-        } catch (notifError) {
-          console.warn('Failed to send admin notification:', notifError);
-          // Don't fail the whole request if notification fails
-        }
+      if (!supabaseUrl || !supabaseKey) {
+        throw new Error('Supabase configuration missing. Please check your environment variables.');
       }
 
-      // Send confirmation email to the user (requester)
+      // SECURITY: Never log URLs that might expose keys
+
+      // Use fetch with AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      let created;
       try {
-        await sendUserNotification(formData.requester_email, {
-          title: formData.title,
-          event_name: formData.title,
-          requester_name: formData.requester_name,
-          requester_email: formData.requester_email,
-          start_date: formData.start_date,
-          end_date: formData.end_date,
-          event_type: formData.event_type
-        }, 'initial_request_received');
-      } catch (notifError) {
-        console.warn('Failed to send user confirmation:', notifError);
-        // Don't fail the whole request if notification fails
+        const response = await fetch(`${supabaseUrl}/rest/v1/event_requests`, {
+          method: 'POST',
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify(insertData),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        secureLog('log', 'Response status', { status: response.status, ok: response.ok });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          secureLog('error', 'REST API error response', {
+            status: response.status,
+            statusText: response.statusText,
+            error: sanitizeError(errorText)
+          });
+          throw new Error(`HTTP ${response.status}: ${sanitizeError(errorText)}`);
+        }
+
+        const result = await response.json();
+        secureLog('log', 'Response data received', result);
+        
+        created = Array.isArray(result) ? result[0] : result;
+        
+        if (!created || !created.id) {
+          secureLog('error', 'No ID in response', created);
+          throw new Error('Event request was created but no ID was returned');
+        }
+
+        secureLog('log', 'Event request created successfully via REST API', { id: created.id });
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        
+        if (fetchError.name === 'AbortError') {
+          secureLog('error', 'Request aborted (timeout)');
+          throw new Error('Request timeout. The database might be slow or there might be a network issue.');
+        }
+        
+        secureLog('error', 'Fetch error', sanitizeError(fetchError));
+        throw fetchError;
       }
 
+      // Success - set the result and show success message
+      setSubmissionResult(created);
       setSuccess(true);
+      setLoading(false);
       
-      // Show success message and close after delay
-      setTimeout(() => {
-        if (onSuccess) onSuccess(result);
-        if (onClose) onClose();
-        // Reset form
-        setFormData({
-          title: '',
-          requester_name: '',
-          requester_email: '',
-          requester_phone: '',
-          start_date: '',
-          end_date: '',
-          event_type: 'Privates Event',
-          additional_notes: ''
-        });
-        setSuccess(false);
-      }, 2000);
+      // Fire notifications asynchronously (don't wait for them)
+      if (areNotificationsEnabled()) {
+        sendAdminNotification(created, 'initial_request').catch(() => {});
+      }
+      sendUserNotification(formData.requester_email, {
+        ...created,
+        requester_name: formData.requester_name,
+        event_name: formData.title,
+        event_type: formData.event_type
+      }, 'initial_request_received').catch(() => {});
 
     } catch (err) {
-      console.error('Error submitting request:', err);
-      setError(err.message || 'Fehler beim Senden der Anfrage');
-    } finally {
+      secureLog('error', 'All methods failed to create event request', sanitizeError(err));
+      secureLog('error', 'Error details', {
+        message: sanitizeError(err.message),
+        name: err.name
+      });
+      
+      // Provide more helpful error message
+      let errorMessage = 'Fehler beim Senden der Anfrage. ';
+      if (err.message) {
+        if (err.message.includes('permission') || err.message.includes('RLS')) {
+          errorMessage += 'Berechtigungsfehler. Bitte kontaktieren Sie den Administrator.';
+        } else if (err.message.includes('network') || err.message.includes('fetch')) {
+          errorMessage += 'Netzwerkfehler. Bitte überprüfen Sie Ihre Internetverbindung.';
+        } else {
+          errorMessage += err.message;
+        }
+      } else {
+        errorMessage += 'Bitte versuchen Sie es erneut oder kontaktieren Sie den Support.';
+      }
+      
+      setError(errorMessage);
       setLoading(false);
+      setSuccess(false);
     }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#4a4a4a]' : ''} relative`}>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-30 p-4">
+      <div className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-2xl shadow-xl max-w-2xl w-full max-h-[70vh] overflow-y-auto border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#4a4a4a]' : ''} relative`}>
 
         <div className={`flex items-center justify-between p-8 border-b border-[#A58C81] ${isDarkMode ? 'dark:border-[#EBE9E9]' : ''}`}>
           <div>
@@ -269,7 +330,7 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-8">
+        <form onSubmit={handleSubmit} className="p-8 space-y-8 relative">
           {error && (
             <div className={`rounded-lg p-4 bg-red-50 ${isDarkMode ? 'dark:bg-red-900/20' : ''} border border-red-200 ${isDarkMode ? 'dark:border-red-800' : ''}`}>
               <p className={`text-sm text-red-600 ${isDarkMode ? 'dark:text-red-400' : ''}`}>{error}</p>
@@ -277,7 +338,34 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
           )}
 
           {success && (
-            <div className={`rounded-lg p-6 bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''}`}>
+            <div className={`rounded-lg p-6 bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} relative`}>
+              {/* Close button */}
+              <button
+                onClick={() => {
+                  if (onSuccess && submissionResult) onSuccess(submissionResult);
+                  if (onClose) onClose();
+                  // Reset form
+                  setFormData({
+                    title: '',
+                    requester_name: '',
+                    requester_email: '',
+                    requester_phone: '',
+                    start_date: '',
+                    end_date: '',
+                    event_type: 'Privates Event',
+                    additional_notes: ''
+                  });
+                  setSuccess(false);
+                  setError('');
+                  setSubmissionResult(null);
+                }}
+                className={`absolute top-4 right-4 p-2 hover:opacity-70 transition-opacity rounded-lg text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}
+                aria-label="Schließen"
+                title="Schließen"
+              >
+                <X size={24} />
+              </button>
+              
               <div className="text-center mb-6">
                 <CheckCircle className={`h-16 w-16 mx-auto text-green-500 mb-4`} />
                 <h3 className={`text-2xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} mb-2`}>

@@ -1,6 +1,11 @@
+// FILE OVERVIEW
+// - Purpose: DSGVO compliance component allowing users to export their data, request deletion, and manage consent.
+// - Used by: ProfilePage to provide data protection rights (Article 15, 16, 17 GDPR); uses dsgvoAPI for operations.
+// - Notes: Production component. Critical for legal compliance; handles user data export and deletion requests.
+
 import React, { useState } from 'react'
 import { Download, Trash2, Edit, Shield, CheckCircle, AlertTriangle } from 'lucide-react'
-import { dsgvoAPI } from '../../services/httpApi'
+import { dsgvoAPI } from '../../services/databaseApi'
 
 const DSGVOCompliance = ({ userId, userEmail }) => {
   const [loading, setLoading] = useState(false)
@@ -39,7 +44,6 @@ const DSGVOCompliance = ({ userId, userEmail }) => {
       
       showMessage('Your data has been exported successfully', 'success')
     } catch (error) {
-      console.error('Error exporting data:', error)
       showMessage('Error exporting your data. Please try again.', 'error')
     } finally {
       setLoading(false)
@@ -65,7 +69,6 @@ const DSGVOCompliance = ({ userId, userEmail }) => {
       await dsgvoAPI.updateUserData(userId, newEmail || null, newName || null)
       showMessage('Your data has been updated successfully', 'success')
     } catch (error) {
-      console.error('Error updating data:', error)
       showMessage('Error updating your data. Please try again.', 'error')
     } finally {
       setLoading(false)
@@ -104,7 +107,6 @@ const DSGVOCompliance = ({ userId, userEmail }) => {
         window.location.href = '/'
       }, 2000)
     } catch (error) {
-      console.error('Error deleting data:', error)
       showMessage('Error deleting your data. Please try again.', 'error')
     } finally {
       setLoading(false)
@@ -125,7 +127,6 @@ const DSGVOCompliance = ({ userId, userEmail }) => {
       await dsgvoAPI.withdrawConsent(consentId)
       showMessage('Consent has been withdrawn successfully', 'success')
     } catch (error) {
-      console.error('Error withdrawing consent:', error)
       showMessage('Error withdrawing consent. Please try again.', 'error')
     } finally {
       setLoading(false)

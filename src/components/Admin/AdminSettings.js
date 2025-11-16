@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Admin settings component for configuring notification emails, auto-approve settings, and other admin preferences.
+// - Used by: AdminPanelClean in the settings tab; allows admins to manage system-wide settings stored in localStorage.
+// - Notes: Production component. Uses settingsHelper for reading/writing admin settings; manages admin notification email list.
+
 import React, { useState } from 'react'
 import { Settings, Save, AlertCircle, CheckCircle } from 'lucide-react'
 
@@ -36,7 +41,6 @@ const AdminSettings = () => {
       // No artificial delay
       
       // In a real application, you would save these settings to the database
-      console.log('Saving settings:', settings)
       
       setSuccess(true)
       // Success message stays visible until next action

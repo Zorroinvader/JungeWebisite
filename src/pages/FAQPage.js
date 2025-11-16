@@ -1,5 +1,10 @@
+// FILE OVERVIEW
+// - Purpose: FAQ page with expandable question/answer sections and quick links to membership and event request info.
+// - Used by: Route '/faq' in App.js, linked from header and footer.
+// - Notes: Production content page; text here explains the basic usage and rules of the venue.
+
 import React, { useState } from 'react'
-import { ChevronDown, ChevronUp, MapPin, Mail, Clock, Users, FileText, Calendar } from 'lucide-react'
+import { ChevronDown, ChevronUp, MapPin, Mail, Clock, FileText, Calendar } from 'lucide-react'
 
 const FAQPage = () => {
   const [openItems, setOpenItems] = useState({})

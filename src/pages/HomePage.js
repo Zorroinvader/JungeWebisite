@@ -1,22 +1,29 @@
+// FILE OVERVIEW
+// - Purpose: Main public landing page that shows hero, next event info, CTA buttons, and the small month calendar.
+// - Used by: Route component for path '/', rendered from the main router (see App.js).
+// - Notes: Core production page. Changes here affect the first impression for all visitors.
+
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useDarkMode } from '../contexts/DarkModeContext'
-import { Calendar, Users, FileText, Search } from 'lucide-react'
+import { Calendar, Users, FileText } from 'lucide-react'
 import SimpleMonthCalendar from '../components/Calendar/SimpleMonthCalendar'
 import TypewriterText from '../components/UI/TypewriterText'
 import NextEventInfo from '../components/UI/NextEventInfo'
+import { getActiveSpecialEvents } from '../services/specialEventsApi'
 import PublicEventRequestForm from '../components/Calendar/PublicEventRequestForm'
 import GuestOrRegisterModal from '../components/Calendar/GuestOrRegisterModal'
 
 const HomePage = () => {
   const { user } = useAuth()
-  const { isDarkMode } = useDarkMode()
   const navigate = useNavigate()
   const [showSubtitle, setShowSubtitle] = useState(false)
   const [showPublicRequestForm, setShowPublicRequestForm] = useState(false)
   const [showGuestOrRegister, setShowGuestOrRegister] = useState(false)
   const [selectedDate, setSelectedDate] = useState(null)
+  const [specialEvents, setSpecialEvents] = useState([])
+  const [currentDate, setCurrentDate] = useState(new Date())
 
   const handleFirstTextComplete = () => {
     setShowSubtitle(true)
@@ -66,6 +73,15 @@ const HomePage = () => {
     }
   }, [user])
 
+  // Load active special events (cached) for CTA target
+  useEffect(() => {
+    let mounted = true
+    getActiveSpecialEvents({ useCache: true })
+      .then(list => { if (mounted) setSpecialEvents(list || []) })
+      .catch(() => {})
+    return () => { mounted = false }
+  }, [])
+
   return (
     <div className="min-h-screen">
 
@@ -113,6 +129,16 @@ const HomePage = () => {
                 </div>
               </div>
             </div>
+
+            {/* Mobile Special Events CTA: always visible on home */}
+            <div className="mt-4 md:hidden">
+              <Link
+                to="/kostuemwettbewerb-ergebnisse"
+                className="inline-flex items-center justify-center px-4 py-3 text-base font-semibold text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg shadow-md w-full"
+              >
+                Kostümwettbewerb Ergebnisse
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -142,7 +168,7 @@ const HomePage = () => {
           <div className="text-center">
             <button
               onClick={() => handleEventRequest()}
-              className="group inline-flex items-center justify-center px-[8vw] sm:px-[6vw] md:px-[5vw] lg:px-[4vw] py-[2.5vh] sm:py-[2.2vh] md:py-[2vh] text-[3.5vw] sm:text-[3vw] md:text-[2.4vw] lg:text-[2vw] xl:text-[1.6vw] font-bold text-white bg-[#6054d9] hover:bg-[#4f44c7] dark:bg-[#6054d9] dark:hover:bg-[#4f44c7] rounded-2xl hover:scale-105 transition-all duration-200 shadow-2xl hover:shadow-3xl"
+              className="group inline-flex items-center justify-center px-[7vw] sm:px-[5.5vw] md:px-[4.5vw] lg:px-[3.5vw] py-[2.2vh] sm:py-[2vh] md:py-[1.8vh] text-[3.2vw] sm:text-[2.7vw] md:text-[2.2vw] lg:text-[1.8vw] xl:text-[1.5vw] font-semibold text-white bg-[#6054d9] hover:bg-[#4f44c7] dark:bg-[#6054d9] dark:hover:bg-[#4f44c7] rounded-lg transition-colors duration-200 shadow-xl"
             >
               <Calendar className="h-[4.5vw] sm:h-[4vw] md:h-[3.5vw] lg:h-[2.8vw] xl:h-[2.2vw] w-[4.5vw] sm:w-[4vw] md:w-[3.5vw] lg:w-[2.8vw] xl:w-[2.2vw] mr-[2vw] sm:mr-[1.8vw] md:mr-[1.5vw] lg:mr-[1.2vw]" />
               Event anfragen
@@ -156,6 +182,15 @@ const HomePage = () => {
                 className={`text-[2.5vw] sm:text-[2vw] md:text-[1.6vw] lg:text-[1.3vw] xl:text-[1.1vw] font-medium text-[#252422] dark:text-[#F4F1E8] hover:text-[#A58C81] dark:hover:text-[#EBE9E9] transition-colors underline decoration-2 underline-offset-4 decoration-[#A58C81] dark:decoration-[#EBE9E9]`}
               >
                 Status verfolgen
+              </Link>
+              <span className={`text-[2.2vw] sm:text-[1.8vw] md:text-[1.4vw] lg:text-[1.1vw] xl:text-[0.9vw] text-[#252422] dark:text-[#F4F1E8]`}>
+                oder
+              </span>
+              <Link 
+                to="/kostuemwettbewerb-ergebnisse"
+                className={`text-[2.5vw] sm:text-[2vw] md:text-[1.6vw] lg:text-[1.3vw] xl:text-[1.1vw] font-medium text-[#252422] dark:text-[#F4F1E8] hover:text-[#A58C81] dark:hover:text-[#EBE9E9] transition-colors underline decoration-2 underline-offset-4 decoration-[#A58C81] dark:decoration-[#EBE9E9]`}
+              >
+                Ergebnisse ansehen
               </Link>
             </div>
           </div>
@@ -172,7 +207,11 @@ const HomePage = () => {
           <div className="bg-white dark:bg-[#252422] rounded-2xl shadow-xl p-[2vw] sm:p-[1.5vw] md:p-[1vw] lg:p-[0.8vw] xl:p-[0.6vw] 2xl:p-[0.5vw] relative border-2 border-[#A58C81] dark:border-[#EBE9E9]">
             {/* Make calendar header usable on small screens */}
             <div className="w-full touch-pan-x">
-              <SimpleMonthCalendar onDateClick={handleEventRequest} />
+              <SimpleMonthCalendar 
+                currentDate={currentDate}
+                onNavigate={(date) => setCurrentDate(date)}
+                onDateClick={handleEventRequest}
+              />
             </div>
           </div>
         </div>

@@ -1,10 +1,15 @@
+// FILE OVERVIEW
+// - Purpose: Main admin dashboard component that provides tabs for event management, request management, user management, settings, and special events.
+// - Used by: Route '/admin' in App.js (protected, admin-only); central hub for all admin operations.
+// - Notes: Production component. Admin-only access; includes ThreeStepRequestManagement, EventRequestManagement, UserManagement, AdminSettings, SpecialEventModeration.
+
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDarkMode } from '../../contexts/DarkModeContext'
-import { Calendar, Users, FileText, Settings, AlertCircle, Check, X, Clock, Eye, Download, ArrowLeft, Workflow, Plus, Edit } from 'lucide-react'
-import { eventRequestsAPI, eventsAPI } from '../../services/httpApi'
-import eventBus from '../../utils/eventBus'
+import { Calendar, Users, FileText, Settings, AlertCircle, Check, X, Eye, Download, ArrowLeft, Workflow, Plus, Edit, RefreshCw } from 'lucide-react'
+import { eventsAPI } from '../../services/databaseApi'
+import { secureLog, sanitizeError } from '../../utils/secureConfig'
 import UserManagement from './UserManagement'
 import ThreeStepRequestManagement from './ThreeStepRequestManagement'
 import AdminEventCreationForm from './AdminEventCreationForm'
@@ -20,6 +25,7 @@ const AdminPanelClean = () => {
   const tabs = [
     { id: 'three-step-requests', name: '3-Schritt Anfragen', icon: Workflow },
     { id: 'events', name: 'Events verwalten', icon: FileText },
+    { id: 'special-events', name: 'Special Events', icon: Eye },
     { id: 'users', name: 'Benutzer verwalten', icon: Users },
     { id: 'settings', name: 'Einstellungen', icon: Settings }
   ]
@@ -92,6 +98,8 @@ const AdminPanelClean = () => {
         return <ThreeStepRequestManagement />
       case 'events':
         return <EventsTab />
+      case 'special-events':
+        return <SpecialEventsTab />
       case 'users':
         return <UsersTab />
       case 'settings':
@@ -224,28 +232,14 @@ const EventsTab = () => {
       setLoading(true)
       setError(null)
       
-      console.log('📋 Admin Events: Loading events...')
       // Get all events directly from events table
+      // getAll() now uses Supabase client as primary with HTTP fallback built-in
       let data = []
       try {
         data = await eventsAPI.getAll()
-        console.log('📋 Admin Events: API response:', data)
-        console.log('📋 Admin Events: Total events loaded:', data?.length || 0)
       } catch (error) {
-        console.error('📋 Admin Events: Primary API failed, trying fallback:', error)
-        try {
-          data = await eventsAPI.getAllDirect()
-          console.log('📋 Admin Events: Fallback API success:', data?.length || 0, 'events')
-        } catch (fallbackError) {
-          console.error('📋 Admin Events: Direct API failed, trying ultra-simple:', fallbackError)
-          try {
-            data = await eventsAPI.getAllSimple()
-            console.log('📋 Admin Events: Ultra-simple API success:', data?.length || 0, 'events')
-          } catch (simpleError) {
-            console.error('📋 Admin Events: All API methods failed:', simpleError)
-            data = []
-          }
-        }
+        secureLog('error', 'Failed to load events', sanitizeError(error))
+        data = []
       }
       
       // Filter out past events - only show future events
@@ -253,14 +247,11 @@ const EventsTab = () => {
       const futureEvents = (data || []).filter(event => {
         const eventDate = new Date(event.start_date || event.end_date)
         const isFuture = eventDate >= now
-        console.log(`📋 Admin Events: Event "${event.title}" - Date: ${event.start_date}, Is Future: ${isFuture}`)
         return isFuture
       })
       
-      console.log('📋 Admin Events: Future events count:', futureEvents.length)
       setEvents(futureEvents)
     } catch (err) {
-      console.error('📋 Admin Events: Error loading events:', err)
       setError(err.message)
     } finally {
       setLoading(false)
@@ -437,15 +428,21 @@ const UsersTab = () => {
 }
 
 const SettingsTab = () => {
-  const { isDarkMode } = useDarkMode()
   const [notificationsEnabled, setNotificationsEnabled] = useState(true)
   const [autoApprovePublic, setAutoApprovePublic] = useState(false)
   const [showPrivateEvents, setShowPrivateEvents] = useState(true)
   const [showBlockedDates, setShowBlockedDates] = useState(true)
   const [defaultToWeekView, setDefaultToWeekView] = useState(false)
   const [adminEmails, setAdminEmails] = useState([])
+  const [adminEmailsFull, setAdminEmailsFull] = useState([]) // Full objects from DB
+  const [pendingEmails, setPendingEmails] = useState([]) // Emails to be added
+  const [emailsToRemove, setEmailsToRemove] = useState([]) // Email IDs to remove
   const [newEmail, setNewEmail] = useState('')
   const [emailError, setEmailError] = useState('')
+  const [loadingEmails, setLoadingEmails] = useState(true)
+  const [saveSuccess, setSaveSuccess] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [saving, setSaving] = useState(false)
 
   // Load settings from localStorage on mount
   useEffect(() => {
@@ -458,11 +455,25 @@ const SettingsTab = () => {
         setShowPrivateEvents(settings.showPrivateEvents ?? true)
         setShowBlockedDates(settings.showBlockedDates ?? true)
         setDefaultToWeekView(settings.defaultToWeekView ?? false)
-        setAdminEmails(settings.adminEmails ?? [])
       } catch (error) {
-        console.error('Error loading settings:', error)
       }
     }
+  }, [])
+
+  // Load admin emails from database
+  useEffect(() => {
+    async function loadEmails() {
+      try {
+        const { getAdminNotificationEmails } = await import('../../services/emailApi')
+        const emails = await getAdminNotificationEmails()
+        setAdminEmailsFull(emails)
+        setAdminEmails(emails.map(e => e.email))
+      } catch (error) {
+      } finally {
+        setLoadingEmails(false)
+      }
+    }
+    loadEmails()
   }, [])
 
   const validateEmail = (email) => {
@@ -472,91 +483,106 @@ const SettingsTab = () => {
 
   const handleAddEmail = () => {
     setEmailError('')
+    setSaveSuccess(false)
+    setSaveError('')
     
     if (!newEmail.trim()) {
-      setEmailError('Bitte geben Sie eine E-Mail-Adresse ein')
+      setEmailError('Bitte geben Sie eine oder mehrere E-Mail-Adressen ein')
       return
     }
 
-    if (!validateEmail(newEmail)) {
-      setEmailError('Bitte geben Sie eine gültige E-Mail-Adresse ein')
+    // Parse multiple emails (separated by comma, semicolon, or newline)
+    const emailRegex = /[\s,;]+/
+    const rawEmails = newEmail.split(emailRegex).map(e => e.trim()).filter(e => e.length > 0)
+    
+    if (rawEmails.length === 0) {
+      setEmailError('Bitte geben Sie mindestens eine E-Mail-Adresse ein')
       return
     }
 
-    if (adminEmails.includes(newEmail.toLowerCase())) {
-      setEmailError('Diese E-Mail-Adresse wurde bereits hinzugefügt')
+    const validEmails = []
+    const invalidEmails = []
+    const duplicates = []
+    
+    rawEmails.forEach(rawEmail => {
+      if (!validateEmail(rawEmail)) {
+        invalidEmails.push(rawEmail)
+      } else {
+        const emailLower = rawEmail.toLowerCase()
+        
+        // Check if already in database or pending
+        if (adminEmails.map(e => e.toLowerCase()).includes(emailLower) || 
+            pendingEmails.map(e => e.toLowerCase()).includes(emailLower)) {
+          duplicates.push(rawEmail)
+        } else {
+          validEmails.push(rawEmail)
+        }
+      }
+    })
+
+    // Show errors if any
+    if (invalidEmails.length > 0) {
+      setEmailError(`Ungültige E-Mail-Adressen: ${invalidEmails.join(', ')}`)
       return
     }
 
-    setAdminEmails([...adminEmails, newEmail.toLowerCase()])
-    setNewEmail('')
+    if (duplicates.length > 0) {
+      setEmailError(`Diese E-Mail-Adressen existieren bereits: ${duplicates.join(', ')}`)
+      return
+    }
+
+    // Add valid emails to pending list
+    if (validEmails.length > 0) {
+      setPendingEmails([...pendingEmails, ...validEmails])
+      setNewEmail('')
+    }
   }
 
-  const handleRemoveEmail = (emailToRemove) => {
-    setAdminEmails(adminEmails.filter(email => email !== emailToRemove))
+  const handleRemoveEmail = (emailId, emailToRemove) => {
+    setSaveSuccess(false)
+    setSaveError('')
+    
+    // If email is in database, add to removal list
+    if (emailId) {
+      setEmailsToRemove([...emailsToRemove, emailId])
+      setAdminEmailsFull(adminEmailsFull.filter(e => e.id !== emailId))
+      setAdminEmails(adminEmails.filter(email => email !== emailToRemove))
+    } else {
+      // If it's a pending email, just remove from pending
+      setPendingEmails(pendingEmails.filter(e => e.toLowerCase() !== emailToRemove.toLowerCase()))
+    }
   }
 
   const handleImportOldCalendar = async () => {
     // Use Supabase Edge Function as proxy to bypass CORS
-    const ICS_FEED_URL = `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/fetch-ics`
+    // SECURITY: Use secure getters to prevent key exposure
+    const { getSupabaseUrl, getSupabaseAnonKey } = await import('../../utils/secureConfig')
+    const supabaseUrl = getSupabaseUrl()
+    const ICS_FEED_URL = `${supabaseUrl}/functions/v1/fetch-ics`
     
-    console.log('═══════════════════════════════════════════════════════════')
-    console.log('🚀 CALENDAR IMPORT STARTED')
-    console.log('═══════════════════════════════════════════════════════════')
-    console.log('⏰ Start Time:', new Date().toLocaleString())
-    console.log('🔗 ICS Feed URL:', ICS_FEED_URL)
-    console.log('')
     
     if (!window.confirm('Möchten Sie Events aus dem alten Kalender importieren?\n\nDies kann einige Minuten dauern.')) {
-      console.log('❌ Import cancelled by user')
       return
     }
     
     try {
       // Show loading indicator
-      console.log('───────────────────────────────────────────────────────────')
-      console.log('📡 PHASE 1: FETCHING ICS FEED')
-      console.log('───────────────────────────────────────────────────────────')
       
       alert('Import wird gestartet...\n\nBitte warten Sie, während die Events importiert werden.\n\nÖffnen Sie die Browser-Konsole (F12) für Live-Logs!')
       
       // Fetch and parse ICS feed
-      console.log('📥 Fetching ICS feed...')
-      const startFetch = Date.now()
-      const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY
+      const supabaseKey = getSupabaseAnonKey()
       const parsedEvents = await fetchAndParseICS(ICS_FEED_URL, supabaseKey)
-      const fetchTime = Date.now() - startFetch
       
-      console.log(`✅ Fetch completed in ${fetchTime}ms`)
-      console.log(`📊 Total events parsed: ${parsedEvents.length}`)
-      console.log('')
       
       // Show sample of first few events
-      console.log('───────────────────────────────────────────────────────────')
-      console.log('📋 SAMPLE OF PARSED EVENTS (First 3):')
-      console.log('───────────────────────────────────────────────────────────')
       parsedEvents.slice(0, 3).forEach((evt, idx) => {
-        console.log(`${idx + 1}. ${evt.SUMMARY}`)
-        console.log(`   📅 Date: ${evt.startDate?.toLocaleDateString()}`)
-        console.log(`   🏷️ Category: ${evt.CATEGORIES}`)
-        console.log(`   🔒 Private: ${evt.isPrivate}`)
-        console.log(`   📍 Location: ${evt.LOCATION || 'N/A'}`)
-        console.log('')
       })
       
       // Get existing events once
-      console.log('───────────────────────────────────────────────────────────')
-      console.log('📡 PHASE 2: CHECKING FOR DUPLICATES')
-      console.log('───────────────────────────────────────────────────────────')
-      console.log('🔍 Fetching existing events from database...')
       const existingEvents = await eventsAPI.getAll()
-      console.log(`📊 Found ${existingEvents.length} existing events in database`)
-      console.log('')
       
       // Convert and import events
-      console.log('───────────────────────────────────────────────────────────')
-      console.log('📡 PHASE 3: IMPORTING EVENTS')
-      console.log('───────────────────────────────────────────────────────────')
       
       let successCount = 0
       let errorCount = 0
@@ -566,7 +592,6 @@ const SettingsTab = () => {
       
       for (let i = 0; i < parsedEvents.length; i++) {
         const icsEvent = parsedEvents[i]
-        const progress = `[${i + 1}/${parsedEvents.length}]`
         
         try {
           const dbEvent = convertToDBEvent(icsEvent)
@@ -576,78 +601,35 @@ const SettingsTab = () => {
           
           if (exists) {
             skipCount++
-            console.log(`${progress} ⏭️  SKIP (duplicate): "${dbEvent.title}"`)
             continue
           }
           
           // Create event in database
-          console.log(`${progress} 📝 Creating: "${dbEvent.title}"`)
-          console.log(`         📅 ${dbEvent.start_date} - ${dbEvent.end_date}`)
-          console.log(`         🎨 Type: ${dbEvent.event_type}, Private: ${dbEvent.is_private}`)
           
           await eventsAPI.create(dbEvent)
           successCount++
-          console.log(`${progress} ✅ SUCCESS: "${dbEvent.title}"`)
-          console.log('')
           
         } catch (error) {
           errorCount++
           errors.push({ event: icsEvent.SUMMARY, error: error.message })
-          console.error(`${progress} ❌ ERROR: "${icsEvent.SUMMARY}"`)
-          console.error(`         ⚠️  ${error.message}`)
-          console.error(error)
-          console.log('')
         }
       }
       
-      const importTime = Date.now() - startImport
-      
       // Show results
-      console.log('')
-      console.log('═══════════════════════════════════════════════════════════')
-      console.log('🎉 IMPORT COMPLETED')
-      console.log('═══════════════════════════════════════════════════════════')
-      console.log('📊 STATISTICS:')
-      console.log(`   ✅ Successfully imported: ${successCount}`)
-      console.log(`   ❌ Errors: ${errorCount}`)
-      console.log(`   ⏭️  Skipped (duplicates): ${skipCount}`)
-      console.log(`   📊 Total processed: ${parsedEvents.length}`)
-      console.log('')
-      console.log('⏱️  TIMING:')
-      console.log(`   📥 Fetch time: ${fetchTime}ms`)
-      console.log(`   💾 Import time: ${importTime}ms`)
-      console.log(`   🕐 Total time: ${fetchTime + importTime}ms`)
-      console.log('')
-      console.log('⏰ End Time:', new Date().toLocaleString())
       
       if (errors.length > 0) {
-        console.log('')
-        console.log('───────────────────────────────────────────────────────────')
-        console.log('⚠️  ERRORS DETAILS:')
-        console.log('───────────────────────────────────────────────────────────')
         errors.forEach((err, idx) => {
-          console.error(`${idx + 1}. Event: "${err.event}"`)
-          console.error(`   Error: ${err.error}`)
         })
       }
       
-      console.log('═══════════════════════════════════════════════════════════')
       
       const message = `Import abgeschlossen!\n\n✅ Erfolgreich importiert: ${successCount}\n❌ Fehler: ${errorCount}\n⏭️ Übersprungen (Duplikate): ${skipCount}\n\nDetails in der Browser-Konsole (F12)\n\nSeite wird neu geladen...`
       alert(message)
       
       // Reload events
-      console.log('🔄 Reloading page...')
       window.location.reload()
       
     } catch (error) {
-      console.error('')
-      console.error('═══════════════════════════════════════════════════════════')
-      console.error('💥 IMPORT FAILED')
-      console.error('═══════════════════════════════════════════════════════════')
-      console.error('❌ Error:', error.message)
-      console.error('📍 Stack:', error.stack)
-      console.error('═══════════════════════════════════════════════════════════')
       
       alert(`Import fehlgeschlagen!\n\nFehler: ${error.message}\n\nBitte überprüfen Sie die Browser-Konsole (F12) für Details.`)
     }
@@ -681,7 +663,6 @@ const SettingsTab = () => {
     )
     
     if (!confirmStep1) {
-      console.log('❌ Delete cancelled at step 1')
       return
     }
 
@@ -693,7 +674,6 @@ const SettingsTab = () => {
     
     if (confirmStep2 !== 'ALLE EVENTS LÖSCHEN') {
       alert('❌ Abgebrochen: Falsche Eingabe')
-      console.log('❌ Delete cancelled at step 2')
       return
     }
 
@@ -705,31 +685,19 @@ const SettingsTab = () => {
     )
     
     if (!confirmStep3) {
-      console.log('❌ Delete cancelled at step 3')
       return
     }
 
     try {
-      console.log('═══════════════════════════════════════════════════════════')
-      console.log('🗑️ DELETE ALL EVENTS STARTED')
-      console.log('═══════════════════════════════════════════════════════════')
-      console.log('⏰ Start Time:', new Date().toLocaleString())
-      console.log('')
 
       // Fetch all events
-      console.log('📥 Fetching all events...')
       const allEvents = await eventsAPI.getAll()
-      console.log(`📊 Found ${allEvents.length} events to delete`)
       
       if (allEvents.length === 0) {
         alert('ℹ️ Keine Events zum Löschen gefunden.')
         return
       }
 
-      console.log('')
-      console.log('───────────────────────────────────────────────────────────')
-      console.log('🗑️ DELETING EVENTS')
-      console.log('───────────────────────────────────────────────────────────')
 
       let successCount = 0
       let errorCount = 0
@@ -737,44 +705,22 @@ const SettingsTab = () => {
 
       for (let i = 0; i < allEvents.length; i++) {
         const event = allEvents[i]
-        const progress = `[${i + 1}/${allEvents.length}]`
 
         try {
-          console.log(`${progress} 🗑️ Deleting: "${event.title}"`)
           await eventsAPI.delete(event.id)
           successCount++
-          console.log(`${progress} ✅ Deleted: "${event.title}"`)
         } catch (error) {
           errorCount++
           errors.push({ event: event.title, error: error.message })
-          console.error(`${progress} ❌ Error deleting: "${event.title}"`)
-          console.error(`         ⚠️  ${error.message}`)
         }
       }
 
-      console.log('')
-      console.log('═══════════════════════════════════════════════════════════')
-      console.log('🎯 DELETE COMPLETED')
-      console.log('═══════════════════════════════════════════════════════════')
-      console.log('📊 STATISTICS:')
-      console.log(`   ✅ Successfully deleted: ${successCount}`)
-      console.log(`   ❌ Errors: ${errorCount}`)
-      console.log(`   📊 Total processed: ${allEvents.length}`)
-      console.log('')
-      console.log('⏰ End Time:', new Date().toLocaleString())
 
       if (errors.length > 0) {
-        console.log('')
-        console.log('───────────────────────────────────────────────────────────')
-        console.log('⚠️ ERRORS DETAILS:')
-        console.log('───────────────────────────────────────────────────────────')
         errors.forEach((err, idx) => {
-          console.error(`${idx + 1}. Event: "${err.event}"`)
-          console.error(`   Error: ${err.error}`)
         })
       }
 
-      console.log('═══════════════════════════════════════════════════════════')
 
       alert(
         `✅ Löschvorgang abgeschlossen!\n\n` +
@@ -787,49 +733,105 @@ const SettingsTab = () => {
       window.location.reload()
 
     } catch (error) {
-      console.error('')
-      console.error('═══════════════════════════════════════════════════════════')
-      console.error('💥 DELETE FAILED')
-      console.error('═══════════════════════════════════════════════════════════')
-      console.error('❌ Error:', error.message)
-      console.error('📍 Stack:', error.stack)
-      console.error('═══════════════════════════════════════════════════════════')
 
       alert(`❌ Fehler beim Löschen!\n\n${error.message}\n\nDetails in der Konsole (F12).`)
     }
   }
 
-  const handleSaveSettings = () => {
-    const settings = {
-      notificationsEnabled,
-      autoApprovePublic,
-      showPrivateEvents,
-      showBlockedDates,
-      defaultToWeekView,
-      adminEmails,
-      lastUpdated: new Date().toISOString()
-    }
-
-    localStorage.setItem('adminSettings', JSON.stringify(settings))
+  const handleSaveSettings = async () => {
     
-    alert('✓ Einstellungen wurden erfolgreich gespeichert!\n\n' +
-          `Benachrichtigungen: ${notificationsEnabled ? 'Aktiviert' : 'Deaktiviert'}\n` +
-          `Admin E-Mails: ${adminEmails.length} konfiguriert\n` +
-          `Auto-Genehmigung: ${autoApprovePublic ? 'Aktiviert' : 'Deaktiviert'}`)
+    setSaving(true)
+    setSaveSuccess(false)
+    setSaveError('')
+    
+    try {
+      // Save basic settings to localStorage
+      const settings = {
+        notificationsEnabled,
+        autoApprovePublic,
+        showPrivateEvents,
+        showBlockedDates,
+        defaultToWeekView,
+        lastUpdated: new Date().toISOString()
+      }
+      localStorage.setItem('adminSettings', JSON.stringify(settings))
+
+      // Only save emails if there are changes
+      if (pendingEmails.length > 0 || emailsToRemove.length > 0) {
+        
+        // Save admin emails to database
+        const { addAdminNotificationEmail, removeAdminNotificationEmail } = await import('../../services/emailApi')
+        
+        // Add pending emails
+        for (const email of pendingEmails) {
+          await addAdminNotificationEmail(email)
+        }
+        
+        // Remove marked emails
+        for (const emailId of emailsToRemove) {
+          await removeAdminNotificationEmail(emailId)
+        }
+        
+        // Reload emails from database
+        const { getAdminNotificationEmails } = await import('../../services/emailApi')
+        const updatedEmails = await getAdminNotificationEmails()
+        setAdminEmailsFull(updatedEmails)
+        setAdminEmails(updatedEmails.map(e => e.email))
+      }
+      
+      // Clear pending lists
+      setPendingEmails([])
+      setEmailsToRemove([])
+      
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 3000)
+      
+    } catch (error) {
+      setSaveError('Fehler beim Speichern der Einstellungen: ' + (error.message || 'Unbekannter Fehler'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-xl font-semibold text-[#252422] dark:text-[#F4F1E8]">Einstellungen</h2>
         <button
           onClick={handleSaveSettings}
-          className="inline-flex items-center px-6 py-3 text-sm font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg transition-colors shadow-md"
+          disabled={saving}
+          className="inline-flex items-center px-6 py-3 text-sm font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Check className="h-4 w-4 mr-2" />
-          Einstellungen speichern
+          {saving ? (
+            <>
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              Speichern...
+            </>
+          ) : (
+            <>
+              <Check className="h-4 w-4 mr-2" />
+              Einstellungen speichern
+            </>
+          )}
         </button>
       </div>
+
+      {/* Success/Error Messages */}
+      {saveSuccess && (
+        <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg">
+          <p className="text-green-700 dark:text-green-300 font-medium">
+            ✓ Einstellungen wurden erfolgreich gespeichert!
+          </p>
+        </div>
+      )}
+      
+      {saveError && (
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg">
+          <p className="text-red-700 dark:text-red-300 font-medium">
+            ✗ {saveError}
+          </p>
+        </div>
+      )}
 
       {/* Notification Settings */}
       <div className={`bg-white dark:bg-[#2a2a2a] rounded-lg p-6 border-2 border-[#A58C81] dark:border-[#4a4a4a]`}>
@@ -871,8 +873,9 @@ const SettingsTab = () => {
             <h4 className={`text-sm font-bold text-[#252422] dark:text-[#F4F1E8] mb-2`}>
               Admin E-Mail-Adressen für Benachrichtigungen
             </h4>
-            <p className={`text-xs text-[#A58C81] dark:text-[#EBE9E9] mb-3`}>
-              Diese E-Mail-Adressen erhalten Benachrichtigungen bei neuen Event-Anfragen
+              <p className={`text-xs text-[#A58C81] dark:text-[#EBE9E9] mb-3`}>
+              Diese E-Mail-Adressen erhalten Benachrichtigungen bei neuen Event-Anfragen. 
+              Sie können mehrere E-Mails gleichzeitig hinzufügen (durch Komma getrennt).
             </p>
 
             {/* Add Email Form */}
@@ -891,7 +894,7 @@ const SettingsTab = () => {
                       handleAddEmail()
                     }
                   }}
-                  placeholder="admin@beispiel.de"
+                  placeholder="admin@beispiel.de, admin2@beispiel.de (mehrere durch Komma getrennt)"
                   className="w-full px-3 py-2 border-2 border-[#A58C81] dark:border-[#6a6a6a] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6054d9] bg-white dark:bg-[#1a1a1a] text-[#252422] dark:text-[#F4F1E8]"
                 />
                 {emailError && (
@@ -907,19 +910,55 @@ const SettingsTab = () => {
             </div>
 
             {/* Email List */}
-            {adminEmails.length > 0 ? (
+            {loadingEmails ? (
+              <p className={`text-xs text-[#A58C81] dark:text-[#EBE9E9] italic text-center py-3`}>
+                E-Mail-Adressen werden geladen...
+              </p>
+            ) : (adminEmailsFull.length > 0 || pendingEmails.length > 0) ? (
               <div className="space-y-2">
-                {adminEmails.map((email, index) => (
+                {/* Pending emails (will be added when save is clicked) */}
+                {pendingEmails.map((email, index) => (
                   <div
-                    key={index}
-                    className="flex items-center justify-between p-2 bg-gray-50 dark:bg-[#1a1a1a] rounded-lg border border-[#A58C81] dark:border-[#6a6a6a]"
+                    key={`pending-${index}`}
+                    className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border-2 border-yellow-300 dark:border-yellow-700"
                   >
-                    <span className={`text-sm text-[#252422] dark:text-[#F4F1E8]`}>
-                      {email}
-                    </span>
+                    <div className="flex-1">
+                      <span className={`text-sm font-medium text-[#252422] dark:text-[#F4F1E8]`}>
+                        {email} <span className="text-xs text-yellow-600 dark:text-yellow-400">(wird hinzugefügt)</span>
+                      </span>
+                    </div>
                     <button
-                      onClick={() => handleRemoveEmail(email)}
-                      className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                      onClick={() => handleRemoveEmail(null, email)}
+                      className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors ml-2"
+                      title="Entfernen"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+                
+                {/* Database emails */}
+                {adminEmailsFull.map((emailObj) => (
+                  <div
+                    key={emailObj.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-[#1a1a1a] rounded-lg border border-[#A58C81] dark:border-[#6a6a6a]"
+                  >
+                    <div className="flex-1">
+                      <span className={`text-sm font-medium text-[#252422] dark:text-[#F4F1E8]`}>
+                        {emailObj.email}
+                        {emailsToRemove.includes(emailObj.id) && (
+                          <span className="text-xs text-red-600 dark:text-red-400 ml-2">(wird entfernt)</span>
+                        )}
+                      </span>
+                      {emailObj.added_at && (
+                        <p className="text-xs text-[#A58C81] dark:text-[#EBE9E9] mt-1">
+                          Hinzugefügt am {new Date(emailObj.added_at).toLocaleDateString('de-DE')}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => handleRemoveEmail(emailObj.id, emailObj.email)}
+                      className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors ml-2"
                       title="Entfernen"
                     >
                       <X className="h-4 w-4" />
@@ -930,6 +969,13 @@ const SettingsTab = () => {
             ) : (
               <p className={`text-xs text-[#A58C81] dark:text-[#EBE9E9] italic text-center py-3`}>
                 Noch keine E-Mail-Adressen konfiguriert
+              </p>
+            )}
+            
+            {/* Info text about saving */}
+            {(pendingEmails.length > 0 || emailsToRemove.length > 0) && (
+              <p className="text-xs text-blue-600 dark:text-blue-400 italic text-center py-2">
+                ⚠️ Klicken Sie auf "Einstellungen speichern", um die Änderungen zu speichern
               </p>
             )}
           </div>
@@ -1112,3 +1158,11 @@ const SettingsTab = () => {
 }
 
 export default AdminPanelClean
+
+const SpecialEventsTab = () => {
+  const [mounted, setMounted] = React.useState(false)
+  useEffect(() => { setMounted(true) }, [])
+  if (!mounted) return null
+  const SpecialEventModeration = require('./SpecialEventModeration').default
+  return <SpecialEventModeration />
+}

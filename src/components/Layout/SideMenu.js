@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Side navigation menu for mobile/tablet views with links to main pages and user account actions.
+// - Used by: Header component on mobile devices; provides hamburger menu alternative to desktop navigation.
+// - Notes: Production component. Responsive design; shows user-specific links when logged in; includes dark mode toggle.
+
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Users, FileText, MapPin, Mail, X, User, Settings, LogOut } from 'lucide-react'
@@ -15,7 +20,6 @@ const SideMenu = () => {
       await logout()
       setIsOpen(false)
     } catch (error) {
-      console.error('Logout error:', error)
     }
   }
 

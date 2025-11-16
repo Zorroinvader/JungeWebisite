@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Main React entry for all routes; wires Router, layout, pages, and protected/admin routes.
+// - Used by: Root React render in index.js as the top-level application component.
+// - Notes: Production file. Any new page or route should be registered here.
+
 import React from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
@@ -10,11 +15,15 @@ import ContactPage from './pages/ContactPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import ProfilePage from './pages/ProfilePage'
-import ProfilePageSimple from './pages/ProfilePageSimple'
 import EventRequestTrackingPage from './pages/EventRequestTrackingPage'
 import EmailConfirmationHandler from './components/Auth/EmailConfirmationHandler'
 import AdminPanelClean from './components/Admin/AdminPanelClean'
+import SpecialEventsPage from './pages/SpecialEventsPage'
+import SpecialEventDetailPage from './pages/SpecialEventDetailPage'
+import CostumeContestResultsPage from './pages/CostumeContestResultsPage'
 import './index.css'
+// import { Analytics } from '@vercel/analytics/react' // Commented out - package not installed
+import { prefetchActiveSpecialEvents } from './services/specialEventsApi'
 
 // Protected Route Component
 const ProtectedRoute = ({ children, requireAuth = true, requireAdmin = false }) => {
@@ -60,6 +69,11 @@ const ProtectedRoute = ({ children, requireAuth = true, requireAdmin = false }) 
 
 // Main App Component
 const AppContent = () => {
+  React.useEffect(() => {
+    // Prefetch special events early to speed up banner and CTA
+    prefetchActiveSpecialEvents()
+  }, [])
+
   // Check if URL has email confirmation
   const urlParams = new URLSearchParams(window.location.search);
   const hasConfirmation = urlParams.has('token') || 
@@ -84,10 +98,12 @@ const AppContent = () => {
         <Route path="/faq" element={<Layout><FAQPage /></Layout>} />
         <Route path="/contact" element={<Layout><ContactPage /></Layout>} />
         <Route path="/event-tracking" element={<EventRequestTrackingPage />} />
+        <Route path="/special-events" element={<Layout><SpecialEventsPage /></Layout>} />
+        <Route path="/special-events/:slug" element={<Layout><SpecialEventDetailPage /></Layout>} />
+        <Route path="/kostuemwettbewerb-ergebnisse" element={<Layout><CostumeContestResultsPage /></Layout>} />
         
         {/* Test Route */}
         <Route path="/test" element={<div>Test Route Works!</div>} />
-        <Route path="/profile-test" element={<Layout><ProfilePageSimple /></Layout>} />
         <Route path="/admin-test" element={<Layout><AdminPanelClean /></Layout>} />
         
         {/* Auth Routes */}
@@ -124,6 +140,7 @@ const App = () => {
   return (
     <DarkModeProvider>
       <AuthProvider>
+        {/* <Analytics /> */}
         <AppContent />
       </AuthProvider>
     </DarkModeProvider>

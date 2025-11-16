@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Helper utilities for reading, writing, and interpreting admin settings and for generating email content/links.
+// - Used by: Admin UI components and email/notification services when sending user or admin emails and reading settings.
+// - Notes: Production helper file. Relies on localStorage and Supabase Edge Functions; edits can affect email behavior. Uses secureConfig for safe key access.
+
 // Helper functions for reading and managing admin settings
 
 /**
@@ -11,7 +16,6 @@ export const getAdminSettings = () => {
       return JSON.parse(savedSettings)
     }
   } catch (error) {
-    console.error('Error loading admin settings:', error)
   }
   
   // Return default settings if none exist
@@ -25,6 +29,17 @@ export const getAdminSettings = () => {
   }
 }
 
+// Resolve the correct public base URL for links in emails (prod-safe)
+const getBaseUrl = () => {
+  try {
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      return window.location.origin
+    }
+  } catch (_) {}
+  // Fallback to production domain if not running in browser
+  return 'https://jungengesellschaft-website.vercel.app'
+}
+
 /**
  * Get the list of admin emails for notifications
  * @returns {Array<string>} Array of admin email addresses
@@ -35,8 +50,7 @@ export const getAdminNotificationEmails = () => {
   
   // If no emails configured, use admin@admin.com as default
   if (emails.length === 0) {
-    console.warn('No admin emails configured, using default: admin@admin.com')
-    return ['admin@admin.com']
+    return ['zorro.invader@gmail.com']
   }
   
   return emails
@@ -95,12 +109,8 @@ export const getDefaultCalendarView = () => {
  */
 export const sendUserNotification = async (userEmail, eventData, type) => {
   if (!userEmail) {
-    console.warn('No user email provided for notification')
     return
   }
-
-  console.log('[USER NOTIFICATION] Sending to:', userEmail)
-  console.log('[USER NOTIFICATION] Type:', type)
 
   let subject = ''
   let message = ''
@@ -121,7 +131,7 @@ export const sendUserNotification = async (userEmail, eventData, type) => {
                 `Zeitraum reserviert: Der gewünschte Zeitraum ist vorläufig für Sie reserviert\n` +
                 `In Bearbeitung: Ein Administrator prüft Ihre Anfrage\n\n` +
                 `Sie erhalten eine weitere E-Mail, sobald Ihre Anfrage bearbeitet wurde.\n\n` +
-                `Status verfolgen: http://localhost:3000/event-tracking\n\n` +
+                `Status verfolgen: ${getBaseUrl()}/event-tracking\n\n` +
                 `Mit freundlichen Grüßen\n` +
                 `Ihr Event-Management-Team\n\n` +
                 `Junge Gesellschaft Pferdestall Wedes Wedel\n` +
@@ -142,7 +152,7 @@ export const sendUserNotification = async (userEmail, eventData, type) => {
                 `1. Genaue Start- und Endzeiten\n` +
                 `2. Gewünschte Schlüsselübergabe- und Rückgabezeiten\n` +
                 `3. Signierter Mietvertrag (als PDF)\n\n` +
-                `Details ergänzen: http://localhost:3000/event-tracking\n\n` +
+                `Details ergänzen: ${getBaseUrl()}/event-tracking\n\n` +
                 `Mit freundlichen Grüßen\n` +
                 `Ihr Event-Management-Team\n\n` +
                 `Junge Gesellschaft Pferdestall Wedes Wedel\n` +
@@ -162,7 +172,7 @@ export const sendUserNotification = async (userEmail, eventData, type) => {
                 `${'-'.repeat(50)}\n` +
                 `Ihr Event ist jetzt im Kalender eingetragen und reserviert.\n` +
                 `Alle Details wurden bestätigt.\n\n` +
-                `Kalender ansehen: http://localhost:3000/\n\n` +
+                `Kalender ansehen: ${getBaseUrl()}/\n\n` +
                 `Wir wünschen Ihnen eine erfolgreiche Veranstaltung!\n\n` +
                 `Mit freundlichen Grüßen\n` +
                 `Ihr Event-Management-Team\n\n` +
@@ -178,14 +188,11 @@ export const sendUserNotification = async (userEmail, eventData, type) => {
   const htmlContent = generateUserEmailHTML(subject, message, eventData, type)
 
   // Send via Supabase Edge Function
+  // SECURITY: Use secure getters to prevent key exposure
   try {
-    const supabaseUrl = process.env.REACT_APP_SUPABASE_URL
-    const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY
-
-    if (!supabaseUrl || !supabaseKey) {
-      console.warn('⚠️ Supabase credentials not found')
-      return
-    }
+    const { getSupabaseUrl, getSupabaseAnonKey } = await import('../utils/secureConfig')
+    const supabaseUrl = getSupabaseUrl()
+    const supabaseKey = getSupabaseAnonKey()
 
     const response = await fetch(`${supabaseUrl}/functions/v1/send-admin-notification`, {
       method: 'POST',
@@ -204,10 +211,8 @@ export const sendUserNotification = async (userEmail, eventData, type) => {
     })
 
     if (response.ok) {
-      console.log('✅ User notification sent successfully!')
     }
   } catch (error) {
-    console.error('❌ Failed to send user notification:', error)
   }
 }
 
@@ -218,20 +223,14 @@ export const sendUserNotification = async (userEmail, eventData, type) => {
  */
 export const sendAdminNotification = async (eventData, type = 'initial_request') => {
   if (!areNotificationsEnabled()) {
-    console.log('Notifications disabled, skipping email')
     return
   }
 
   const adminEmails = getAdminNotificationEmails()
   
   if (adminEmails.length === 0) {
-    console.warn('No admin emails configured for notifications')
     return
   }
-
-  console.log('[NOTIFICATION] Sending to:', adminEmails)
-  console.log('[NOTIFICATION] Event:', eventData)
-  console.log('[NOTIFICATION] Type:', type)
   
   // Format notification message based on type
   let subject = ''
@@ -304,26 +303,17 @@ export const sendAdminNotification = async (eventData, type = 'initial_request')
                 `Ihr Event-Management-System`
   }
   
-  // Log notification details
-  console.log('\n' + '='.repeat(60))
-  console.log('EMAIL NOTIFICATION')
-  console.log('='.repeat(60))
-  console.log('To:', adminEmails.join(', '))
-  console.log('Subject:', subject)
-  console.log('-'.repeat(60))
-  console.log(message)
-  console.log('='.repeat(60) + '\n')
-  
   // Generate HTML email content
   const htmlContent = generateEmailHTML(subject, message, eventData, type)
   
   // Send email via Supabase Edge Function
   try {
-    const supabaseUrl = process.env.REACT_APP_SUPABASE_URL
-    const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY
+    // SECURITY: Use secure getters to prevent key exposure
+    const { getSupabaseUrl, getSupabaseAnonKey } = await import('../utils/secureConfig')
+    const supabaseUrl = getSupabaseUrl()
+    const supabaseKey = getSupabaseAnonKey()
     
     if (!supabaseUrl || !supabaseKey) {
-      console.warn('⚠️ Supabase credentials not found, showing alert instead')
       alert(`E-MAIL BENACHRICHTIGUNG\n\n` +
             `An: ${adminEmails.join(', ')}\n` +
             `Betreff: ${subject}\n\n` +
@@ -355,14 +345,12 @@ export const sendAdminNotification = async (eventData, type = 'initial_request')
     const result = await response.json()
     
     if (result.success) {
-      console.log('✅ Email sent successfully!')
       // Optionally show a subtle success notification
     } else {
       throw new Error(result.error || 'Unknown error')
     }
     
   } catch (error) {
-    console.error('❌ Failed to send email:', error)
     // Show alert as fallback
     alert(`E-MAIL BENACHRICHTIGUNG (Versand fehlgeschlagen)\n\n` +
           `An: ${adminEmails.join(', ')}\n` +
@@ -377,7 +365,7 @@ export const sendAdminNotification = async (eventData, type = 'initial_request')
  * Generate HTML email template for user notifications
  */
 export const generateUserEmailHTML = (subject, message, eventData, type) => {
-  const buttonUrl = type === 'initial_request_accepted' ? 'http://localhost:3000/event-tracking' : 'http://localhost:3000/'
+  const buttonUrl = type === 'initial_request_accepted' ? `${getBaseUrl()}/event-tracking` : `${getBaseUrl()}/`
   const buttonText = type === 'initial_request_accepted' ? 'Details ergänzen' : type === 'final_approval' ? 'Kalender ansehen' : 'Status verfolgen'
   
   // Format dates nicely
@@ -422,7 +410,7 @@ export const generateUserEmailHTML = (subject, message, eventData, type) => {
 <body>
   <div class="email-wrapper">
     <div class="header">
-      <img src="http://localhost:3000/assets/Wappen-Junge-Gesellschaft-Pferdestall-Wedes-Wedel.png" alt="Junge Gesellschaft" class="logo" />
+      <img src="${getBaseUrl()}/assets/Wappen-Junge-Gesellschaft-Pferdestall-Wedes-Wedel.png" alt="Junge Gesellschaft" class="logo" />
       <h1 class="header-title">Junge Gesellschaft Pferdestall</h1>
     </div>
     
@@ -485,8 +473,8 @@ export const generateUserEmailHTML = (subject, message, eventData, type) => {
       <p style="margin: 0 0 10px 0; font-weight: 600;">Junge Gesellschaft Pferdestall Wedes Wedel</p>
       <p style="margin: 0; color: #A58C81;">Event-Anfragen: kontakt@junge-gesellschaft-wedel.de</p>
       <div class="footer-links">
-        <a href="http://localhost:3000/">Startseite</a> | 
-        <a href="http://localhost:3000/event-tracking">Status verfolgen</a>
+        <a href="${getBaseUrl()}/">Startseite</a> | 
+        <a href="${getBaseUrl()}/event-tracking">Status verfolgen</a>
       </div>
       <p style="margin: 15px 0 0 0; color: #A58C81; font-size: 11px;">Diese E-Mail wurde automatisch generiert.</p>
     </div>
@@ -547,7 +535,7 @@ export const generateEmailHTML = (subject, message, eventData, type) => {
 <body>
   <div class="email-wrapper">
     <div class="header">
-      <img src="http://localhost:3000/assets/Wappen-Junge-Gesellschaft-Pferdestall-Wedes-Wedel.png" alt="Junge Gesellschaft" class="logo" />
+      <img src="${getBaseUrl()}/assets/Wappen-Junge-Gesellschaft-Pferdestall-Wedes-Wedel.png" alt="Junge Gesellschaft" class="logo" />
       <h1 class="header-title">Junge Gesellschaft Pferdestall</h1>
     </div>
     
@@ -575,7 +563,7 @@ export const generateEmailHTML = (subject, message, eventData, type) => {
         ${type === 'detailed_info_submitted' ? '<div class="status-badge">Mietvertrag hochgeladen</div>' : ''}
         
         <center>
-          <a href="http://localhost:3000/admin" class="cta-button">Zum Admin-Panel</a>
+          <a href="${getBaseUrl()}/admin" class="cta-button">Zum Admin-Panel</a>
         </center>
         
         <p style="margin-top: 30px; color: #A58C81; font-size: 14px;">
@@ -593,8 +581,8 @@ export const generateEmailHTML = (subject, message, eventData, type) => {
       <p style="margin: 0 0 10px 0; font-weight: 600;">Junge Gesellschaft Pferdestall Wedes Wedel</p>
       <p style="margin: 0; color: #A58C81;">Event-Anfragen: kontakt@junge-gesellschaft-wedel.de</p>
       <div class="footer-links">
-        <a href="http://localhost:3000/">Startseite</a> | 
-        <a href="http://localhost:3000/admin">Admin-Panel</a>
+        <a href="${getBaseUrl()}/">Startseite</a> | 
+        <a href="${getBaseUrl()}/admin">Admin-Panel</a>
       </div>
       <p style="margin: 15px 0 0 0; color: #A58C81; font-size: 11px;">Diese E-Mail wurde automatisch generiert.</p>
     </div>
@@ -617,7 +605,6 @@ export const saveAdminSettings = (settings) => {
     localStorage.setItem('adminSettings', JSON.stringify(settingsWithTimestamp))
     return true
   } catch (error) {
-    console.error('Error saving admin settings:', error)
     return false
   }
 }

@@ -1,9 +1,15 @@
+// FILE OVERVIEW
+// - Purpose: Main site header with navigation links, logo, user menu, dark mode toggle, and admin access.
+// - Used by: Layout component on all public pages; provides navigation to About, FAQ, Contact, Profile, Admin.
+// - Notes: Production component. Shows user menu when logged in; admin link visible only to admins; includes dark mode toggle.
+
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDarkMode } from '../../contexts/DarkModeContext'
-import { ChevronDown, Moon, Sun, FileText, LogOut, AlertTriangle } from 'lucide-react'
+import { ChevronDown, Moon, Sun, FileText, LogOut, AlertTriangle, Sparkles } from 'lucide-react'
 import PDFLink from '../UI/PDFLink'
+import SpecialEventsBanner from '../UI/SpecialEventsBanner'
 
 const Header = () => {
   const { user, isAdmin, signOut } = useAuth()
@@ -14,6 +20,8 @@ const Header = () => {
   return (
     <>
     <nav className="w-full border-b sticky top-0 z-40 bg-[#F4F1E8] dark:bg-[#252422] border-[#A58C81] dark:border-[#EBE9E9]">
+      {/* Special Events banner inside sticky header for mobile visibility */}
+      <SpecialEventsBanner />
       <div className="w-full px-[1vw] sm:px-[1.5vw] md:px-[2vw] lg:px-[2.5vw] xl:px-[3vw] 2xl:px-[3.5vw]">
         <div className="flex justify-between items-center h-[10vh] sm:h-[9vh] md:h-[8vh] lg:h-[7vh] xl:h-[6vh] 2xl:h-[5vh] w-full">
           {/* Logo on the left - Clickable to homepage */}
@@ -64,6 +72,12 @@ const Header = () => {
               </div>
             </div>
             
+            {/* Special Events Link */}
+            <Link to="/special-events" className="text-[2.5vw] sm:text-[2vw] md:text-[1.5vw] lg:text-[1.2vw] xl:text-[1vw] 2xl:text-[0.8vw] font-normal hover:opacity-70 transition-opacity flex items-center text-[#252422] dark:text-[#EBE9E9]">
+              <Sparkles className="h-[3vw] sm:h-[2.5vw] md:h-[2vw] lg:h-[1.5vw] xl:h-[1.2vw] 2xl:h-[1vw] w-[3vw] sm:w-[2.5vw] md:w-[2vw] lg:w-[1.5vw] xl:w-[1.2vw] 2xl:w-[1vw] mr-[0.5vw] sm:mr-[0.4vw] md:mr-[0.3vw] lg:mr-[0.2vw] xl:mr-[0.15vw] 2xl:mr-[0.1vw]" />
+              Special Events
+            </Link>
+
             {/* Downloads Dropdown */}
             <div className="relative group">
               <span className="text-[2.5vw] sm:text-[2vw] md:text-[1.5vw] lg:text-[1.2vw] xl:text-[1vw] 2xl:text-[0.8vw] font-normal hover:opacity-70 transition-opacity flex items-center cursor-pointer text-[#252422] dark:text-[#EBE9E9]">
@@ -194,6 +208,7 @@ const Header = () => {
           
           <Link to="/about" className="block text-sm font-medium text-[#252422] dark:text-[#EBE9E9]" onClick={() => setMobileOpen(false)}>Über uns</Link>
           <Link to="/faq" className="block text-sm font-medium text-[#252422] dark:text-[#EBE9E9]" onClick={() => setMobileOpen(false)}>FAQ</Link>
+          <Link to="/special-events" className="block text-sm font-medium text-[#252422] dark:text-[#EBE9E9]" onClick={() => setMobileOpen(false)}>Special Events</Link>
           <Link to="/contact" className="block text-sm font-medium text-[#252422] dark:text-[#EBE9E9]" onClick={() => setMobileOpen(false)}>Kontakt</Link>
           {!user ? (
             <div className="pt-2 space-y-2">
@@ -258,13 +273,11 @@ const Header = () => {
               <button
                 onClick={async () => {
                   try {
-                    console.log('Logout confirmed')
                     await signOut()
                     setShowLogoutConfirm(false)
                     setMobileOpen(false)
                     // Don't force page reload - let auth state change handle UI update
                   } catch (error) {
-                    console.error('Logout error:', error)
                     setShowLogoutConfirm(false)
                   }
                 }}

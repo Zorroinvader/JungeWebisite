@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Event validation utilities for checking date conflicts, validating event times, and formatting conflict messages.
+// - Used by: AdminEventCreationForm, AdminEventEditForm for conflict checking before creating/updating events.
+// - Notes: Production utility. Prevents double-booking; validates date ranges and time overlaps.
+
 /**
  * Event validation utilities to prevent overlapping bookings
  */

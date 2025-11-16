@@ -1,12 +1,19 @@
-import React, { useState } from 'react';
+// FILE OVERVIEW
+// - Purpose: Public/self-service page where users can look up, track, update, and cancel their event requests via email or logged-in user ID.
+// - Used by: Route '/event-tracking' in App.js and email links in notification templates.
+// - Notes: Production page. Uses Layout, DetailedEventForm, RequestTimeline and eventRequestsAPI; changes affect core user flow.
+
+import React, { useEffect, useState } from 'react';
 import Layout from '../components/Layout/Layout';
-import { eventRequestsAPI } from '../services/httpApi';
+import { eventRequestsAPI } from '../services/databaseApi';
 import RequestTimeline from '../components/Calendar/RequestTimeline';
 import DetailedEventForm from '../components/Calendar/DetailedEventForm';
 import { useDarkMode } from '../contexts/DarkModeContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const EventRequestTrackingPage = () => {
   const { isDarkMode } = useDarkMode();
+  const { user } = useAuth();
   const [email, setEmail] = useState('');
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -18,6 +25,11 @@ const EventRequestTrackingPage = () => {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [requestToCancel, setRequestToCancel] = useState(null);
 
+  // Prefill email if logged in
+  useEffect(() => {
+    if (user?.email && !email) setEmail(user.email);
+  }, [user, email]);
+
   const handleSearch = async (e) => {
     e.preventDefault();
     setError('');
@@ -25,17 +37,9 @@ const EventRequestTrackingPage = () => {
     setSearched(true);
 
     try {
-      console.log('Searching for requests with email:', email);
       const data = await eventRequestsAPI.getByEmail(email);
-      console.log('Search results:', data);
       setRequests(data || []);
     } catch (err) {
-      console.error('Error fetching requests:', err);
-      console.error('Error details:', {
-        message: err.message,
-        stack: err.stack,
-        name: err.name
-      });
       setError('Fehler beim Laden der Anfragen: ' + err.message);
     } finally {
       setLoading(false);
@@ -45,6 +49,22 @@ const EventRequestTrackingPage = () => {
   const handleFillDetails = (request) => {
     setSelectedRequest(request);
     setShowDetailedForm(true);
+  };
+
+  const handleLoadMyRequests = async () => {
+    if (!user?.id) return;
+    setError('');
+    setLoading(true);
+    setSearched(true);
+    try {
+      const data = await eventRequestsAPI.getByUser(user.id);
+      setRequests(data || []);
+      // Do not overwrite the email input; keep what the user typed
+    } catch (err) {
+      setError('Fehler beim Laden Ihrer Anfragen: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDetailsSubmitted = () => {
@@ -76,7 +96,6 @@ const EventRequestTrackingPage = () => {
         handleSearch({ preventDefault: () => {} });
       }
     } catch (err) {
-      console.error('Error cancelling request:', err);
       setError('Fehler beim Stornieren der Anfrage');
     } finally {
       setCancellingId(null);
@@ -117,14 +136,25 @@ const EventRequestTrackingPage = () => {
                   placeholder="ihre@email.de"
                 />
               </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className={`w-full px-6 py-3 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} hover:bg-[#8a6a5a] ${isDarkMode ? 'dark:hover:bg-[#8a8a8a]' : ''}`}
-              >
-                {loading ? 'Suche läuft...' : 'Anfragen suchen'}
-              </button>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className={`w-full px-6 py-3 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} hover:bg-[#8a6a5a] ${isDarkMode ? 'dark:hover:bg-[#8a8a8a]' : ''}`}
+                >
+                  {loading ? 'Suche läuft...' : 'Anfragen suchen'}
+                </button>
+                {user?.id && (
+                  <button
+                    type="button"
+                    onClick={handleLoadMyRequests}
+                    disabled={loading}
+                    className={`w-full px-6 py-3 text-sm font-medium text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''}`}
+                  >
+                    Meine Anfragen anzeigen
+                  </button>
+                )}
+              </div>
             </form>
           </div>
 

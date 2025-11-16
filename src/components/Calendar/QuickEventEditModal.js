@@ -1,6 +1,11 @@
+// FILE OVERVIEW
+// - Purpose: Quick edit modal for updating event details (title, dates, times, notes) without full form; admin-only.
+// - Used by: EventDetailsModal when admin clicks edit button; provides fast inline editing of event properties.
+// - Notes: Production component. Uses eventsAPI.update for saving changes; validates date ranges and required fields.
+
 import React, { useState, useEffect } from 'react';
 import { X, Save } from 'lucide-react';
-import { eventsAPI } from '../../services/httpApi';
+import { eventsAPI } from '../../services/databaseApi';
 import { useDarkMode } from '../../contexts/DarkModeContext';
 
 const QuickEventEditModal = ({ isOpen, onClose, onSuccess, event }) => {
@@ -119,31 +124,12 @@ const QuickEventEditModal = ({ isOpen, onClose, onSuccess, event }) => {
       if (startDate >= endDate) {
         throw new Error('Das Enddatum muss nach dem Startdatum liegen');
       }
-
-      console.log('🔄 Updating event:', {
-        id: event.id,
-        title: formData.title,
-        start_date: startDatetime,
-        end_date: endDatetime,
-        original_start: event.start_date,
-        original_end: event.end_date
-      });
-      console.log('⏰ Time details:', {
-        start_time: formData.event_start_time,
-        end_time: formData.event_end_time,
-        formatted_start: startDatetime,
-        formatted_end: endDatetime
-      });
-
       // Update title and date/time
-      const result = await eventsAPI.update(event.id, {
+      await eventsAPI.update(event.id, {
         title: formData.title.trim(),
         start_date: startDatetime,
         end_date: endDatetime
       });
-
-      console.log('✅ Event update result:', result);
-
       // Show success message
       setSuccess(true);
       
@@ -158,7 +144,6 @@ const QuickEventEditModal = ({ isOpen, onClose, onSuccess, event }) => {
       }, 1000);
 
     } catch (err) {
-      console.error('❌ Error updating event:', err);
       setError(err.message || 'Fehler beim Aktualisieren des Events');
     } finally {
       setLoading(false);
