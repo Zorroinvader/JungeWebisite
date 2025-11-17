@@ -151,7 +151,7 @@ cmd = "uvicorn src.services.fritzWorkerService:app --host 0.0.0.0 --port $PORT"
    PersistentKeepalive = 25
    ```
 
-3. Modifiziere `fritzWorkerService.py` um die Config aus Umgebungsvariable zu lesen
+3. ✅ **FERTIG**: `fritzWorker.py` wurde bereits modifiziert und liest die Config aus der Umgebungsvariable `WG_CONFIG`
 
 ### Option B: Config im Code (weniger sicher)
 

@@ -208,15 +208,26 @@ def _connect_wireguard():
     system = platform.system().lower()
     tunnel_name = "FritzBox_WireGuard"
     
-    # Check for existing config file in the services directory
+    # Check for WireGuard config from environment variable first (for Railway/cloud deployments)
+    wg_config_from_env = os.environ.get('WG_CONFIG', '').strip()
+    
     script_dir = os.path.dirname(os.path.abspath(__file__))
     existing_config = os.path.join(script_dir, 'wg_config.conf')
     
     try:
-        # Use existing config file if it exists, otherwise create one
-        if os.path.exists(existing_config):
+        # Priority 1: Use environment variable if set (for Railway/cloud)
+        if wg_config_from_env:
+            print("Using WireGuard config from WG_CONFIG environment variable")
+            # Create temporary file from environment variable
+            wg_config = tempfile.NamedTemporaryFile(mode='w', suffix='.conf', delete=False)
+            wg_config.write(wg_config_from_env)
+            wg_config.close()
+            wg_config_path = wg_config.name
+        # Priority 2: Use existing config file if it exists
+        elif os.path.exists(existing_config):
             print(f"Using existing WireGuard config file: {existing_config}")
             wg_config_path = existing_config
+        # Priority 3: Create from VPN_CONFIG
         else:
             # Create WireGuard configuration file from VPN_CONFIG
             print("Creating WireGuard config file from VPN_CONFIG...")
