@@ -11,6 +11,7 @@
     "clsx": "^2.0.0",
     "lucide-react": "^0.294.0",
     "moment": "^2.29.4",
+    "pip": "^0.0.1",
     "postcss": "^8.4.32",
     "react": "^18.2.0",
     "react-big-calendar": "^1.8.2",

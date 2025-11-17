@@ -1,6 +1,6 @@
 [
   {
-    "name": "All API Tests",
+    "name": "API Tests",
     "command": "npm",
     "args": [
       "run",
@@ -10,7 +10,7 @@
     "severity": "high"
   },
   {
-    "name": "All E2E Tests",
+    "name": "E2E Tests",
     "command": "npm",
     "args": [
       "run",
@@ -18,26 +18,6 @@
     ],
     "category": "security",
     "severity": "critical"
-  },
-  {
-    "name": "Accessibility Tests",
-    "command": "npm",
-    "args": [
-      "run",
-      "test:e2e:a11y"
-    ],
-    "category": "e2e",
-    "severity": "high"
-  },
-  {
-    "name": "Email API Tests",
-    "command": "npm",
-    "args": [
-      "run",
-      "test:api:email"
-    ],
-    "category": "api",
-    "severity": "high"
   },
   {
     "name": "Visual Regression Tests",

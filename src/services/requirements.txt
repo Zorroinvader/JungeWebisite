@@ -1,0 +1,4 @@
+# Python-Abhängigkeiten für FritzBox-WLAN-Monitor
+fritzconnection>=1.12.0
+
+
