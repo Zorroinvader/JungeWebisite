@@ -13,18 +13,11 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy requirements first (for better caching)
-# Try src/services/requirements.txt first, fallback to root requirements.txt
-COPY requirements.txt* ./requirements.txt
-COPY src/services/requirements.txt* ./services-requirements.txt
+# Railway expects requirements.txt in root
+COPY requirements.txt ./requirements.txt
 
-# Install Python dependencies (use whichever exists)
-RUN if [ -f ./requirements.txt ]; then \
-      pip install --no-cache-dir -r requirements.txt; \
-    elif [ -f ./services-requirements.txt ]; then \
-      pip install --no-cache-dir -r services-requirements.txt; \
-    else \
-      pip install --no-cache-dir fritzconnection>=1.12.0 fastapi>=0.104.0 uvicorn>=0.24.0; \
-    fi
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
