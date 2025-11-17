@@ -27,7 +27,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     }
   },
   realtime: {
-    enabled: false
+    enabled: true
   },
   storage: {
     // Add storage-specific configuration
@@ -40,7 +40,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 export const TABLES = {
   EVENTS: 'events',
   EVENT_REQUESTS: 'event_requests',
-  PROFILES: 'profiles'
+  PROFILES: 'profiles',
+  CLUB_STATUS: 'club_status'
 }
 
 // User roles - hierarchical permission system

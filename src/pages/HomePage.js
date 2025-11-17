@@ -11,6 +11,7 @@ import { Calendar, Users, FileText } from 'lucide-react'
 import SimpleMonthCalendar from '../components/Calendar/SimpleMonthCalendar'
 import TypewriterText from '../components/UI/TypewriterText'
 import NextEventInfo from '../components/UI/NextEventInfo'
+import ClubStatusIndicator from '../components/UI/ClubStatusIndicator'
 import { getActiveSpecialEvents } from '../services/specialEventsApi'
 import PublicEventRequestForm from '../components/Calendar/PublicEventRequestForm'
 import GuestOrRegisterModal from '../components/Calendar/GuestOrRegisterModal'
@@ -128,6 +129,11 @@ const HomePage = () => {
                   <NextEventInfo />
                 </div>
               </div>
+            </div>
+
+            {/* Club Status Indicator */}
+            <div className="mt-4 flex justify-center lg:justify-start">
+              <ClubStatusIndicator />
             </div>
 
             {/* Mobile Special Events CTA: always visible on home */}

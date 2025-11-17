@@ -19,7 +19,8 @@
     "react-router-dom": "^6.8.1",
     "react-scripts": "^5.0.1",
     "supabase": "^2.58.5",
-    "tailwindcss": "^3.3.6"
+    "tailwindcss": "^3.3.6",
+    "wireguard": "^1.0.0"
   },
   "scripts": {
     "start": "react-scripts start",
