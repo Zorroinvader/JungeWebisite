@@ -9,6 +9,10 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Note: WireGuard needs CAP_NET_ADMIN capability
+# Railway containers should have this by default, but if not,
+# you may need to configure it in Railway settings
+
 # Set working directory
 WORKDIR /app
 

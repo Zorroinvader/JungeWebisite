@@ -351,6 +351,7 @@ PersistentKeepalive = {config['persistent_keepalive']}
                 
         else:
             # Linux/Unix WireGuard - use wg-quick
+            # In Docker containers, we usually run as root, so sudo is not needed
             try:
                 subprocess.run(['which', 'wg-quick'], check=True, capture_output=True)
             except (subprocess.CalledProcessError, FileNotFoundError):
@@ -358,23 +359,78 @@ PersistentKeepalive = {config['persistent_keepalive']}
                 print(f"Config file available at: {wg_config_path}")
                 return False, None, None
             
-            # Connect using wg-quick with the config file
-            process = subprocess.Popen(
-                ['sudo', 'wg-quick', 'up', wg_config_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
+            # Check if we're running as root (common in Docker containers)
+            # If root, we don't need sudo
+            import os
+            is_root = os.geteuid() == 0 if hasattr(os, 'geteuid') else True  # Default to True for Windows/containers
             
-            time.sleep(3)
+            # Try without sudo first (for Docker containers running as root)
+            wg_quick_cmd = ['wg-quick', 'up', wg_config_path]
+            if not is_root:
+                # Only use sudo if not root
+                wg_quick_cmd = ['sudo'] + wg_quick_cmd
             
-            if process.poll() is None or process.returncode == 0:
-                print(f"WireGuard VPN connection initiated to {server}:{port}")
-                return True, process, tunnel_name
-            else:
-                stdout, stderr = process.communicate()
-                print(f"WireGuard VPN connection failed: {stderr.decode()}")
-                print(f"Config file location: {wg_config_path}")
-                return False, None, None
+            try:
+                process = subprocess.Popen(
+                    wg_quick_cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+                
+                # Wait a bit for connection to establish
+                time.sleep(3)
+                
+                # Check if process is still running or completed successfully
+                if process.poll() is None:
+                    # Process is still running (good - connection established)
+                    print(f"WireGuard VPN connection initiated to {server}:{port}")
+                    return True, process, tunnel_name
+                elif process.returncode == 0:
+                    # Process completed successfully
+                    print(f"WireGuard VPN connection established to {server}:{port}")
+                    return True, process, tunnel_name
+                else:
+                    # Process failed
+                    stdout, stderr = process.communicate()
+                    error_msg = stderr.decode() if stderr else stdout.decode()
+                    print(f"WireGuard VPN connection failed: {error_msg}")
+                    print(f"Config file location: {wg_config_path}")
+                    
+                    # If sudo failed, try without sudo (for containers running as root)
+                    if 'sudo' in str(wg_quick_cmd) and 'permission' in error_msg.lower():
+                        print("Retrying without sudo (assuming root privileges)...")
+                        process2 = subprocess.Popen(
+                            ['wg-quick', 'up', wg_config_path],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE
+                        )
+                        time.sleep(3)
+                        if process2.poll() is None or process2.returncode == 0:
+                            print(f"WireGuard VPN connection established (without sudo) to {server}:{port}")
+                            return True, process2, tunnel_name
+                    
+                    return False, None, None
+            except FileNotFoundError as e:
+                print(f"Error: Command not found: {e}")
+                print("Trying without sudo...")
+                # Try without sudo as fallback
+                try:
+                    process = subprocess.Popen(
+                        ['wg-quick', 'up', wg_config_path],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE
+                    )
+                    time.sleep(3)
+                    if process.poll() is None or process.returncode == 0:
+                        print(f"WireGuard VPN connection established to {server}:{port}")
+                        return True, process, tunnel_name
+                    else:
+                        stdout, stderr = process.communicate()
+                        print(f"WireGuard VPN connection failed: {stderr.decode()}")
+                        return False, None, None
+                except Exception as e2:
+                    print(f"Error connecting via WireGuard: {e2}")
+                    return False, None, None
                 
     except Exception as e:
         print(f"Error connecting via WireGuard: {e}")
@@ -433,15 +489,33 @@ def disconnect_vpn(vpn_method='wireguard', connection_name=None):
                     print(f"WireGuard not found. Tunnel '{tunnel_name}' may still be active.")
             else:
                 # Find active WireGuard interface
-                result = subprocess.run(['sudo', 'wg', 'show'], 
-                                      capture_output=True, text=True)
+                # Try without sudo first (for Docker containers)
+                try:
+                    result = subprocess.run(['wg', 'show'], 
+                                          capture_output=True, text=True, timeout=5)
+                except (FileNotFoundError, subprocess.TimeoutExpired):
+                    # Fallback to sudo if needed
+                    try:
+                        result = subprocess.run(['sudo', 'wg', 'show'], 
+                                              capture_output=True, text=True, timeout=5)
+                    except:
+                        result = type('obj', (object,), {'returncode': 1, 'stdout': ''})()
                 if result.returncode == 0 and result.stdout:
                     # Extract interface name and disconnect
                     for line in result.stdout.split('\n'):
                         if line.startswith('interface:'):
                             interface = line.split(':')[1].strip()
-                            subprocess.run(['sudo', 'wg-quick', 'down', interface],
-                                         capture_output=True)
+                            # Try without sudo first (for Docker containers)
+                            try:
+                                subprocess.run(['wg-quick', 'down', interface],
+                                             capture_output=True, timeout=5)
+                            except (FileNotFoundError, subprocess.TimeoutExpired):
+                                # Fallback to sudo if needed
+                                try:
+                                    subprocess.run(['sudo', 'wg-quick', 'down', interface],
+                                                 capture_output=True, timeout=5)
+                                except:
+                                    pass  # Ignore errors on disconnect
         elif vpn_method.lower() == 'ipsec':
             if system == 'windows':
                 if connection_name:
