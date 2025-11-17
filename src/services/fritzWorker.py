@@ -361,7 +361,7 @@ PersistentKeepalive = {config['persistent_keepalive']}
             
             # Check if we're running as root (common in Docker containers)
             # If root, we don't need sudo
-            import os
+            # os is already imported at the top of the file
             is_root = os.geteuid() == 0 if hasattr(os, 'geteuid') else True  # Default to True for Windows/containers
             
             # Try without sudo first (for Docker containers running as root)
