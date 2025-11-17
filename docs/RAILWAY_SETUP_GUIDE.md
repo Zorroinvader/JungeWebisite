@@ -134,24 +134,54 @@ cmd = "uvicorn src.services.fritzWorkerService:app --host 0.0.0.0 --port $PORT"
 
 ### Option A: Als Umgebungsvariable
 
-1. Gehe zu **"Variables"**
-2. Füge hinzu:
-   ```
-   WG_CONFIG=[Interface]
-   PrivateKey = gMZanpT8ocSoMdEdjmu8BV63ZdfwKEhAuLWf4IOF9VA=
-   Address = 192.168.178.202/24
-   DNS = 192.168.178.1
-   DNS = fritz.box
-   
-   [Peer]
-   PublicKey = ZPNPsuxAXAWDNZyOqZhXrRmFgU7d6vxRSyFuPPAt8As=
-   PresharedKey = V8Wu2/mtcAODOjU3MGYBLO3ajB7n/0S2/xUJosRkMLU=
-   AllowedIPs = 192.168.178.0/24,0.0.0.0/0
-   Endpoint = llezz3op4nv9opzb.myfritz.net:58294
-   PersistentKeepalive = 25
+**WICHTIG**: Railway unterstützt mehrzeilige Werte. Du musst die Config als eine Zeile mit `\n` für Zeilenumbrüche eingeben.
+
+#### Schritt-für-Schritt in Railway:
+
+1. Gehe zu Railway → Dein Service → **"Variables"** Tab
+2. Klicke auf **"+ New Variable"**
+3. **Name**: `WG_CONFIG`
+4. **Value**: Kopiere diesen Wert (alles in EINE Zeile mit `\n`):
+
+```
+[Interface]\nPrivateKey = gMZanpT8ocSoMdEdjmu8BV63ZdfwKEhAuLWf4IOF9VA=\nAddress = 192.168.178.202/24\nDNS = 192.168.178.1\nDNS = fritz.box\n\n[Peer]\nPublicKey = ZPNPsuxAXAWDNZyOqZhXrRmFgU7d6vxRSyFuPPAt8As=\nPresharedKey = V8Wu2/mtcAODOjU3MGYBLO3ajB7n/0S2/xUJosRkMLU=\nAllowedIPs = 192.168.178.0/24,0.0.0.0/0\nEndpoint = llezz3op4nv9opzb.myfritz.net:58294\nPersistentKeepalive = 25
+```
+
+5. Klicke **"Add"** oder **"Save"**
+
+#### Alternative: Mit Railway CLI (einfacher für mehrzeilige Werte)
+
+Falls du Railway CLI installiert hast:
+
+```bash
+# Installiere Railway CLI (falls noch nicht installiert)
+npm i -g @railway/cli
+
+# Login
+railway login
+
+# Link zu deinem Projekt
+railway link
+
+# Setze die Variable (kannst die Config aus Datei lesen)
+railway variables set WG_CONFIG="$(cat src/services/wg_config.conf)"
+```
+
+#### Alternative: Als Base64 kodiert (falls Railway Probleme mit \n hat)
+
+1. Kodiere die Config zu Base64:
+   ```bash
+   # Windows PowerShell
+   [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes((Get-Content src/services/wg_config.conf -Raw)))
    ```
 
-3. ✅ **FERTIG**: `fritzWorker.py` wurde bereits modifiziert und liest die Config aus der Umgebungsvariable `WG_CONFIG`
+2. In Railway Variable:
+   - **Name**: `WG_CONFIG_BASE64`
+   - **Value**: `[base64-string]`
+   
+3. Modifiziere Code um Base64 zu dekodieren (optional, wenn nötig)
+
+#### ✅ **FERTIG**: `fritzWorker.py` wurde bereits modifiziert und liest die Config aus der Umgebungsvariable `WG_CONFIG`
 
 ### Option B: Config im Code (weniger sicher)
 

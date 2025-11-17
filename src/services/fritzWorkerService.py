@@ -133,6 +133,7 @@ async def check_devices_get(authorization: str = Header(None)):
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get('PORT', 8000))
+    # Railway sets PORT env var, default to 8000 if not set
+    port = int(os.environ.get('PORT', '8000'))
     uvicorn.run(app, host="0.0.0.0", port=port)
 
