@@ -25,6 +25,9 @@ COPY . .
 # Create directory for WireGuard configs if needed
 RUN mkdir -p /app/src/services
 
+# Make start script executable
+RUN chmod +x start.sh
+
 # Expose port (Railway will set PORT env var)
 EXPOSE 8000
 
@@ -32,6 +35,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:8000/health || exit 1
 
-# Start command - use PORT env var or default to 8000
-CMD sh -c "uvicorn src.services.fritzWorkerService:app --host 0.0.0.0 --port ${PORT:-8000}"
+# Start command - use start.sh script which handles PORT env var
+CMD ["./start.sh"]
 
