@@ -33,6 +33,8 @@ serve(async (req) => {
     let hasNewDevices = false
     let message = 'Niemand ist gerade im Club'
     let devices: any[] = []
+    let isFallback = false
+    let responseFromEC2 = false
 
     // Call the external FritzBox service that handles VPN
     if (FRITZ_SERVICE_URL) {
@@ -61,44 +63,73 @@ serve(async (req) => {
         
         if (response.ok) {
           const data = await response.json()
-          hasNewDevices = data.has_new === true
-          devices = data.new_devices || []
-          
-          if (hasNewDevices) {
-            message = 'Jemand ist im Club'
+          // Only use EC2 response if it's valid and has expected fields
+          if (data && typeof data.has_new !== 'undefined') {
+            responseFromEC2 = true
+            hasNewDevices = data.has_new === true
+            devices = data.new_devices || []
+            
+            // Use message from EC2 service if provided, otherwise generate one
+            if (data.message && typeof data.message === 'string') {
+              message = data.message
+            } else {
+              message = hasNewDevices ? 'Jemand ist im Club' : 'Niemand ist gerade im Club'
+            }
+            console.log(`Using EC2 service response: has_new=${hasNewDevices}, message="${message}"`)
           } else {
-            message = 'Niemand ist gerade im Club'
+            console.error('EC2 service returned invalid response format:', data)
+            isFallback = true
+            // Fallback to database status
+            const { data: currentStatus } = await supabase.rpc('get_latest_club_status')
+            if (currentStatus && currentStatus.length > 0) {
+              hasNewDevices = currentStatus[0].has_new_devices
+              message = currentStatus[0].message || message
+            }
           }
         } else {
           const errorText = await response.text()
           console.error('Fritz service error:', response.status, errorText)
-          // On error, keep current status
+          isFallback = true
+          // On error, keep current status from database
           const { data: currentStatus } = await supabase.rpc('get_latest_club_status')
           if (currentStatus && currentStatus.length > 0) {
             hasNewDevices = currentStatus[0].has_new_devices
             message = currentStatus[0].message || message
+            console.log(`Using fallback from database: has_new=${hasNewDevices}, message="${message}"`)
           }
         }
       } catch (error) {
         console.error('Error calling Fritz service:', error)
-        // On error, keep current status
+        isFallback = true
+        
+        // Check if it's a timeout error
+        if (error instanceof Error && error.name === 'TimeoutError') {
+          console.error('Timeout: EC2 service took longer than 58 seconds. This indicates the service needs optimization.')
+          console.error('Consider: 1) Deploy WireGuard reuse optimization, 2) Check EC2 service performance, 3) Upgrade to Supabase Pro Plan for longer timeouts')
+        }
+        
+        // On error, keep current status from database
         const { data: currentStatus } = await supabase.rpc('get_latest_club_status')
         if (currentStatus && currentStatus.length > 0) {
           hasNewDevices = currentStatus[0].has_new_devices
           message = currentStatus[0].message || message
+          console.log(`Using fallback from database (error occurred): has_new=${hasNewDevices}, message="${message}"`)
         } else {
-          // Default to not occupied on error
+          // Default to not occupied on error if no database status exists
           hasNewDevices = false
           message = 'Niemand ist gerade im Club'
+          console.log('Using default fallback: has_new=false, message="Niemand ist gerade im Club"')
         }
       }
     } else {
       console.warn('FRITZ_SERVICE_URL not set')
-      // Keep current status
+      isFallback = true
+      // Keep current status from database
       const { data: currentStatus } = await supabase.rpc('get_latest_club_status')
       if (currentStatus && currentStatus.length > 0) {
         hasNewDevices = currentStatus[0].has_new_devices
         message = currentStatus[0].message || message
+        console.log(`Using fallback from database (no URL set): has_new=${hasNewDevices}, message="${message}"`)
       }
     }
 
@@ -130,6 +161,8 @@ serve(async (req) => {
         device_count: devices.length,
         devices: devices,
         timestamp: new Date().toISOString(),
+        response_source: responseFromEC2 ? 'ec2_service' : 'fallback',
+        is_fallback: isFallback,
       }),
       {
         status: 200,
