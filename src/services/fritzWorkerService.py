@@ -98,9 +98,9 @@ async def check_devices(authorization: str = Header(None)):
         
         # Determine message based on result
         if has_new:
-            message = "Neue Geräte die nicht zum Baseline gehören"
+            message = "Jemand ist im Club"
         else:
-            message = "Außer den Baseline Geräten ist niemand im Club"
+            message = "Niemand ist gerade im Club"
         
         return JSONResponse(
             status_code=200,

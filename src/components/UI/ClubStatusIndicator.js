@@ -10,7 +10,7 @@ import { useDarkMode } from '../../contexts/DarkModeContext'
 const ClubStatusIndicator = () => {
   const { isDarkMode } = useDarkMode()
   const [isOccupied, setIsOccupied] = useState(false)
-  const [message, setMessage] = useState('Außer den Baseline Geräten ist niemand im Club')
+  const [message, setMessage] = useState('Niemand ist gerade im Club')
   const [isLoading, setIsLoading] = useState(true)
   const [lastChecked, setLastChecked] = useState(null)
 
@@ -32,7 +32,7 @@ const ClubStatusIndicator = () => {
           console.log('Club status changed:', payload)
           if (payload.new) {
             setIsOccupied(payload.new.is_occupied)
-            setMessage(payload.new.message || 'Außer den Baseline Geräten ist niemand im Club')
+            setMessage(payload.new.message || 'Niemand ist gerade im Club')
             setLastChecked(payload.new.last_checked)
           } else {
             fetchStatus()
@@ -68,7 +68,7 @@ const ClubStatusIndicator = () => {
 
       if (data) {
         setIsOccupied(data.is_occupied)
-        setMessage(data.message || 'Außer den Baseline Geräten ist niemand im Club')
+        setMessage(data.message || 'Niemand ist gerade im Club')
         setLastChecked(data.last_checked)
       }
     } catch (error) {
@@ -96,7 +96,7 @@ const ClubStatusIndicator = () => {
             ? 'bg-green-500 shadow-lg shadow-green-500/50'
             : 'bg-red-500 shadow-lg shadow-red-500/50'
         }`}
-        title={isOccupied ? 'Neue Geräte im WLAN' : 'Nur Baseline Geräte'}
+        title={isOccupied ? 'Jemand ist im Club' : 'Niemand ist gerade im Club'}
       />
       
       {/* Status text */}

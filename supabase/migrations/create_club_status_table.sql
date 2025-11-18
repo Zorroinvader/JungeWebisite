@@ -15,43 +15,34 @@ CREATE OR REPLACE FUNCTION update_club_status(
   message_value TEXT DEFAULT NULL
 )
 RETURNS void AS $$
+DECLARE
+  latest_id UUID;
 BEGIN
-  -- Delete old records (keep only the latest)
-  DELETE FROM club_status WHERE id != (
-    SELECT id FROM club_status ORDER BY updated_at DESC LIMIT 1
-  );
+  -- Get the latest record ID (if exists)
+  SELECT id INTO latest_id 
+  FROM club_status 
+  ORDER BY updated_at DESC 
+  LIMIT 1;
   
-  -- Determine if occupied: if has_new_devices is true, someone new is there
+  -- Delete old records (keep only the latest one)
+  IF latest_id IS NOT NULL THEN
+    DELETE FROM club_status WHERE id != latest_id;
+  END IF;
+  
+  -- Insert new status record
   INSERT INTO club_status (is_occupied, has_new_devices, message, last_checked, updated_at)
   VALUES (
     has_new_devices_value, -- is_occupied = true when new devices found
     has_new_devices_value,
     COALESCE(message_value, 
       CASE 
-        WHEN has_new_devices_value THEN 'Neue Geräte die nicht zum Baseline gehören'
-        ELSE 'Außer den Baseline Geräten ist niemand im Club'
+        WHEN has_new_devices_value THEN 'Jemand ist im Club'
+        ELSE 'Niemand ist gerade im Club'
       END
     ),
     NOW(),
     NOW()
   );
-  
-  -- If no records exist, create one
-  IF NOT FOUND THEN
-    INSERT INTO club_status (is_occupied, has_new_devices, message, last_checked, updated_at)
-    VALUES (
-      has_new_devices_value,
-      has_new_devices_value,
-      COALESCE(message_value, 
-        CASE 
-          WHEN has_new_devices_value THEN 'Neue Geräte die nicht zum Baseline gehören'
-          ELSE 'Außer den Baseline Geräten ist niemand im Club'
-        END
-      ),
-      NOW(),
-      NOW()
-    );
-  END IF;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -88,6 +79,6 @@ CREATE POLICY "Allow service role to update club_status"
 
 -- Insert initial status
 INSERT INTO club_status (is_occupied, has_new_devices, message, last_checked) 
-VALUES (false, false, 'Außer den Baseline Geräten ist niemand im Club', NOW())
+VALUES (false, false, 'Niemand ist gerade im Club', NOW())
 ON CONFLICT DO NOTHING;
 

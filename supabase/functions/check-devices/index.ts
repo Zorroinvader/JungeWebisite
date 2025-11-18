@@ -10,7 +10,9 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '
 
 // URL to the FritzBox Worker Service (deployed separately but called from Supabase)
 // This service handles WireGuard VPN and device checking
-const FRITZ_SERVICE_URL = Deno.env.get('FRITZ_SERVICE_URL') ?? ''
+// Clean and validate the URL - remove trailing slashes, whitespace, and invalid characters
+const FRITZ_SERVICE_URL_RAW = Deno.env.get('FRITZ_SERVICE_URL') ?? ''
+const FRITZ_SERVICE_URL = FRITZ_SERVICE_URL_RAW.trim().replace(/[`'"]/g, '').replace(/\/+$/, '') // Remove backticks, quotes, and trailing slashes
 const FRITZ_SERVICE_API_KEY = Deno.env.get('FRITZ_SERVICE_API_KEY') ?? ''
 
 serve(async (req) => {
@@ -29,7 +31,7 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
     let hasNewDevices = false
-    let message = 'Außer den Baseline Geräten ist niemand im Club'
+    let message = 'Niemand ist gerade im Club'
     let devices: any[] = []
 
     // Call the external FritzBox service that handles VPN
@@ -63,9 +65,9 @@ serve(async (req) => {
           devices = data.new_devices || []
           
           if (hasNewDevices) {
-            message = 'Neue Geräte die nicht zum Baseline gehören'
+            message = 'Jemand ist im Club'
           } else {
-            message = 'Außer den Baseline Geräten ist niemand im Club'
+            message = 'Niemand ist gerade im Club'
           }
         } else {
           const errorText = await response.text()
@@ -87,7 +89,7 @@ serve(async (req) => {
         } else {
           // Default to not occupied on error
           hasNewDevices = false
-          message = 'Außer den Baseline Geräten ist niemand im Club'
+          message = 'Niemand ist gerade im Club'
         }
       }
     } else {
@@ -101,13 +103,22 @@ serve(async (req) => {
     }
 
     // Update the status in the database
-    const { error } = await supabase.rpc('update_club_status', {
-      has_new_devices_value: hasNewDevices,
-      message_value: message,
-    })
+    // Don't fail the entire request if database update fails - log error but continue
+    try {
+      const { error: dbError } = await supabase.rpc('update_club_status', {
+        has_new_devices_value: hasNewDevices,
+        message_value: message,
+      })
 
-    if (error) {
-      throw error
+      if (dbError) {
+        console.error('Error updating club_status in database:', dbError)
+        // Don't throw - allow response to be returned even if DB update fails
+      } else {
+        console.log('Club status updated successfully in database')
+      }
+    } catch (dbUpdateError) {
+      console.error('Exception updating club_status:', dbUpdateError)
+      // Don't throw - allow response to be returned even if DB update fails
     }
 
     return new Response(
