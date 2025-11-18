@@ -195,15 +195,63 @@ conn {connection_name}
         return False, None, None
 
 
+def _is_wireguard_connected():
+    """
+    Check if WireGuard is already connected.
+    Returns True if connection exists, False otherwise.
+    """
+    system = platform.system().lower()
+    
+    try:
+        if system == 'windows':
+            # On Windows, check if we can ping the FritzBox IP (VPN IP)
+            try:
+                result = subprocess.run(['ping', '-n', '1', '-w', '2000', '192.168.178.1'], 
+                                       capture_output=True, text=True, timeout=3)
+                if result.returncode == 0:
+                    # Can ping FritzBox IP, likely connected via VPN
+                    return True
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                pass
+        else:
+            # On Linux, check if wg interface exists and can reach FritzBox
+            try:
+                # Check if wg command exists and shows interfaces
+                result = subprocess.run(['wg', 'show'], 
+                                       capture_output=True, text=True, timeout=3)
+                if result.returncode == 0 and result.stdout.strip():
+                    # wg show returned something, check connectivity
+                    ping_result = subprocess.run(['ping', '-c', '1', '-W', '2', '192.168.178.1'], 
+                                                capture_output=True, timeout=3)
+                    if ping_result.returncode == 0:
+                        # Can ping FritzBox IP, connected via VPN
+                        return True
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                pass
+    except Exception:
+        pass
+    
+    return False
+
+
 def _connect_wireguard():
     """
     Connects via WireGuard VPN protocol.
     Uses existing config file (wg_config.conf) if available, otherwise creates one from VPN_CONFIG.
     Automatically activates the tunnel via CLI on Windows.
+    Checks if connection already exists before connecting.
     """
     config = VPN_CONFIG['wireguard']
     server = config['server']
     port = config['port']
+    
+    # Check if already connected (saves time!)
+    if _is_wireguard_connected():
+        print("WireGuard VPN already connected, reusing existing connection.")
+        system = platform.system().lower()
+        tunnel_name = "FritzBox_WireGuard"
+        # Return True with None process since connection already exists
+        return True, None, tunnel_name
     
     system = platform.system().lower()
     tunnel_name = "FritzBox_WireGuard"
@@ -553,9 +601,15 @@ def check_for_new_devices(vpn_method='wireguard', use_vpn=True):
         if not vpn_connected:
             print("Warning: VPN connection failed. Attempting direct connection...")
         else:
-            # Wait a bit for VPN to establish (reduced from 5s to 2s for performance)
-            print("Waiting for VPN connection to establish...")
-            time.sleep(2)
+            # Only wait if we just connected (not if reusing existing connection)
+            if vpn_process is not None:
+                # Wait a bit for VPN to establish (reduced from 5s to 2s for performance)
+                print("Waiting for VPN connection to establish...")
+                time.sleep(2)
+            else:
+                # Reusing existing connection, minimal wait
+                print("Using existing VPN connection, minimal wait...")
+                time.sleep(0.5)
     
     try:
         # Connect to FritzBox (should work via VPN if connected, or directly if on same network)
@@ -619,10 +673,13 @@ def check_for_new_devices(vpn_method='wireguard', use_vpn=True):
         return has_new, new_devices
         
     finally:
-        # Disconnect VPN if we connected
-        if use_vpn and vpn_connected and connection_name:
+        # Disconnect VPN if we connected (but not if we reused an existing connection)
+        # Only disconnect if vpn_process is not None (meaning we created a new connection)
+        if use_vpn and vpn_connected and connection_name and vpn_process is not None:
             print(f"Disconnecting from VPN ({vpn_method})...")
             disconnect_vpn(vpn_method, connection_name)
+        elif use_vpn and vpn_connected and vpn_process is None:
+            print("Keeping existing VPN connection active (reused connection).")
 
 
 if __name__ == '__main__':
