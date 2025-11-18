@@ -1,5 +1,4 @@
 # Python-Abhängigkeiten für FritzBox-WLAN-Monitor
-# Diese Datei wird von Railway verwendet (im Root-Verzeichnis)
 fritzconnection>=1.12.0
 fastapi>=0.104.0
 uvicorn>=0.24.0

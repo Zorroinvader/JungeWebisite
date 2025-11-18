@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 HTTP Service for FritzBox device checking with WireGuard VPN support.
-This service can be deployed to Railway, Render, Heroku, or any VPS.
+This service is designed to run on a VPS (Virtual Private Server) with WireGuard support.
 
 Usage:
     # Local development
@@ -25,13 +25,10 @@ from services.fritzWorker import check_for_new_devices
 
 app = FastAPI(title="FritzBox Device Checker Service with VPN")
 
-# Check if running on Railway and adjust config path if needed
-if os.environ.get('RAILWAY_ENVIRONMENT'):
-    # On Railway, we might need to adjust paths
-    # Ensure the services directory is in path
-    service_dir = Path(__file__).parent
-    if str(service_dir) not in sys.path:
-        sys.path.insert(0, str(service_dir))
+# Ensure the services directory is in path
+service_dir = Path(__file__).parent
+if str(service_dir) not in sys.path:
+    sys.path.insert(0, str(service_dir))
 
 # Get API key from environment (for security)
 API_KEY = os.environ.get('FRITZ_SERVICE_API_KEY', '')
@@ -133,7 +130,7 @@ async def check_devices_get(authorization: str = Header(None)):
 
 if __name__ == "__main__":
     import uvicorn
-    # Railway sets PORT env var, default to 8000 if not set
+    # PORT env var (defaults to 8000 if not set)
     port = int(os.environ.get('PORT', '8000'))
     uvicorn.run(app, host="0.0.0.0", port=port)
 

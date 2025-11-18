@@ -208,14 +208,14 @@ def _connect_wireguard():
     system = platform.system().lower()
     tunnel_name = "FritzBox_WireGuard"
     
-    # Check for WireGuard config from environment variable first (for Railway/cloud deployments)
+    # Check for WireGuard config from environment variable first (for VPS deployments)
     wg_config_from_env = os.environ.get('WG_CONFIG', '').strip()
     
     script_dir = os.path.dirname(os.path.abspath(__file__))
     existing_config = os.path.join(script_dir, 'wg_config.conf')
     
     try:
-        # Priority 1: Use environment variable if set (for Railway/cloud)
+        # Priority 1: Use environment variable if set (for VPS deployments)
         if wg_config_from_env:
             print("Using WireGuard config from WG_CONFIG environment variable")
             # Create temporary file from environment variable

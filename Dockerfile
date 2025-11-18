@@ -10,14 +10,12 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Note: WireGuard needs CAP_NET_ADMIN capability
-# Railway containers should have this by default, but if not,
-# you may need to configure it in Railway settings
+# VPS systems have this by default when running as root
 
 # Set working directory
 WORKDIR /app
 
 # Copy requirements first (for better caching)
-# Railway expects requirements.txt in root
 COPY requirements.txt ./requirements.txt
 
 # Install Python dependencies
@@ -32,7 +30,7 @@ RUN mkdir -p /app/src/services
 # Make start script executable
 RUN chmod +x start.sh
 
-# Expose port (Railway will set PORT env var)
+# Expose port (PORT env var can be set, defaults to 8000)
 EXPOSE 8000
 
 # Health check

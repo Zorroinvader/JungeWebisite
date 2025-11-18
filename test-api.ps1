@@ -4,10 +4,11 @@
 # TLS 1.2 aktivieren (für ältere PowerShell Versionen)
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-$serviceUrl = "https://adequate-bravery-production-3a76.up.railway.app"
+# Update this URL to your VPS IP or domain
+$serviceUrl = "http://YOUR_VPS_IP:8000"
 $apiKey = "JC!Pferdestall"
 
-Write-Host "=== Testing Railway Service ===" -ForegroundColor Cyan
+Write-Host "=== Testing FritzBox Service ===" -ForegroundColor Cyan
 Write-Host "Service URL: $serviceUrl" -ForegroundColor Yellow
 Write-Host "API Key: $apiKey" -ForegroundColor Yellow
 Write-Host ""
