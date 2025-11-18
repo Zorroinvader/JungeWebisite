@@ -377,8 +377,8 @@ PersistentKeepalive = {config['persistent_keepalive']}
                     stderr=subprocess.PIPE
                 )
                 
-                # Wait a bit for connection to establish
-                time.sleep(3)
+                # Wait a bit for connection to establish (reduced from 3s to 1.5s for performance)
+                time.sleep(1.5)
                 
                 # Check if process is still running or completed successfully
                 if process.poll() is None:
@@ -404,7 +404,7 @@ PersistentKeepalive = {config['persistent_keepalive']}
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE
                         )
-                        time.sleep(3)
+                        time.sleep(1.5)
                         if process2.poll() is None or process2.returncode == 0:
                             print(f"WireGuard VPN connection established (without sudo) to {server}:{port}")
                             return True, process2, tunnel_name
@@ -553,13 +553,14 @@ def check_for_new_devices(vpn_method='wireguard', use_vpn=True):
         if not vpn_connected:
             print("Warning: VPN connection failed. Attempting direct connection...")
         else:
-            # Wait a bit for VPN to establish
+            # Wait a bit for VPN to establish (reduced from 5s to 2s for performance)
             print("Waiting for VPN connection to establish...")
-            time.sleep(5)
+            time.sleep(2)
     
     try:
         # Connect to FritzBox (should work via VPN if connected, or directly if on same network)
-        fc = FritzConnection(address='192.168.178.1', user='admin', password='JC!Pferdestall')
+        # Reduce timeout for faster failure detection
+        fc = FritzConnection(address='192.168.178.1', user='admin', password='JC!Pferdestall', timeout=10)
         
         # Get number of hosts
         num_hosts = fc.call_action('Hosts', 'GetHostNumberOfEntries')

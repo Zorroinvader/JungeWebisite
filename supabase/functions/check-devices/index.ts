@@ -35,6 +35,9 @@ serve(async (req) => {
     // Call the external FritzBox service that handles VPN
     if (FRITZ_SERVICE_URL) {
       try {
+        console.log(`Calling Fritz service: ${FRITZ_SERVICE_URL}/check-devices`)
+        const startTime = Date.now()
+        
         const headers: HeadersInit = {
           'Content-Type': 'application/json',
           'User-Agent': 'Supabase-Edge-Function',
@@ -48,8 +51,11 @@ serve(async (req) => {
         const response = await fetch(`${FRITZ_SERVICE_URL}/check-devices`, {
           method: 'POST',
           headers,
-          signal: AbortSignal.timeout(60000), // 60 second timeout (VPN connection takes time)
+          signal: AbortSignal.timeout(58000), // 58 second timeout (under Supabase Free Tier 60s limit)
         })
+        
+        const duration = Date.now() - startTime
+        console.log(`Fritz service response received in ${duration}ms, status: ${response.status}`)
         
         if (response.ok) {
           const data = await response.json()
