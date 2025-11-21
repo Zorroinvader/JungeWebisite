@@ -60,7 +60,7 @@ const SpecialEventsBanner = () => {
         <div className="flex items-center justify-center gap-2 sm:gap-3 flex-wrap">
           <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-[#6054d9] dark:text-[#EBE9E9] flex-shrink-0" />
           <span className="text-xs sm:text-sm font-semibold text-[#252422] dark:text-[#F4F1E8]">
-            {activeEvents.length === 1 ? 'Special Event' : 'Special Events'}
+            {activeEvents.length === 1 ? 'Besondere Veranstaltung' : 'Besondere Veranstaltungen'}
           </span>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             {activeEvents.map(event => (

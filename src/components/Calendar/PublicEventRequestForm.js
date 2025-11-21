@@ -127,7 +127,7 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
 
   const validateForm = () => {
     if (!formData.title.trim()) {
-      setError('Bitte geben Sie einen Event-Namen ein');
+      setError('Bitte geben Sie einen Namen für die Veranstaltung ein');
       return false;
     }
     if (!formData.requester_name.trim()) {
@@ -204,7 +204,7 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
       const supabaseKey = getSupabaseAnonKey()
 
       if (!supabaseUrl || !supabaseKey) {
-        throw new Error('Supabase configuration missing. Please check your environment variables.');
+        throw new Error('Supabase-Konfiguration fehlt. Bitte überprüfen Sie Ihre Umgebungsvariablen.');
       }
 
       // SECURITY: Never log URLs that might expose keys
@@ -248,7 +248,7 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
         
         if (!created || !created.id) {
           secureLog('error', 'No ID in response', created);
-          throw new Error('Event request was created but no ID was returned');
+          throw new Error('Veranstaltungs-Anfrage wurde erstellt, aber keine ID zurückgegeben');
         }
 
         secureLog('log', 'Event request created successfully via REST API', { id: created.id });
@@ -257,7 +257,7 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
         
         if (fetchError.name === 'AbortError') {
           secureLog('error', 'Request aborted (timeout)');
-          throw new Error('Request timeout. The database might be slow or there might be a network issue.');
+          throw new Error('Anfrage-Timeout. Die Datenbank könnte langsam sein oder es gibt ein Netzwerkproblem.');
         }
         
         secureLog('error', 'Fetch error', sanitizeError(fetchError));
@@ -309,28 +309,42 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
 
   if (!isOpen) return null;
 
+  // MOBILE RESPONSIVE: Modal with responsive sizing, proper mobile padding, and touch-friendly interactions
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-30 p-4">
-      <div className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-2xl shadow-xl max-w-2xl w-full max-h-[70vh] overflow-y-auto border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#4a4a4a]' : ''} relative`}>
-
-        <div className={`flex items-center justify-between p-8 border-b border-[#A58C81] ${isDarkMode ? 'dark:border-[#EBE9E9]' : ''}`}>
-          <div>
-            <h2 className={`text-2xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
-              Event anfragen
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-30 p-2 sm:p-3 md:p-4"
+      style={{ touchAction: 'pan-y', overscrollBehavior: 'contain' }}
+    >
+      <div 
+        className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-xl sm:rounded-2xl shadow-xl max-w-2xl w-full max-h-[95vh] sm:max-h-[85vh] md:max-h-[70vh] overflow-y-auto border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#4a4a4a]' : ''} relative`}
+        style={{ 
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y',
+          overscrollBehavior: 'contain'
+        }}
+      >
+        {/* MOBILE RESPONSIVE: Header with responsive padding and proper close button tap target */}
+        <div className={`flex items-center justify-between p-4 sm:p-6 md:p-8 border-b border-[#A58C81] ${isDarkMode ? 'dark:border-[#EBE9E9]' : ''}`}>
+          <div className="flex-1 min-w-0 pr-2">
+            <h2 className={`text-lg sm:text-xl md:text-2xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} truncate`}>
+              Veranstaltung anfragen
             </h2>
-            <p className={`text-sm mt-1 text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>
+            <p className={`text-xs sm:text-sm mt-1 text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>
               Schritt 1 von 3: Stellen Sie eine erste Anfrage
             </p>
           </div>
           <button
             onClick={onClose}
-            className={`p-2 hover:opacity-70 transition-opacity rounded-lg text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}
+            className={`min-w-[44px] min-h-[44px] p-2 hover:opacity-70 active:scale-95 transition-all rounded-lg text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} touch-manipulation flex items-center justify-center flex-shrink-0`}
+            aria-label="Schließen"
+            style={{ touchAction: 'manipulation' }}
           >
             <X size={24} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-8 relative">
+        {/* MOBILE RESPONSIVE: Form with responsive padding and spacing */}
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 md:p-8 space-y-6 sm:space-y-8 relative">
           {error && (
             <div className={`rounded-lg p-4 bg-red-50 ${isDarkMode ? 'dark:bg-red-900/20' : ''} border border-red-200 ${isDarkMode ? 'dark:border-red-800' : ''}`}>
               <p className={`text-sm text-red-600 ${isDarkMode ? 'dark:text-red-400' : ''}`}>{error}</p>
@@ -372,7 +386,7 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
                   Anfrage erfolgreich eingereicht!
                 </h3>
                 <p className={`text-sm text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>
-                  Ihre Event-Anfrage wurde empfangen und wird bearbeitet
+                  Ihre Veranstaltungs-Anfrage wurde empfangen und wird bearbeitet
                 </p>
               </div>
 
@@ -408,7 +422,7 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
                   <li>Ein Administrator prüft Ihre Anfrage</li>
                   <li>Sie erhalten eine E-Mail, sobald Ihre Anfrage akzeptiert wurde</li>
                   <li>Danach können Sie die detaillierten Informationen ergänzen</li>
-                  <li>Nach finaler Genehmigung ist Ihr Event im Kalender aktiv</li>
+                  <li>Nach finaler Genehmigung ist Ihre Veranstaltung im Kalender aktiv</li>
                 </ol>
               </div>
 
@@ -418,7 +432,7 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
                 </p>
                 <a
                   href="/event-tracking"
-                  className={`inline-flex items-center px-6 py-3 text-sm font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg transition-colors shadow-md`}
+                  className={`inline-flex items-center px-6 py-3 text-sm font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg transition-colors shadow-md align-middle vertical-align-middle inline-block`}
                 >
                   Status verfolgen
                 </a>
@@ -434,26 +448,28 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
               Grundinformationen
             </h3>
             <p className={`text-xs text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mb-4`}>
-              Bitte geben Sie die grundlegenden Informationen zu Ihrem Event an
+              Bitte geben Sie die grundlegenden Informationen zu Ihrer Veranstaltung an
             </p>
 
             <div className="space-y-4">
               <div>
                 <label className={`block text-sm font-semibold mb-2 text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
-                  Name des Events *
+                  Name der Veranstaltung *
                 </label>
                 <input
                   type="text"
                   name="title"
                   value={formData.title}
                   onChange={handleChange}
-                  className={`w-full px-3 py-3 border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} placeholder-gray-500 ${isDarkMode ? 'dark:placeholder-gray-400' : ''}`}
+                  className={`w-full px-3 py-3 min-h-[44px] text-base border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} placeholder-gray-500 ${isDarkMode ? 'dark:placeholder-gray-400' : ''}`}
+                  style={{ fontSize: '16px' }}
                   placeholder="z.B. Geburtstag, Hochzeit, Firmenfeier"
                   required
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* MOBILE RESPONSIVE: Stack on mobile, side-by-side on desktop */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={`block text-sm font-semibold mb-2 text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
                     Ihr Name *
@@ -463,7 +479,8 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
                     name="requester_name"
                     value={formData.requester_name}
                     onChange={handleChange}
-                    className={`w-full px-3 py-3 border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} placeholder-gray-500 ${isDarkMode ? 'dark:placeholder-gray-400' : ''}`}
+                    className={`w-full px-3 py-3 min-h-[44px] text-base border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} placeholder-gray-500 ${isDarkMode ? 'dark:placeholder-gray-400' : ''}`}
+                  style={{ fontSize: '16px' }}
                     placeholder="Max Mustermann"
                     required
                   />
@@ -478,7 +495,8 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
                     name="requester_email"
                     value={formData.requester_email}
                     onChange={handleChange}
-                    className={`w-full px-3 py-3 border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} placeholder-gray-500 ${isDarkMode ? 'dark:placeholder-gray-400' : ''}`}
+                    className={`w-full px-3 py-3 min-h-[44px] text-base border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} placeholder-gray-500 ${isDarkMode ? 'dark:placeholder-gray-400' : ''}`}
+                  style={{ fontSize: '16px' }}
                     placeholder="max@beispiel.de"
                     required
                   />
@@ -494,7 +512,8 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
                   name="requester_phone"
                   value={formData.requester_phone}
                   onChange={handleChange}
-                  className={`w-full px-3 py-3 border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} placeholder-gray-500 ${isDarkMode ? 'dark:placeholder-gray-400' : ''}`}
+                  className={`w-full px-3 py-3 min-h-[44px] text-base border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} placeholder-gray-500 ${isDarkMode ? 'dark:placeholder-gray-400' : ''}`}
+                  style={{ fontSize: '16px' }}
                   placeholder="+49 123 456789"
                 />
               </div>
@@ -507,7 +526,7 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
               Gewünschter Zeitraum
             </h3>
             <p className={`text-xs text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mb-4`}>
-              Wählen Sie die Tage aus, an denen Sie das Event planen
+              Wählen Sie die Tage aus, an denen Sie die Veranstaltung planen
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -546,10 +565,10 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
           {/* Event Type Section */}
           <div className={`border-l-4 border-[#A58C81] pl-4 py-2`}>
             <h3 className={`text-xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} mb-1`}>
-              Event-Typ
+              Veranstaltungstyp
             </h3>
             <p className={`text-xs text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mb-4`}>
-              Wählen Sie aus, ob Ihr Event privat oder öffentlich sein soll
+              Wählen Sie aus, ob Ihre Veranstaltung privat oder öffentlich sein soll
             </p>
             
             <div className="space-y-3">
@@ -564,7 +583,7 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
                   className={`h-4 w-4 focus:ring-2 focus:ring-opacity-50 border-gray-300 ${isDarkMode ? 'dark:border-gray-600' : ''} text-[#A58C81] ${isDarkMode ? 'dark:text-[#8a8a8a]' : ''} focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''}`}
                 />
                 <label htmlFor="private_event" className={`ml-3 block text-sm font-medium text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
-                  Privates Event
+                  Private Veranstaltung
                 </label>
               </div>
               <div className="flex items-center">
@@ -578,7 +597,7 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
                   className={`h-4 w-4 focus:ring-2 focus:ring-opacity-50 border-gray-300 ${isDarkMode ? 'dark:border-gray-600' : ''} text-[#A58C81] ${isDarkMode ? 'dark:text-[#8a8a8a]' : ''} focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''}`}
                 />
                 <label htmlFor="public_event" className={`ml-3 block text-sm font-medium text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
-                  Öffentliches Event
+                  Öffentliche Veranstaltung
                 </label>
               </div>
             </div>
@@ -590,7 +609,7 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
               Anmerkungen
             </h3>
             <p className={`text-xs text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mb-3`}>
-              Optional: Beschreiben Sie Ihr Event und besondere Anforderungen
+              Optional: Beschreiben Sie Ihre Veranstaltung und besondere Anforderungen
             </p>
             
             <textarea
@@ -607,14 +626,16 @@ const PublicEventRequestForm = ({ isOpen, onClose, onSuccess, selectedDate, user
             <button
               type="button"
               onClick={onClose}
-              className={`px-6 py-3 text-sm font-medium rounded-lg hover:opacity-80 transition-opacity border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} bg-transparent hover:bg-gray-50 ${isDarkMode ? 'dark:hover:bg-[#1a1a1a]' : ''}`}
+              className={`w-full sm:w-auto px-6 py-3 min-h-[44px] text-base font-medium rounded-lg hover:opacity-80 active:scale-95 transition-all border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} bg-transparent hover:bg-gray-50 ${isDarkMode ? 'dark:hover:bg-[#1a1a1a]' : ''} touch-manipulation`}
+              style={{ touchAction: 'manipulation' }}
             >
               Abbrechen
             </button>
             <button
               type="submit"
               disabled={loading}
-              className={`px-6 py-3 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} hover:bg-[#8a6a5a] ${isDarkMode ? 'dark:hover:bg-[#8a8a8a]' : ''}`}
+              className={`w-full sm:w-auto px-6 py-3 min-h-[44px] text-base font-medium text-white rounded-lg hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} hover:bg-[#8a6a5a] ${isDarkMode ? 'dark:hover:bg-[#8a8a8a]' : ''} touch-manipulation`}
+              style={{ touchAction: 'manipulation' }}
             >
               {loading ? 'Wird gesendet...' : 'Anfrage absenden'}
             </button>

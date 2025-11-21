@@ -9,7 +9,6 @@
 
 import { supabase } from '../lib/supabase'
 import { sendUserNotification, sendAdminNotification } from '../utils/settingsHelper'
-import { getAdminNotificationEmails } from './emailApi'
 import { getSupabaseUrl, getSupabaseAnonKey, sanitizeError, secureLog } from '../utils/secureConfig'
 
 // SECURITY: Use secure getters to prevent key exposure
@@ -29,6 +28,7 @@ const validatePhone = (phone) => {
 
 const sanitizeText = (text) => {
   if (!text) return text
+  // eslint-disable-next-line no-control-regex
   return text
     .replace(/[<>'"]/g, '')
     .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
@@ -66,11 +66,44 @@ const validateFileUpload = (fileName, fileSize, fileType, maxSize = 10485760) =>
 
 const getHeaders = async (userEmail = null) => {
   try {
-    // Get the current session from Supabase
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    // Try to get session token from localStorage first (faster, avoids hanging getSession call)
+    // Supabase stores session in localStorage under 'sb-<project-ref>-auth-token'
+    let userToken = SUPABASE_KEY
+    let session = null
     
-    // Use session token if available, otherwise use anon key (for anonymous users)
-    const userToken = session?.access_token || SUPABASE_KEY
+    // Try to get session from localStorage to avoid hanging getSession() call
+    try {
+      const storageKey = Object.keys(localStorage).find(key => key.includes('auth-token'))
+      if (storageKey) {
+        const storedSession = localStorage.getItem(storageKey)
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession)
+          session = parsed
+          userToken = parsed?.access_token || SUPABASE_KEY
+        }
+      }
+    } catch (e) {
+      // Ignore localStorage errors
+    }
+    
+    // Only call getSession if we don't have a token
+    if (!session || !userToken || userToken === SUPABASE_KEY) {
+      try {
+        // Add timeout to prevent hanging
+        const sessionPromise = supabase.auth.getSession()
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Sitzungs-Timeout')), 2000)
+        )
+        const { data: { session: fetchedSession } } = await Promise.race([sessionPromise, timeoutPromise])
+        if (fetchedSession?.access_token) {
+          userToken = fetchedSession.access_token
+          session = fetchedSession
+        }
+      } catch (error) {
+        // Use anon key if getSession fails or times out
+        secureLog('warn', '[getHeaders] getSession failed or timed out, using anon key', { error: sanitizeError(error) })
+      }
+    }
     
     const headers = {
       'apikey': SUPABASE_KEY,
@@ -103,31 +136,106 @@ const getHeaders = async (userEmail = null) => {
 // This helper ensures we try Supabase client first (primary), then HTTP fetch (fallback)
 // Only use HTTP fetch when Supabase client explicitly fails
 
-const executeWithFallback = async (supabaseOperation, httpFallback, operationName = 'operation') => {
+const executeWithFallback = async (primaryOperation, fallbackOperation, operationName = 'operation') => {
   try {
-    // PRIMARY: Try Supabase client first (as per Supabase documentation)
-    const result = await supabaseOperation()
+    // PRIMARY: Try primary operation first
+    // For events.getAll, primary is now HTTP (fast), fallback is Supabase client
+    // Add timeout for operations that might hang
+    let result;
+    // Add timeout for operations that might hang (Supabase client operations)
+    const operationsWithTimeout = [
+      'eventRequests.getAdminPanelData', 
+      'events.getAll',
+      'events.delete',
+      'eventRequests.delete',
+      'eventRequests.getAll',
+      'profiles.getById',
+      'profiles.getAll',
+      'eventRequests.getByUser'
+    ];
+    
+    if (operationsWithTimeout.includes(operationName)) {
+      // Set timeout based on operation
+      let timeout = 5000; // default 5s
+      if (operationName === 'profiles.getById' || 
+          operationName === 'profiles.getAll' ||
+          operationName === 'eventRequests.getByUser' ||
+          operationName === 'eventRequests.getAll' ||
+          operationName === 'eventRequests.getAdminPanelData') {
+        timeout = 3000; // 3s for faster operations
+      }
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error(`Vorgangs-Timeout nach ${timeout}ms`)), timeout)
+      );
+      result = await Promise.race([primaryOperation(), timeoutPromise]);
+    } else {
+      result = await primaryOperation();
+    }
     
     // Supabase client returns { data, error } format
-    if (result.error) {
+    if (result && result.error) {
       throw result.error
     }
     
     // Return data (could be array, object, or null)
-    return result.data !== undefined ? result.data : result
+    // If result has a data property, return it; otherwise return the result itself
+    // EXCEPTION: For delete operations, return the full result object to preserve success indicators
+    let returnValue = result
+    
+    // For delete operations, always return the full result to preserve success, deletedCount, etc.
+    if (operationName.includes('.delete')) {
+      return result
+    }
+    
+    // For profiles.getById, return the result directly (already extracted by the API)
+    if (operationName === 'profiles.getById') {
+      // profilesAPI.getById already returns the profile object or null
+      // Don't extract .data again
+      return result
+    }
+    
+    if (result && typeof result === 'object') {
+      if (result.data !== undefined) {
+        returnValue = result.data
+      }
+    }
+    
+    // For operations that should return arrays, ensure we return an array
+    const arrayOperations = [
+      'eventRequests.getAdminPanelData', 
+      'events.getAll', 
+      'eventRequests.getByUser',
+      'eventRequests.getAll',
+      'profiles.getAll'
+    ];
+    
+    if (arrayOperations.includes(operationName)) {
+      if (!Array.isArray(returnValue)) {
+        // If it's null/undefined, return empty array
+        if (returnValue == null) {
+          returnValue = []
+        } else {
+          // Try to extract data if it's an object
+          returnValue = Array.isArray(returnValue) ? returnValue : []
+        }
+      }
+    }
+    
+    return returnValue
   } catch (primaryError) {
-    // FALLBACK: Only use HTTP when Supabase client fails
+    // FALLBACK: Try fallback operation when primary fails
     // SECURITY: Sanitize error messages to prevent key exposure
-    secureLog('warn', `[FALLBACK] Supabase client failed for ${operationName}, using HTTP REST API`, { error: sanitizeError(primaryError) })
+    secureLog('warn', `[FALLBACK] Primary operation failed for ${operationName}, trying fallback`, { error: sanitizeError(primaryError) })
     
     try {
-      const fallbackResult = await httpFallback()
-      secureLog('info', `[FALLBACK] HTTP REST API succeeded for ${operationName}`)
+      const fallbackResult = await fallbackOperation()
+      secureLog('info', `[FALLBACK] Fallback operation succeeded for ${operationName}`)
       return fallbackResult
     } catch (fallbackError) {
       // SECURITY: Sanitize error before throwing
       const sanitizedError = new Error(sanitizeError(fallbackError))
-      secureLog('error', `[FALLBACK] HTTP REST API also failed for ${operationName}`, { error: sanitizeError(fallbackError) })
+      secureLog('error', `[FALLBACK] Fallback operation also failed for ${operationName}`, { error: sanitizeError(fallbackError) })
       throw sanitizedError
     }
   }
@@ -135,24 +243,18 @@ const executeWithFallback = async (supabaseOperation, httpFallback, operationNam
 
 // Events API
 export const eventsAPI = {
-  // PRIMARY: Uses Supabase client, FALLBACK: HTTP REST API (only when client fails)
+  // PRIMARY: HTTP REST API (fast and reliable), FALLBACK: Supabase client
+  // User requested to use HTTP fallback primarily since it works fast
   async getAll() {
     return executeWithFallback(
-      // PRIMARY: Supabase client (as per Supabase documentation)
-      async () => {
-        return await supabase
-          .from('events')
-          .select('id,title,description,start_date,end_date,created_by,is_private,status,requested_by')
-          .order('start_date', { ascending: true })
-      },
-      // FALLBACK: HTTP REST API (only used when Supabase client fails)
+      // PRIMARY: HTTP REST API (fast, reliable, user confirmed it works)
       async () => {
         const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 3000)
+        const timeoutId = setTimeout(() => controller.abort(), 5000)
         
         try {
           const response = await fetch(
-            `${SUPABASE_URL}/rest/v1/events?select=id,title,description,start_date,end_date,created_by,is_private,status,requested_by&order=start_date.asc`,
+            `${SUPABASE_URL}/rest/v1/events?select=id,title,description,start_date,end_date,created_by,is_private,status,requested_by,event_type,requester_name,schluesselannahme_time,schluesselabgabe_time,additional_notes,uploaded_mietvertrag_url&order=start_date.asc`,
             {
               method: 'GET',
               headers: {
@@ -171,17 +273,45 @@ export const eventsAPI = {
             throw new Error(`HTTP ${response.status}: ${errorText}`)
           }
           
-          return await response.json()
+          const data = await response.json()
+          // Ensure we return an array
+          return Array.isArray(data) ? data : []
         } catch (fetchError) {
           clearTimeout(timeoutId)
           if (fetchError.name === 'AbortError') {
-            throw new Error('Request timeout - API call took too long')
+            throw new Error('Anfrage-Timeout - API-Aufruf dauerte zu lange')
           }
           throw fetchError
         }
       },
+      // FALLBACK: Supabase client (only used when HTTP fails)
+      async () => {
+        const result = await supabase
+          .from('events')
+          .select('id,title,description,start_date,end_date,created_by,is_private,status,requested_by,event_type,requester_name,schluesselannahme_time,schluesselabgabe_time,additional_notes,uploaded_mietvertrag_url')
+          .order('start_date', { ascending: true })
+        
+        if (result.error) {
+          throw result.error
+        }
+        
+        // Return the data array, not the { data, error } object
+        const data = result.data || []
+        
+        // Ensure we always return an array
+        return Array.isArray(data) ? data : []
+      },
       'events.getAll'
-    )
+    ).then(result => {
+      // Ensure we always return an array, even if executeWithFallback returns something else
+      if (Array.isArray(result)) {
+        return result
+      }
+      if (result && typeof result === 'object' && Array.isArray(result.data)) {
+        return result.data
+      }
+      return []
+    })
   },
 
   async getById(id) {
@@ -283,30 +413,87 @@ export const eventsAPI = {
   },
 
   async delete(id) {
-    return executeWithFallback(
-      // PRIMARY: Supabase client
+    if (!id) {
+      throw new Error('Veranstaltungs-ID ist erforderlich')
+    }
+    
+    secureLog('log', '[eventsAPI.delete] Starting delete', { eventId: id })
+    
+    // PRIMARY: HTTP REST API (fast and reliable, avoids Supabase client hanging)
+    // FALLBACK: Supabase client (only if HTTP fails)
+    const result = await executeWithFallback(
+      // PRIMARY: HTTP REST API (fast, avoids hanging)
       async () => {
-        return await supabase
+        secureLog('log', '[eventsAPI.delete] Using HTTP REST API (primary)')
+        const headers = await getHeaders()
+        
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 5000)
+        
+        try {
+          const response = await fetch(`${SUPABASE_URL}/rest/v1/events?id=eq.${id}`, {
+            method: 'DELETE',
+            headers: {
+              ...headers,
+              'Prefer': 'return=representation' // Return deleted rows
+            },
+            signal: controller.signal
+          })
+
+          clearTimeout(timeoutId)
+          secureLog('log', '[eventsAPI.delete] HTTP response', { status: response.status })
+
+          if (!response.ok) {
+            const errorText = await response.text()
+            secureLog('error', '[eventsAPI.delete] HTTP error', { status: response.status, error: sanitizeError(errorText) })
+            throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`)
+          }
+
+          const data = await response.json()
+          const responseData = { 
+            success: true, 
+            data: Array.isArray(data) ? data : [],
+            deletedCount: Array.isArray(data) ? data.length : 0
+          }
+          secureLog('log', '[eventsAPI.delete] HTTP success', { deletedCount: responseData.deletedCount })
+          return responseData
+        } catch (fetchError) {
+          clearTimeout(timeoutId)
+          if (fetchError.name === 'AbortError') {
+            throw new Error('Lösch-Anfrage-Timeout')
+          }
+          throw fetchError
+        }
+      },
+      // FALLBACK: Supabase client (only if HTTP fails)
+      async () => {
+        secureLog('log', '[eventsAPI.delete] Using Supabase client (fallback)')
+        const result = await supabase
           .from('events')
           .delete()
           .eq('id', id)
-      },
-      // FALLBACK: HTTP REST API
-      async () => {
-        const headers = await getHeaders()
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/events?id=eq.${id}`, {
-          method: 'DELETE',
-          headers
-        })
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+          .select()
+        
+        // Check for errors
+        if (result.error) {
+          secureLog('error', '[eventsAPI.delete] Supabase error', { error: sanitizeError(result.error) })
+          throw new Error(result.error.message || 'Fehler beim Löschen der Veranstaltung')
         }
-
-        return { success: true }
+        
+        // Return success indicator
+        // Supabase delete returns { data: [...deleted rows], error: null }
+        const response = {
+          success: true,
+          data: result.data,
+          deletedCount: result.data ? result.data.length : 0
+        }
+        secureLog('log', '[eventsAPI.delete] Supabase success', { deletedCount: response.deletedCount })
+        return response
       },
       'events.delete'
     )
+    
+    return result
   },
 
   // Optimized method for calendar display - only essential columns
@@ -366,27 +553,49 @@ export const eventRequestsAPI = {
   // PRIMARY: Uses Supabase client, FALLBACK: HTTP REST API (only when client fails)
   async getAll() {
     return executeWithFallback(
-      // PRIMARY: Supabase client (as per Supabase documentation)
+      // PRIMARY: HTTP REST API (fast, avoids Supabase client hanging)
       async () => {
-        return await supabase
+        const headers = await getHeaders()
+        
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 3000)
+        
+        try {
+          const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?select=id,title,event_name,requester_name,requester_email,start_date,end_date,requested_days,request_stage,status,is_private,event_type,created_at,initial_accepted_at,details_submitted_at,final_accepted_at,rejected_at,admin_notes,rejection_reason&order=created_at.desc`, {
+            method: 'GET',
+            headers,
+            signal: controller.signal
+          })
+
+          clearTimeout(timeoutId)
+
+          if (!response.ok) {
+            const errorText = await response.text()
+            throw new Error(`HTTP ${response.status}: ${errorText}`)
+          }
+
+          const data = await response.json()
+          return Array.isArray(data) ? data : []
+        } catch (fetchError) {
+          clearTimeout(timeoutId)
+          if (fetchError.name === 'AbortError') {
+            throw new Error('Lade-Timeout für Veranstaltungs-Anfragen')
+          }
+          throw fetchError
+        }
+      },
+      // FALLBACK: Supabase client (only if HTTP fails)
+      async () => {
+        const result = await supabase
           .from('event_requests')
           .select('id,title,event_name,requester_name,requester_email,start_date,end_date,requested_days,request_stage,status,is_private,event_type,created_at,initial_accepted_at,details_submitted_at,final_accepted_at,rejected_at,admin_notes,rejection_reason')
           .order('created_at', { ascending: false })
-      },
-      // FALLBACK: HTTP REST API (only used when Supabase client fails)
-      async () => {
-        const headers = await getHeaders()
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?select=id,title,event_name,requester_name,requester_email,start_date,end_date,requested_days,request_stage,status,is_private,event_type,created_at,initial_accepted_at,details_submitted_at,final_accepted_at,rejected_at,admin_notes,rejection_reason&order=created_at.desc`, {
-          method: 'GET',
-          headers
-        })
-
-        if (!response.ok) {
-          const errorText = await response.text()
-          throw new Error(`HTTP ${response.status}: ${errorText}`)
+        
+        if (result.error) {
+          throw result.error
         }
-
-        return await response.json()
+        
+        return Array.isArray(result.data) ? result.data : []
       },
       'eventRequests.getAll'
     )
@@ -394,24 +603,56 @@ export const eventRequestsAPI = {
 
   // Get admin panel data - Ultra-optimized for fast loading
   async getAdminPanelData(limit = 50, offset = 0) {
-    try {
-      const headers = await getHeaders()
-      // Select columns needed for admin panel including PDF fields
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?select=id,title,event_name,requester_name,requester_email,start_date,end_date,request_stage,status,created_at,details_submitted_at,initial_accepted_at,final_accepted_at,signed_contract_url,uploaded_file_data,uploaded_file_name,uploaded_file_size,uploaded_file_type,exact_start_datetime,exact_end_datetime,event_type,additional_notes,admin_notes&order=created_at.desc&limit=${limit}&offset=${offset}`, {
-        method: 'GET',
-        headers
-      })
+    return executeWithFallback(
+      // PRIMARY: HTTP REST API (fast, avoids Supabase client hanging)
+      async () => {
+        const headers = await getHeaders()
+        
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 3000)
+        
+        try {
+          const url = `${SUPABASE_URL}/rest/v1/event_requests?select=id,title,event_name,requester_name,requester_email,start_date,end_date,request_stage,status,created_at,details_submitted_at,initial_accepted_at,final_accepted_at,signed_contract_url,uploaded_file_data,uploaded_file_name,uploaded_file_size,uploaded_file_type,exact_start_datetime,exact_end_datetime,key_handover_datetime,key_return_datetime,schluesselannahme_time,schluesselabgabe_time,event_type,additional_notes,admin_notes&order=created_at.desc&limit=${limit}&offset=${offset}`
+          
+          const response = await fetch(url, {
+            method: 'GET',
+            headers,
+            signal: controller.signal
+          })
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
-      }
+          clearTimeout(timeoutId)
 
-      const result = await response.json()
-      return result
-    } catch (error) {
-      throw error
-    }
+          if (!response.ok) {
+            const errorText = await response.text()
+            throw new Error(`HTTP ${response.status}: ${errorText}`)
+          }
+
+          const result = await response.json()
+          return Array.isArray(result) ? result : []
+        } catch (fetchError) {
+          clearTimeout(timeoutId)
+          if (fetchError.name === 'AbortError') {
+            throw new Error('Lade-Timeout für Admin-Panel-Daten')
+          }
+          throw fetchError
+        }
+      },
+      // FALLBACK: Supabase client (only if HTTP fails)
+      async () => {
+        const queryResult = await supabase
+          .from('event_requests')
+          .select('id,title,event_name,requester_name,requester_email,start_date,end_date,request_stage,status,created_at,details_submitted_at,initial_accepted_at,final_accepted_at,signed_contract_url,uploaded_file_data,uploaded_file_name,uploaded_file_size,uploaded_file_type,exact_start_datetime,exact_end_datetime,key_handover_datetime,key_return_datetime,schluesselannahme_time,schluesselabgabe_time,event_type,additional_notes,admin_notes')
+          .order('created_at', { ascending: false })
+          .range(offset, offset + limit - 1)
+        
+        if (queryResult.error) {
+          throw queryResult.error
+        }
+        
+        return Array.isArray(queryResult.data) ? queryResult.data : []
+      },
+      'eventRequests.getAdminPanelData'
+    )
   },
 
   // Get requests by stage - Optimized
@@ -436,46 +677,96 @@ export const eventRequestsAPI = {
 
   // Get request by email (for non-logged-in users)
   async getByEmail(email) {
-    try {
-      const headers = await getHeaders(email)
-      
-      // Use ilike for case-insensitive match and encode the email
-      const encoded = encodeURIComponent(email.trim())
-      const url = `${SUPABASE_URL}/rest/v1/event_requests?requester_email=ilike.${encoded}&select=id,title,event_name,requester_name,requester_email,start_date,end_date,request_stage,status,created_at&order=created_at.desc`
-      const response = await fetch(url, {
-        method: 'GET',
-        headers
-      })
-
-      
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
-      }
-
-      const data = await response.json()
-      return data
-    } catch (error) {
-      throw error
+    if (!email || !email.trim()) {
+      throw new Error('E-Mail-Adresse ist erforderlich')
     }
+    
+    const trimmedEmail = email.trim()
+    
+    return executeWithFallback(
+      // PRIMARY: Use Supabase client (respects RLS properly)
+      async () => {
+        return await supabase
+          .from('event_requests')
+          .select('id,title,event_name,requester_name,requester_email,start_date,end_date,request_stage,status,created_at,details_submitted_at,initial_accepted_at,final_accepted_at,exact_start_datetime,exact_end_datetime,key_handover_datetime,key_return_datetime,schluesselannahme_time,schluesselabgabe_time,additional_notes,signed_contract_url,uploaded_file_data,uploaded_file_name,uploaded_file_size,uploaded_file_type,event_type,admin_notes,rejection_reason')
+          .ilike('requester_email', trimmedEmail)
+          .order('created_at', { ascending: false })
+      },
+      // FALLBACK: HTTP REST API
+      async () => {
+        const headers = await getHeaders(trimmedEmail)
+        
+        // Use ilike for case-insensitive match
+        const encoded = encodeURIComponent(trimmedEmail)
+        const url = `${SUPABASE_URL}/rest/v1/event_requests?requester_email=ilike.${encoded}&select=id,title,event_name,requester_name,requester_email,start_date,end_date,request_stage,status,created_at,details_submitted_at,initial_accepted_at,final_accepted_at,exact_start_datetime,exact_end_datetime,key_handover_datetime,key_return_datetime,schluesselannahme_time,schluesselabgabe_time,additional_notes,signed_contract_url,uploaded_file_data,uploaded_file_name,uploaded_file_size,uploaded_file_type,event_type,admin_notes,rejection_reason&order=created_at.desc`
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          throw new Error(`HTTP ${response.status}: ${errorText}`)
+        }
+
+        const data = await response.json()
+        return data || []
+      },
+      'eventRequests.getByEmail'
+    )
   },
 
   async getByUser(userId) {
-    try {
-      const headers = await getHeaders()
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?requested_by=eq.${userId}&select=id,title,event_name,requester_name,requester_email,start_date,end_date,request_stage,status,created_at&order=created_at.desc`, {
-        method: 'GET',
-        headers
-      })
+    if (!userId) return []
+    
+    return executeWithFallback(
+      // PRIMARY: HTTP REST API (fast, avoids Supabase client hanging)
+      async () => {
+        const headers = await getHeaders()
+        
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 3000)
+        
+        try {
+          const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?requested_by=eq.${userId}&select=id,title,event_name,requester_name,requester_email,start_date,end_date,request_stage,status,created_at,details_submitted_at,initial_accepted_at,final_accepted_at,exact_start_datetime,exact_end_datetime,key_handover_datetime,key_return_datetime,schluesselannahme_time,schluesselabgabe_time,additional_notes,signed_contract_url,uploaded_file_data,uploaded_file_name,uploaded_file_size,uploaded_file_type,event_type,admin_notes,rejection_reason&order=created_at.desc`, {
+            method: 'GET',
+            headers,
+            signal: controller.signal
+          })
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
+          clearTimeout(timeoutId)
 
-      return await response.json()
-    } catch (error) {
-      throw error
-    }
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+          }
+
+          const data = await response.json()
+          return Array.isArray(data) ? data : []
+        } catch (fetchError) {
+          clearTimeout(timeoutId)
+          if (fetchError.name === 'AbortError') {
+            throw new Error('Lade-Timeout für Veranstaltungs-Anfragen')
+          }
+          throw fetchError
+        }
+      },
+      // FALLBACK: Supabase client (only if HTTP fails)
+      async () => {
+        const result = await supabase
+          .from('event_requests')
+          .select('id,title,event_name,requester_name,requester_email,start_date,end_date,request_stage,status,created_at,details_submitted_at,initial_accepted_at,final_accepted_at,exact_start_datetime,exact_end_datetime,key_handover_datetime,key_return_datetime,schluesselannahme_time,schluesselabgabe_time,additional_notes,signed_contract_url,uploaded_file_data,uploaded_file_name,uploaded_file_size,uploaded_file_type,event_type,admin_notes,rejection_reason')
+          .eq('requested_by', userId)
+          .order('created_at', { ascending: false })
+        
+        if (result.error) {
+          throw result.error
+        }
+        
+        return Array.isArray(result.data) ? result.data : []
+      },
+      'eventRequests.getByUser'
+    )
   },
 
   async getById(id) {
@@ -512,11 +803,11 @@ export const eventRequestsAPI = {
     try {
       // Security validation (blocking)
       if (!validateEmail(data.requester_email)) {
-        throw new Error('Invalid email format')
+        throw new Error('Ungültiges E-Mail-Format')
       }
       
       if (data.requester_phone && !validatePhone(data.requester_phone)) {
-        throw new Error('Invalid phone format')
+        throw new Error('Ungültiges Telefonnummern-Format')
       }
 
       // Sanitize text inputs
@@ -532,7 +823,7 @@ export const eventRequestsAPI = {
         if (detectSQLInjection(field)) {
           // Log but don't await (non-blocking)
           securityAPI.logSuspiciousActivity('sql_injection_attempt', `SQL injection detected in event request: ${field}`, 'high').catch(() => {})
-          throw new Error('Invalid input detected')
+          throw new Error('Ungültige Eingabe erkannt')
         }
       }
 
@@ -546,7 +837,7 @@ export const eventRequestsAPI = {
       }
       
       if (!rateLimitOk) {
-        throw new Error('Too many requests. Please try again later.')
+        throw new Error('Zu viele Anfragen. Bitte versuchen Sie es später erneut.')
       }
 
       const requestData = {
@@ -612,7 +903,7 @@ export const eventRequestsAPI = {
       const created = Array.isArray(result) ? result[0] : result
       
       if (!created || !created.id) {
-        throw new Error('Event request was created but no ID was returned')
+        throw new Error('Veranstaltungs-Anfrage wurde erstellt, aber keine ID zurückgegeben')
       }
       
       // Log successful creation (non-blocking)
@@ -620,10 +911,28 @@ export const eventRequestsAPI = {
       
       // Send emails (non-blocking)
       try {
-        // Send confirmation email to user
-        sendUserNotification(data.requester_email, created, 'initial_request_received').catch(() => {})
+        // Send confirmation email to user with proper event data
+        sendUserNotification(data.requester_email, {
+          ...created,
+          requester_email: data.requester_email,
+          requester_name: data.requester_name,
+          title: created.title || created.event_name,
+          event_name: created.event_name || created.title,
+          start_date: created.start_date,
+          end_date: created.end_date,
+          event_type: created.event_type
+        }, 'initial_request_received').catch(() => {})
         // Send notification email to admins
-        sendAdminNotification(created, 'initial_request').catch(() => {})
+        sendAdminNotification({
+          ...created,
+          title: created.title || created.event_name,
+          event_name: created.event_name || created.title,
+          requester_name: created.requester_name,
+          requester_email: created.requester_email,
+          start_date: created.start_date,
+          end_date: created.end_date,
+          event_type: created.event_type
+        }, 'initial_request').catch(() => {})
       } catch (emailError) {
         secureLog('warn', 'Email sending failed (non-critical)', sanitizeError(emailError))
       }
@@ -647,14 +956,14 @@ export const eventRequestsAPI = {
       })
       
       if (!getRequestResponse.ok) {
-        throw new Error(`Failed to get request details`)
+        throw new Error(`Fehler beim Abrufen der Anfrage-Details`)
       }
       
       const requests = await getRequestResponse.json()
       const request = requests[0]
       
       if (!request) {
-        throw new Error('Request not found')
+        throw new Error('Anfrage nicht gefunden')
       }
       
       // Update request status
@@ -673,7 +982,8 @@ export const eventRequestsAPI = {
         throw new Error(`HTTP ${response.status}: ${errorText}`)
       }
 
-      // Create temporary blocker for the dates
+      // Create temporary blocker for the dates - BLOCKS TIME SLOT FROM INITIAL ACCEPTANCE
+      // This ensures no other requests can be accepted for the same time slot
       try {
         const blockData = {
           request_id: id,
@@ -682,21 +992,36 @@ export const eventRequestsAPI = {
           requester_email: request.requester_email,
           start_date: request.start_date,
           end_date: request.end_date,
+          // Use exact datetimes if available, otherwise use start_date/end_date
+          exact_start_datetime: request.exact_start_datetime || request.start_date,
+          exact_end_datetime: request.exact_end_datetime || request.end_date,
           request_stage: 'initial_accepted',
           is_temporary: true
         }
         
         await blockedDatesAPI.createTemporaryBlock(blockData)
+        secureLog('info', 'Temporary block created for initial accepted request', { requestId: id, start_date: blockData.start_date, end_date: blockData.end_date })
       } catch (blockError) {
-        // Don't fail the whole operation if blocker creation fails
+        // Don't fail the whole operation if blocker creation fails, but log it
+        secureLog('warn', 'Failed to create temporary block', { requestId: id, error: sanitizeError(blockError) })
       }
 
-      // Send email to user
+      // Send email to user with proper event data including requester_email for link generation
       try {
-        await sendUserNotification(request.requester_email, request, 'initial_request_accepted')
+        await sendUserNotification(request.requester_email, {
+          ...request,
+          requester_email: request.requester_email,
+          requester_name: request.requester_name,
+          title: request.title || request.event_name,
+          event_name: request.event_name || request.title,
+          start_date: request.start_date,
+          end_date: request.end_date,
+          event_type: request.event_type
+        }, 'initial_request_accepted')
         // Do not notify admins yet; wait until the user submits detailed info
       } catch (emailError) {
         // Don't fail if email notification fails
+        secureLog('warn', 'Email notification failed (non-critical)', sanitizeError(emailError))
       }
       
       return { success: true }
@@ -707,99 +1032,181 @@ export const eventRequestsAPI = {
 
   // STEP 3: Admin accepts final request (after user submits details)
   async finalAcceptRequest(id) {
-    try {
-      const headers = await getHeaders()
-      
-      // First, get the request details
-      const getRequestResponse = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}&select=*`, {
-        method: 'GET',
-        headers
-      })
-      
-      if (!getRequestResponse.ok) {
-        throw new Error(`Failed to get request details`)
-      }
-      
-      const requests = await getRequestResponse.json()
-      const request = requests[0]
-      
-      if (!request) {
-        throw new Error('Request not found')
-      }
-      
-      // Update request status to final_accepted
-      const updateResponse = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({
-          request_stage: 'final_accepted',
-          status: 'approved',
-          final_accepted_at: new Date().toISOString()
+    // First, get the request details using Supabase client
+    const requestResult = await executeWithFallback(
+      async () => {
+        const result = await supabase
+          .from('event_requests')
+          .select('*')
+          .eq('id', id)
+          .single()
+        
+        if (result.error) throw result.error
+        return result.data
+      },
+      async () => {
+        const headers = await getHeaders()
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}&select=*`, {
+          method: 'GET',
+          headers
         })
-      })
+        
+        if (!response.ok) {
+          throw new Error(`Fehler beim Abrufen der Anfrage-Details`)
+        }
+        
+        const requests = await response.json()
+        return requests[0]
+      },
+      'eventRequests.finalAcceptRequest.getRequest'
+    )
+    
+    if (!requestResult) {
+      throw new Error('Anfrage nicht gefunden')
+    }
+    
+    const request = requestResult
+    
+    // Update request status to final_accepted using Supabase client
+    await executeWithFallback(
+      async () => {
+        const result = await supabase
+          .from('event_requests')
+          .update({
+            request_stage: 'final_accepted',
+            status: 'approved',
+            final_accepted_at: new Date().toISOString()
+          })
+          .eq('id', id)
+          .select()
+          .single()
+        
+        if (result.error) throw result.error
+        return result.data
+      },
+      async () => {
+        const headers = await getHeaders()
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}`, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({
+            request_stage: 'final_accepted',
+            status: 'approved',
+            final_accepted_at: new Date().toISOString()
+          })
+        })
 
-      if (!updateResponse.ok) {
-        const errorText = await updateResponse.text()
-        throw new Error(`Failed to update request: ${errorText}`)
-      }
+        if (!response.ok) {
+          const errorText = await response.text()
+          throw new Error(`Fehler beim Aktualisieren der Anfrage: ${errorText}`)
+        }
+        
+        const result = await response.json()
+        return Array.isArray(result) ? result[0] : result
+      },
+      'eventRequests.finalAcceptRequest.updateRequest'
+    )
 
-      // Create the event in the events table
-      const eventData = {
-        // Required fields
-        title: request.event_name || request.title,
-        start_date: request.exact_start_datetime || request.start_date,
-        end_date: request.exact_end_datetime || request.end_date,
-        
-        // Optional existing fields
-        description: request.additional_notes || request.initial_notes || '',
-        event_type: request.event_type || (request.is_private ? 'Privates Event' : 'Öffentliches Event'),
-        is_private: request.is_private,
-        location: request.location || '',
-        max_participants: request.max_participants || null,
-        
-        // Requester info
-        requester_name: request.requester_name,
-        requester_email: request.requester_email,
-        requested_by: request.requested_by || null,
-        created_by: request.requested_by || null,
-        
-        // Schlüssel times (stored as text in events table)
-        schluesselannahme_time: request.key_handover_datetime 
-          ? new Date(request.key_handover_datetime).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
-          : request.schluesselannahme_time,
-        schluesselabgabe_time: request.key_return_datetime
-          ? new Date(request.key_return_datetime).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
-          : request.schluesselabgabe_time,
-        
-        // Additional notes
-        additional_notes: request.additional_notes,
-        
-        // Contract URL (only field that exists in events table)
-        uploaded_mietvertrag_url: request.signed_contract_url,
-        
-        // Status
-        status: 'approved'
-      }
+    // Create the event in the events table using Supabase client
+    const eventData = {
+      // Required fields
+      title: request.event_name || request.title,
+      start_date: request.exact_start_datetime || request.start_date,
+      end_date: request.exact_end_datetime || request.end_date,
       
-      const createEventResponse = await fetch(`${SUPABASE_URL}/rest/v1/events`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(eventData)
-      })
+      // Optional existing fields
+      description: request.additional_notes || request.initial_notes || '',
+      event_type: request.event_type || (request.is_private ? 'Privates Event' : 'Öffentliches Event'),
+      is_private: request.is_private,
+      location: request.location || '',
+      max_participants: request.max_participants || null,
+      
+      // Requester info
+      requester_name: request.requester_name,
+      requester_email: request.requester_email,
+      requested_by: request.requested_by || null,
+      created_by: request.requested_by || null,
+      
+      // Schlüssel times (stored as text in events table)
+      schluesselannahme_time: request.key_handover_datetime 
+        ? new Date(request.key_handover_datetime).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+        : request.schluesselannahme_time,
+      schluesselabgabe_time: request.key_return_datetime
+        ? new Date(request.key_return_datetime).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+        : request.schluesselabgabe_time,
+      
+      // Additional notes
+      additional_notes: request.additional_notes,
+      
+      // Contract URL (only field that exists in events table)
+      uploaded_mietvertrag_url: request.signed_contract_url,
+      
+      // Status
+      status: 'approved'
+    }
+    
+    const createdEvent = await executeWithFallback(
+      async () => {
+        const result = await supabase
+          .from('events')
+          .insert(eventData)
+          .select()
+          .single()
+        
+        if (result.error) throw result.error
+        return result.data
+      },
+      async () => {
+        const headers = await getHeaders()
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/events`, {
+          method: 'POST',
+          headers: {
+            ...headers,
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify(eventData)
+        })
 
-      if (!createEventResponse.ok) {
-        const errorText = await createEventResponse.text()
-        throw new Error(`Failed to create event: ${errorText}`)
-      }
+        if (!response.ok) {
+          const errorText = await response.text()
+          throw new Error(`Fehler beim Erstellen der Veranstaltung: ${errorText}`)
+        }
+        
+        const result = await response.json()
+        return Array.isArray(result) ? result[0] : result
+      },
+      'eventRequests.finalAcceptRequest.createEvent'
+    )
       
       // Send notifications
       try {
-        // Notify user of final approval
-        await sendUserNotification(request.requester_email, request, 'final_approval')
+        // Notify user of final approval with proper event data
+        await sendUserNotification(request.requester_email, {
+          ...request,
+          requester_email: request.requester_email,
+          requester_name: request.requester_name,
+          title: request.title || request.event_name,
+          event_name: request.event_name || request.title,
+          start_date: request.start_date,
+          end_date: request.end_date,
+          start_datetime: request.exact_start_datetime,
+          end_datetime: request.exact_end_datetime,
+          event_type: request.event_type
+        }, 'final_approval')
         // Notify admins of final acceptance
-        await sendAdminNotification(request, 'final_acceptance')
+        await sendAdminNotification({
+          ...request,
+          title: request.title || request.event_name,
+          event_name: request.event_name || request.title,
+          requester_name: request.requester_name,
+          requester_email: request.requester_email,
+          start_datetime: request.exact_start_datetime,
+          end_datetime: request.exact_end_datetime,
+          event_type: request.event_type
+        }, 'final_acceptance')
       } catch (emailError) {
         // Don't fail if notifications fail
+        secureLog('warn', 'Email notification failed (non-critical)', sanitizeError(emailError))
       }
       
       // Delete the temporary blocker since event is now created
@@ -813,12 +1220,10 @@ export const eventRequestsAPI = {
         }
       } catch (blockError) {
         // Don't fail the whole operation if blocker deletion fails
+        secureLog('warn', 'Failed to delete temporary block', sanitizeError(blockError))
       }
       
-      return { success: true }
-    } catch (error) {
-      throw error
-    }
+      return { success: true, event: createdEvent }
   },
 
   // Legacy create method for backwards compatibility
@@ -875,21 +1280,82 @@ export const eventRequestsAPI = {
   },
 
   async delete(id) {
-    try {
-      const headers = await getHeaders()
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}`, {
-        method: 'DELETE',
-        headers
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-
-      return { success: true }
-    } catch (error) {
-      throw error
+    if (!id) {
+      throw new Error('Anfrage-ID ist erforderlich')
     }
+    
+    secureLog('log', '[eventRequestsAPI.delete] Starting delete', { requestId: id })
+    
+    // PRIMARY: HTTP REST API (fast and reliable, avoids Supabase client hanging)
+    // FALLBACK: Supabase client (only if HTTP fails)
+    return executeWithFallback(
+      // PRIMARY: HTTP REST API (fast, avoids hanging)
+      async () => {
+        secureLog('log', '[eventRequestsAPI.delete] Using HTTP REST API (primary)')
+        const headers = await getHeaders()
+        
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 5000)
+        
+        try {
+          const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}`, {
+            method: 'DELETE',
+            headers: {
+              ...headers,
+              'Prefer': 'return=representation'
+            },
+            signal: controller.signal
+          })
+
+          clearTimeout(timeoutId)
+          secureLog('log', '[eventRequestsAPI.delete] HTTP response', { status: response.status })
+
+          if (!response.ok) {
+            const errorText = await response.text()
+            secureLog('error', '[eventRequestsAPI.delete] HTTP error', { status: response.status, error: sanitizeError(errorText) })
+            throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`)
+          }
+
+          const data = await response.json()
+          const responseData = { 
+            success: true, 
+            data: Array.isArray(data) ? data : [],
+            deletedCount: Array.isArray(data) ? data.length : 0
+          }
+          secureLog('log', '[eventRequestsAPI.delete] HTTP success', { deletedCount: responseData.deletedCount })
+          return responseData
+        } catch (fetchError) {
+          clearTimeout(timeoutId)
+          if (fetchError.name === 'AbortError') {
+            throw new Error('Lösch-Anfrage-Timeout')
+          }
+          throw fetchError
+        }
+      },
+      // FALLBACK: Supabase client (only if HTTP fails)
+      async () => {
+        secureLog('log', '[eventRequestsAPI.delete] Using Supabase client (fallback)')
+        const result = await supabase
+          .from('event_requests')
+          .delete()
+          .eq('id', id)
+          .select()
+        
+        if (result.error) {
+          secureLog('error', '[eventRequestsAPI.delete] Supabase error', { error: sanitizeError(result.error) })
+          throw new Error(result.error.message || 'Fehler beim Löschen der Veranstaltungs-Anfrage')
+        }
+        
+        const response = {
+          success: true,
+          data: result.data,
+          deletedCount: result.data ? result.data.length : 0
+        }
+        secureLog('log', '[eventRequestsAPI.delete] Supabase success', { deletedCount: response.deletedCount })
+        return response
+      },
+      'eventRequests.delete'
+    )
   },
 
   // Optimized method for calendar display - only essential columns for requests
@@ -957,58 +1423,87 @@ export const eventRequestsAPI = {
 
   // Submit detailed request information (STEP 2: User submits details after initial acceptance)
   async submitDetailedRequest(id, detailedData) {
-    try {
-      const headers = await getHeaders()
-      
-      // Prepare update data
-      const updateData = {
-        request_stage: 'details_submitted',
-        details_submitted_at: new Date().toISOString(),
-        exact_start_datetime: detailedData.exact_start_datetime || null,
-        exact_end_datetime: detailedData.exact_end_datetime || null,
-        location: detailedData.location || null,
-        max_participants: detailedData.max_participants || null,
-        additional_notes: detailedData.additional_notes || null,
-        schluesselannahme_time: detailedData.schluesselannahme_time || null,
-        schluesselabgabe_time: detailedData.schluesselabgabe_time || null,
-        key_handover_datetime: detailedData.key_handover_datetime || null,
-        key_return_datetime: detailedData.key_return_datetime || null,
-        signed_contract_url: detailedData.signed_contract_url || null,
-        uploaded_file_name: detailedData.uploaded_file_name || null,
-        uploaded_file_size: detailedData.uploaded_file_size || null,
-        uploaded_file_type: detailedData.uploaded_file_type || null,
-        uploaded_file_data: detailedData.uploaded_file_data || null
-      }
+    // Prepare update data
+    const updateData = {
+      request_stage: 'details_submitted',
+      details_submitted_at: new Date().toISOString(),
+      exact_start_datetime: detailedData.exact_start_datetime || null,
+      exact_end_datetime: detailedData.exact_end_datetime || null,
+      location: detailedData.location || null,
+      max_participants: detailedData.max_participants || null,
+      additional_notes: detailedData.additional_notes || null,
+      schluesselannahme_time: detailedData.schluesselannahme_time || null,
+      schluesselabgabe_time: detailedData.schluesselabgabe_time || null,
+      key_handover_datetime: detailedData.key_handover_datetime || null,
+      key_return_datetime: detailedData.key_return_datetime || null,
+      signed_contract_url: detailedData.signed_contract_url || null,
+      uploaded_file_name: detailedData.uploaded_file_name || null,
+      uploaded_file_size: detailedData.uploaded_file_size || null,
+      uploaded_file_type: detailedData.uploaded_file_type || null,
+      uploaded_file_data: detailedData.uploaded_file_data || null
+    }
 
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}`, {
-        method: 'PATCH',
-        headers: {
-          ...headers,
-          'Prefer': 'return=representation'
-        },
-        body: JSON.stringify(updateData)
-      })
+    return executeWithFallback(
+      // PRIMARY: Use Supabase client
+      async () => {
+        const result = await supabase
+          .from('event_requests')
+          .update(updateData)
+          .eq('id', id)
+          .select()
+          .single()
+        
+        if (result.error) {
+          throw result.error
+        }
+        
+        return result.data
+      },
+      // FALLBACK: HTTP REST API
+      async () => {
+        const headers = await getHeaders()
+        
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/event_requests?id=eq.${id}`, {
+          method: 'PATCH',
+          headers: {
+            ...headers,
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify(updateData)
+        })
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
-      }
+        if (!response.ok) {
+          const errorText = await response.text()
+          throw new Error(`HTTP ${response.status}: ${errorText}`)
+        }
 
-      const result = await response.json()
-      const updated = Array.isArray(result) ? result[0] : result
-      
-      // Send notification to admins (non-blocking)
+        const result = await response.json()
+        const updated = Array.isArray(result) ? result[0] : result
+        return updated
+      },
+      'eventRequests.submitDetailedRequest'
+    ).then(async (updated) => {
+      // Send notification to admins (non-blocking) with proper event data
       try {
-        await sendAdminNotification(updated, 'detailed_info_submitted')
+        await sendAdminNotification({
+          ...updated,
+          title: updated.title || updated.event_name,
+          event_name: updated.event_name || updated.title,
+          requester_name: updated.requester_name,
+          requester_email: updated.requester_email,
+          start_datetime: updated.exact_start_datetime,
+          end_datetime: updated.exact_end_datetime,
+          event_type: updated.event_type
+        }, 'detailed_info_submitted')
       } catch (emailError) {
         secureLog('warn', 'Email notification failed (non-critical)', sanitizeError(emailError))
       }
       
       return updated
-    } catch (error) {
+    }).catch((error) => {
       secureLog('error', 'submitDetailedRequest error', sanitizeError(error))
       throw error
-    }
+    })
   },
 
   // Reject a request (admin action)
@@ -1056,29 +1551,52 @@ export const eventRequestsAPI = {
 // Profiles API
 export const profilesAPI = {
   async getById(id) {
+    if (!id) return null
+    
     return executeWithFallback(
-      // PRIMARY: Supabase client
+      // PRIMARY: HTTP REST API (fast, avoids Supabase client hanging)
       async () => {
-        return await supabase
+        const headers = await getHeaders()
+        
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 3000)
+        
+        try {
+          const response = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${id}&select=*`, {
+            method: 'GET',
+            headers,
+            signal: controller.signal
+          })
+
+          clearTimeout(timeoutId)
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+          }
+
+          const data = await response.json()
+          return data[0] || null
+        } catch (fetchError) {
+          clearTimeout(timeoutId)
+          if (fetchError.name === 'AbortError') {
+            throw new Error('Profile load timeout')
+          }
+          throw fetchError
+        }
+      },
+      // FALLBACK: Supabase client (only if HTTP fails)
+      async () => {
+        const result = await supabase
           .from('profiles')
           .select('*')
           .eq('id', id)
           .single()
-      },
-      // FALLBACK: HTTP REST API
-      async () => {
-        const headers = await getHeaders()
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${id}&select=*`, {
-          method: 'GET',
-          headers
-        })
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        
+        if (result.error) {
+          throw result.error
         }
-
-        const data = await response.json()
-        return data[0] || null
+        
+        return result.data
       },
       'profiles.getById'
     )
@@ -1153,18 +1671,13 @@ export const profilesAPI = {
     )
   },
 
-  // PRIMARY: Uses Supabase client, FALLBACK: HTTP REST API (only when client fails)
+  // PRIMARY: HTTP REST API (fast, avoids Supabase client hanging), FALLBACK: Supabase client
   async getAll() {
     return executeWithFallback(
-      // PRIMARY: Supabase client (as per Supabase documentation)
+      // PRIMARY: HTTP REST API (fast, avoids Supabase client hanging)
       async () => {
-        return await supabase
-          .from('profiles')
-          .select('id,email,full_name,role,created_at')
-          .order('created_at', { ascending: false })
-      },
-      // FALLBACK: HTTP REST API (only used when Supabase client fails)
-      async () => {
+        const headers = await getHeaders()
+        
         const controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), 3000)
         
@@ -1174,8 +1687,7 @@ export const profilesAPI = {
             {
               method: 'GET',
               headers: {
-                'apikey': SUPABASE_KEY,
-                'Content-Type': 'application/json',
+                ...headers,
                 'Prefer': 'return=minimal'
               },
               signal: controller.signal
@@ -1189,14 +1701,28 @@ export const profilesAPI = {
             throw new Error(`HTTP ${response.status}: ${errorText}`)
           }
 
-          return await response.json()
+          const data = await response.json()
+          return Array.isArray(data) ? data : []
         } catch (fetchError) {
           clearTimeout(timeoutId)
           if (fetchError.name === 'AbortError') {
-            throw new Error('Request timeout - Profiles API call took too long')
+            throw new Error('Profiles load timeout')
           }
           throw fetchError
         }
+      },
+      // FALLBACK: Supabase client (only if HTTP fails)
+      async () => {
+        const result = await supabase
+          .from('profiles')
+          .select('id,email,full_name,role,created_at')
+          .order('created_at', { ascending: false })
+        
+        if (result.error) {
+          throw result.error
+        }
+        
+        return Array.isArray(result.data) ? result.data : []
       },
       'profiles.getAll'
     )
@@ -1239,7 +1765,7 @@ export const profilesAPI = {
         } catch (fetchError) {
           clearTimeout(timeoutId)
           if (fetchError.name === 'AbortError') {
-            throw new Error('Request timeout - Role update took too long')
+            throw new Error('Anfrage-Timeout - Rollen-Update dauerte zu lange')
           }
           throw fetchError
         }
@@ -1249,24 +1775,11 @@ export const profilesAPI = {
   },
 
   async checkAndCreateProfileForUser(email) {
-    try {
-      // Check if user exists in auth without a profile (orphaned user)
-      
-      // Use regular auth to check if we can sign in with this email
-      // This will tell us if the user exists
-      try {
-        // Try to get the user by checking signin (but don't actually sign them in)
-        // We can't use admin API from client-side, so we'll use a different approach
-        
-        // Since we can't access admin API, just return false
-        // The actual fix should be done server-side or manually in Supabase dashboard
-        return false
-      } catch (error) {
-        return false
-      }
-    } catch (error) {
-      return false
-    }
+    // Check if user exists in auth without a profile (orphaned user)
+    // We can't use admin API from client-side, so we'll use a different approach
+    // Since we can't access admin API, just return false
+    // The actual fix should be done server-side or manually in Supabase dashboard
+    return false
   },
 
   async createUser(userData) {
@@ -1860,7 +2373,7 @@ export const eventRequestAPI = {
     try {
       const allRequests = await eventRequestsAPI.getAll()
       const request = allRequests.find(r => r.id === requestId)
-      if (!request) throw new Error('Event request not found')
+      if (!request) throw new Error('Veranstaltungs-Anfrage nicht gefunden')
 
       const eventData = {
         title: request.title,
@@ -1878,7 +2391,7 @@ export const eventRequestAPI = {
       if (eventError) throw eventError
 
       const { data: updatedRequest, error: updateError } = await eventRequestAPI.updateEventRequestStatus(
-        requestId, 'approved', 'Event approved and created', reviewedBy
+        requestId, 'approved', 'Veranstaltung genehmigt und erstellt', reviewedBy
       )
       if (updateError) throw updateError
 

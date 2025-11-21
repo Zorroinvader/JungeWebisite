@@ -101,7 +101,7 @@ const AdminEventEditForm = ({ isOpen, onClose, onSuccess, event, onSaveAsTemplat
     try {
       // Validate required fields
       if (!formData.title.trim()) {
-        throw new Error('Bitte geben Sie einen Event-Namen ein');
+        throw new Error('Bitte geben Sie einen Namen für die Veranstaltung ein');
       }
 
       if (!formData.event_start_date || !formData.event_start_time) {
@@ -163,7 +163,7 @@ const AdminEventEditForm = ({ isOpen, onClose, onSuccess, event, onSaveAsTemplat
           });
         }
         
-        alert(`${seriesEvents.length} Events der Serie wurden aktualisiert!`);
+        alert(`${seriesEvents.length} Veranstaltungen der Serie wurden aktualisiert!`);
       } else {
         // Update only this event
         await eventsAPI.update(event.id, eventData);
@@ -174,7 +174,7 @@ const AdminEventEditForm = ({ isOpen, onClose, onSuccess, event, onSaveAsTemplat
       if (onClose) onClose();
 
     } catch (err) {
-      setError(err.message || 'Fehler beim Aktualisieren des Events');
+      setError(err.message || 'Fehler beim Aktualisieren der Veranstaltung');
     } finally {
       setLoading(false);
     }
@@ -188,7 +188,7 @@ const AdminEventEditForm = ({ isOpen, onClose, onSuccess, event, onSaveAsTemplat
       if (onSuccess) onSuccess();
       if (onClose) onClose();
     } catch (err) {
-      setError(err.message || 'Fehler beim Löschen des Events');
+      setError(err.message || 'Fehler beim Löschen der Veranstaltung');
       setShowDeleteConfirm(false);
     } finally {
       setLoading(false);
@@ -211,27 +211,37 @@ const AdminEventEditForm = ({ isOpen, onClose, onSuccess, event, onSaveAsTemplat
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#4a4a4a]' : ''}`}>
-        {/* Header */}
-        <div className={`flex items-center justify-between p-8 border-b border-[#A58C81] ${isDarkMode ? 'dark:border-[#EBE9E9]' : ''}`}>
-          <div>
-            <h2 className={`text-2xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
-              Event bearbeiten
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-3 md:p-4" style={{ touchAction: 'pan-y', overscrollBehavior: 'contain' }}>
+      <div 
+        className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-xl sm:rounded-2xl shadow-xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#4a4a4a]' : ''}`}
+        style={{ 
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y',
+          overscrollBehavior: 'contain'
+        }}
+      >
+        {/* MOBILE RESPONSIVE: Header with responsive padding */}
+        <div className={`flex items-center justify-between p-4 sm:p-6 md:p-8 border-b border-[#A58C81] ${isDarkMode ? 'dark:border-[#EBE9E9]' : ''}`}>
+          <div className="flex-1 min-w-0 pr-2">
+            <h2 className={`text-lg sm:text-xl md:text-2xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} truncate`}>
+              Veranstaltung bearbeiten
             </h2>
-            <p className={`text-sm mt-1 text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>
-              Ändern Sie die Event-Details
+            <p className={`text-xs sm:text-sm mt-1 text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>
+              Ändern Sie die Veranstaltungs-Details
             </p>
           </div>
           <button
             onClick={onClose}
-            className={`p-2 hover:opacity-70 transition-opacity rounded-lg text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}
+            className={`min-w-[44px] min-h-[44px] p-2 hover:opacity-70 active:scale-95 transition-all rounded-lg text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} touch-manipulation flex items-center justify-center flex-shrink-0`}
+            aria-label="Schließen"
+            style={{ touchAction: 'manipulation' }}
           >
             <X size={24} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-8">
+        {/* MOBILE RESPONSIVE: Form with responsive padding */}
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 md:p-8 space-y-6 sm:space-y-8">
           {error && (
             <div className={`rounded-lg p-4 bg-red-50 ${isDarkMode ? 'dark:bg-red-900/20' : ''} border border-red-200 ${isDarkMode ? 'dark:border-red-800' : ''}`}>
               <p className={`text-sm text-red-600 ${isDarkMode ? 'dark:text-red-400' : ''}`}>{error}</p>
@@ -242,7 +252,7 @@ const AdminEventEditForm = ({ isOpen, onClose, onSuccess, event, onSaveAsTemplat
           {seriesId && seriesEvents.length > 1 && (
             <div className={`bg-purple-50 ${isDarkMode ? 'dark:bg-purple-900/20' : ''} border border-purple-200 ${isDarkMode ? 'dark:border-purple-800' : ''} rounded-lg p-4`}>
               <h4 className={`text-sm font-semibold mb-3 text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
-                Dieses Event ist Teil einer Serie ({seriesEvents.length} Events)
+                Diese Veranstaltung ist Teil einer Serie ({seriesEvents.length} Veranstaltungen)
               </h4>
               <div className="space-y-2">
                 <div className="flex items-center">
@@ -256,7 +266,7 @@ const AdminEventEditForm = ({ isOpen, onClose, onSuccess, event, onSaveAsTemplat
                     className={`h-4 w-4 text-[#6054d9] focus:ring-[#6054d9]`}
                   />
                   <label htmlFor="edit_single" className={`ml-3 text-sm font-medium text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
-                    Nur dieses Event bearbeiten
+                    Nur diese Veranstaltung bearbeiten
                   </label>
                 </div>
                 <div className="flex items-center">
@@ -276,7 +286,7 @@ const AdminEventEditForm = ({ isOpen, onClose, onSuccess, event, onSaveAsTemplat
               </div>
               {editMode === 'series' && (
                 <p className={`text-xs mt-2 text-purple-700 ${isDarkMode ? 'dark:text-purple-300' : ''}`}>
-                  Alle {seriesEvents.length} Events werden mit derselben Zeitverschiebung aktualisiert
+                  Alle {seriesEvents.length} Veranstaltungen werden mit derselben Zeitverschiebung aktualisiert
                 </p>
               )}
             </div>
@@ -285,13 +295,13 @@ const AdminEventEditForm = ({ isOpen, onClose, onSuccess, event, onSaveAsTemplat
           {/* Basic Information */}
           <div className={`border-l-4 border-[#A58C81] pl-4 py-2`}>
             <h3 className={`text-xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} mb-4`}>
-              Event-Informationen
+              Veranstaltungs-Informationen
             </h3>
 
             <div className="space-y-4">
               <div>
                 <label className={`block text-sm font-semibold mb-2 text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
-                  Event-Name *
+                  Veranstaltungs-Name *
                 </label>
                 <input
                   type="text"
@@ -299,7 +309,8 @@ const AdminEventEditForm = ({ isOpen, onClose, onSuccess, event, onSaveAsTemplat
                   value={formData.title}
                   onChange={handleChange}
                   required
-                  className={`w-full px-3 py-3 border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+                  className={`w-full px-3 py-3 min-h-[44px] text-base border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+                  style={{ fontSize: '16px' }}
                 />
               </div>
 
@@ -312,7 +323,8 @@ const AdminEventEditForm = ({ isOpen, onClose, onSuccess, event, onSaveAsTemplat
                   value={formData.description}
                   onChange={handleChange}
                   rows="3"
-                  className={`w-full px-3 py-3 border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+                  className={`w-full px-3 py-3 min-h-[44px] text-base border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+                  style={{ fontSize: '16px' }}
                 />
               </div>
             </div>
@@ -384,7 +396,7 @@ const AdminEventEditForm = ({ isOpen, onClose, onSuccess, event, onSaveAsTemplat
             <div className="space-y-4">
               <div>
                 <label className={`block text-sm font-semibold mb-2 text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
-                  Event-Typ
+                  Veranstaltungs-Typ
                 </label>
                 <div className="space-y-3">
                   <div className="flex items-center">
@@ -398,7 +410,7 @@ const AdminEventEditForm = ({ isOpen, onClose, onSuccess, event, onSaveAsTemplat
                       className={`h-4 w-4 text-[#A58C81] focus:ring-[#A58C81]`}
                     />
                     <label htmlFor="private_event_edit" className={`ml-3 text-sm font-medium text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
-                      Privates Event
+                      Private Veranstaltung
                     </label>
                   </div>
                   <div className="flex items-center">
@@ -412,7 +424,7 @@ const AdminEventEditForm = ({ isOpen, onClose, onSuccess, event, onSaveAsTemplat
                       className={`h-4 w-4 text-[#A58C81] focus:ring-[#A58C81]`}
                     />
                     <label htmlFor="public_event_edit" className={`ml-3 text-sm font-medium text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
-                      Öffentliches Event
+                      Öffentliche Veranstaltung
                     </label>
                   </div>
                 </div>
@@ -463,26 +475,30 @@ const AdminEventEditForm = ({ isOpen, onClose, onSuccess, event, onSaveAsTemplat
                 type="button"
                 onClick={() => setShowDeleteConfirm(true)}
                 disabled={loading}
-                className={`px-4 py-2 text-sm font-medium rounded-lg border-2 border-red-500 ${isDarkMode ? 'dark:border-red-400' : ''} text-red-600 ${isDarkMode ? 'dark:text-red-400' : ''} hover:bg-red-50 ${isDarkMode ? 'dark:hover:bg-red-900/20' : ''} transition-colors flex items-center`}
+                className={`px-4 py-3 min-h-[44px] text-base font-medium rounded-lg border-2 border-red-500 ${isDarkMode ? 'dark:border-red-400' : ''} text-red-600 ${isDarkMode ? 'dark:text-red-400' : ''} hover:bg-red-50 ${isDarkMode ? 'dark:hover:bg-red-900/20' : ''} active:scale-95 transition-all flex items-center justify-center touch-manipulation`}
+                style={{ touchAction: 'manipulation' }}
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Löschen
               </button>
             </div>
 
-            <div className="flex gap-3">
+            {/* MOBILE RESPONSIVE: Buttons stack on mobile */}
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
                 type="button"
                 onClick={onClose}
                 disabled={loading}
-                className={`px-6 py-3 text-sm font-medium rounded-lg border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} hover:bg-gray-50 ${isDarkMode ? 'dark:hover:bg-[#1a1a1a]' : ''} transition-colors`}
+                className={`w-full sm:w-auto px-6 py-3 min-h-[44px] text-base font-medium rounded-lg border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} hover:bg-gray-50 ${isDarkMode ? 'dark:hover:bg-[#1a1a1a]' : ''} active:scale-95 transition-all touch-manipulation`}
+                style={{ touchAction: 'manipulation' }}
               >
                 Abbrechen
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className={`px-6 py-3 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 flex items-center transition-opacity bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''}`}
+                className={`w-full sm:w-auto px-6 py-3 min-h-[44px] text-base font-medium text-white rounded-lg hover:opacity-90 active:scale-95 disabled:opacity-50 flex items-center justify-center transition-all bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} touch-manipulation`}
+                style={{ touchAction: 'manipulation' }}
               >
                 {loading ? (
                   <>
@@ -506,10 +522,10 @@ const AdminEventEditForm = ({ isOpen, onClose, onSuccess, event, onSaveAsTemplat
         <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
           <div className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-xl shadow-xl max-w-md w-full p-8 border-2 border-red-500`}>
             <h3 className={`text-xl font-bold text-red-600 mb-4`}>
-              Event löschen?
+              Veranstaltung löschen?
             </h3>
             <p className={`text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} mb-6`}>
-              Möchten Sie das Event "<strong>{formData.title}</strong>" wirklich löschen?
+              Möchten Sie die Veranstaltung "<strong>{formData.title}</strong>" wirklich löschen?
               Diese Aktion kann nicht rückgängig gemacht werden.
             </p>
             <div className="flex gap-4">

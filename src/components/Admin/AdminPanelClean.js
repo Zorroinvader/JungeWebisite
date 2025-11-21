@@ -14,7 +14,6 @@ import UserManagement from './UserManagement'
 import ThreeStepRequestManagement from './ThreeStepRequestManagement'
 import AdminEventCreationForm from './AdminEventCreationForm'
 import AdminEventEditForm from './AdminEventEditForm'
-// import SimpleMonthCalendar from '../Calendar/SimpleMonthCalendar' // Removed to speed up admin panel
 import { fetchAndParseICS, convertToDBEvent } from '../../utils/icsParser'
 
 const AdminPanelClean = () => {
@@ -24,8 +23,8 @@ const AdminPanelClean = () => {
 
   const tabs = [
     { id: 'three-step-requests', name: '3-Schritt Anfragen', icon: Workflow },
-    { id: 'events', name: 'Events verwalten', icon: FileText },
-    { id: 'special-events', name: 'Special Events', icon: Eye },
+    { id: 'events', name: 'Veranstaltungen verwalten', icon: FileText },
+    { id: 'special-events', name: 'Besondere Veranstaltungen', icon: Eye },
     { id: 'users', name: 'Benutzer verwalten', icon: Users },
     { id: 'settings', name: 'Einstellungen', icon: Settings }
   ]
@@ -70,12 +69,12 @@ const AdminPanelClean = () => {
                 Zugriff verweigert
               </h2>
               <p className="text-base mb-6" style={{ color: '#A58C81' }}>
-                Sie haben keine Berechtigung, auf den Admin-Bereich zuzugreifen.
+                Sie haben keine Berechtigung, auf den Verwaltungsbereich zuzugreifen.
               </p>
               <div className="text-sm mb-6" style={{ color: '#666' }}>
-                <p>User Email: {user?.email || 'Not logged in'}</p>
-                <p>Profile Role: {profile?.role || 'No profile'}</p>
-                <p>Is Admin: {isAdmin() ? 'Yes' : 'No'}</p>
+                <p>E-Mail: {user?.email || 'Nicht angemeldet'}</p>
+                <p>Rolle: {profile?.role || 'Kein Profil'}</p>
+                <p>Administrator: {isAdmin() ? 'Ja' : 'Nein'}</p>
               </div>
               <button
                 onClick={() => navigate('/')}
@@ -115,9 +114,9 @@ const AdminPanelClean = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold mb-4 text-[#252422] dark:text-[#F4F1E8]">Admin Panel</h1>
+            <h1 className="text-4xl font-bold mb-4 text-[#252422] dark:text-[#F4F1E8]">Verwaltung</h1>
             <p className="text-lg text-[#A58C81] dark:text-[#EBE9E9]">
-              Verwalten Sie Events, Benutzer und Einstellungen
+              Verwalten Sie Veranstaltungen, Benutzer und Einstellungen
             </p>
           </div>
         </div>
@@ -156,57 +155,6 @@ const AdminPanelClean = () => {
   )
 }
 
-// Calendar tab component - REMOVED to speed up admin panel loading
-// const CalendarTab = () => {
-//   const [currentDate, setCurrentDate] = useState(new Date())
-//   const [onEventUpdated, setOnEventUpdated] = useState(0)
-//   const [shouldLoad, setShouldLoad] = useState(false)
-
-//   // Only load calendar when component mounts (tab is active)
-//   useEffect(() => {
-//     setShouldLoad(true)
-//     return () => setShouldLoad(false)
-//   }, [])
-
-//   const handleNavigate = (date) => {
-//     setCurrentDate(date)
-//   }
-
-//   const handleDateClick = (date) => {
-//     // Handle date click if needed
-//   }
-
-//   const handleEventUpdated = () => {
-//     // Trigger calendar refresh
-//     setOnEventUpdated(prev => prev + 1)
-//   }
-
-//   return (
-//     <div>
-//       <div className="mb-6">
-//         <h2 className="text-xl font-semibold text-gray-900 dark:text-[#F4F1E8] mb-2">
-//           Kalender-Ansicht
-//         </h2>
-//         <p className="text-sm text-gray-600 dark:text-[#EBE9E9]">
-//           Übersicht aller Events im Kalenderformat
-//         </p>
-//       </div>
-      
-//       <div className="bg-white dark:bg-[#2a2a2a] rounded-lg border-2 border-[#A58C81] dark:border-[#4a4a4a] p-4">
-//         {shouldLoad && (
-//           <SimpleMonthCalendar
-//             currentDate={currentDate}
-//             onNavigate={handleNavigate}
-//             onDateClick={handleDateClick}
-//             onEventUpdated={handleEventUpdated}
-//             key={`admin-calendar-${onEventUpdated}`}
-//           />
-//         )}
-//       </div>
-//     </div>
-//   )
-// }
-
 // Events tab component
 const EventsTab = () => {
   const [events, setEvents] = useState([])
@@ -222,7 +170,7 @@ const EventsTab = () => {
     // Safety timeout to prevent infinite loading
     const timeout = setTimeout(() => {
       setLoading(false)
-    }, 5000) // 5 second timeout
+    }, 3000) // 3 second timeout
     
     return () => clearTimeout(timeout)
   }, [])
@@ -232,11 +180,16 @@ const EventsTab = () => {
       setLoading(true)
       setError(null)
       
-      // Get all events directly from events table
-      // getAll() now uses Supabase client as primary with HTTP fallback built-in
+      // Add timeout wrapper to prevent hanging
+      const loadPromise = eventsAPI.getAll()
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Lade-Timeout')), 4000)
+      )
+      
       let data = []
       try {
-        data = await eventsAPI.getAll()
+        data = await Promise.race([loadPromise, timeoutPromise])
+        data = Array.isArray(data) ? data : []
       } catch (error) {
         secureLog('error', 'Failed to load events', sanitizeError(error))
         data = []
@@ -253,6 +206,7 @@ const EventsTab = () => {
       setEvents(futureEvents)
     } catch (err) {
       setError(err.message)
+      setEvents([])
     } finally {
       setLoading(false)
     }
@@ -278,7 +232,7 @@ const EventsTab = () => {
     return (
       <div className="flex justify-center items-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-        <span className="ml-2 text-gray-600">Lade Events...</span>
+        <span className="ml-2 text-gray-600">Veranstaltungen werden geladen...</span>
       </div>
     )
   }
@@ -302,14 +256,14 @@ const EventsTab = () => {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-[#F4F1E8]">Events verwalten ({events.length})</h2>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-[#F4F1E8]">Veranstaltungen verwalten ({events.length})</h2>
         <div className="flex gap-3">
           <button
             onClick={() => setShowCreateForm(true)}
             className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg transition-colors shadow-md"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Event erstellen
+            Veranstaltung erstellen
           </button>
           <button
             onClick={loadEvents}
@@ -323,16 +277,16 @@ const EventsTab = () => {
       {events.length === 0 ? (
         <div className="text-center py-12 bg-gray-50 dark:bg-gray-900/20 rounded-lg border-2 border-[#A58C81] dark:border-[#4a4a4a]">
           <Calendar className="mx-auto h-12 w-12 text-[#A58C81] dark:text-[#EBE9E9]" />
-          <h3 className="mt-2 text-sm font-medium text-[#252422] dark:text-[#F4F1E8]">Keine Events vorhanden</h3>
+          <h3 className="mt-2 text-sm font-medium text-[#252422] dark:text-[#F4F1E8]">Keine Veranstaltungen vorhanden</h3>
           <p className="mt-1 text-sm text-[#A58C81] dark:text-[#EBE9E9]">
-            Erstellen Sie ein neues Event oder warten Sie auf genehmigte Anfragen.
+            Erstellen Sie eine neue Veranstaltung oder warten Sie auf genehmigte Anfragen.
           </p>
           <button
             onClick={() => setShowCreateForm(true)}
             className="mt-4 inline-flex items-center px-6 py-3 text-sm font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg transition-colors shadow-md"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Erstes Event erstellen
+            Erste Veranstaltung erstellen
           </button>
         </div>
       ) : (
@@ -636,7 +590,7 @@ const SettingsTab = () => {
   }
 
   const handleExportData = () => {
-    alert('Export-Funktion:\n\nAlle Events und Anfragen werden als CSV/JSON exportiert.\n(In Entwicklung)')
+    alert('Export-Funktion:\n\nAlle Veranstaltungen und Anfragen werden als CSV/JSON exportiert.\n(In Entwicklung)')
   }
 
   const handleClearCache = () => {
@@ -656,8 +610,8 @@ const SettingsTab = () => {
   const handleDeleteAllEvents = async () => {
     // Triple confirmation for safety
     const confirmStep1 = window.confirm(
-      '⚠️ WARNUNG: Alle Events löschen\n\n' +
-      'Dies wird ALLE Events aus der Datenbank löschen!\n\n' +
+      '⚠️ WARNUNG: Alle Veranstaltungen löschen\n\n' +
+      'Dies wird ALLE Veranstaltungen aus der Datenbank löschen!\n\n' +
       'Diese Aktion kann NICHT rückgängig gemacht werden!\n\n' +
       'Möchten Sie fortfahren?'
     )
@@ -668,11 +622,11 @@ const SettingsTab = () => {
 
     const confirmStep2 = window.prompt(
       '⚠️ ZWEITE BESTÄTIGUNG\n\n' +
-      'Um fortzufahren, geben Sie "ALLE EVENTS LÖSCHEN" ein:\n\n' +
+      'Um fortzufahren, geben Sie "ALLE VERANSTALTUNGEN LÖSCHEN" ein:\n\n' +
       '(Groß-/Kleinschreibung wird beachtet)'
     )
     
-    if (confirmStep2 !== 'ALLE EVENTS LÖSCHEN') {
+    if (confirmStep2 !== 'ALLE VERANSTALTUNGEN LÖSCHEN') {
       alert('❌ Abgebrochen: Falsche Eingabe')
       return
     }
@@ -680,7 +634,7 @@ const SettingsTab = () => {
     const confirmStep3 = window.confirm(
       '🔴 LETZTE WARNUNG\n\n' +
       'Dies ist Ihre letzte Chance!\n\n' +
-      'Alle Events werden unwiderruflich gelöscht.\n\n' +
+      'Alle Veranstaltungen werden unwiderruflich gelöscht.\n\n' +
       'Sind Sie ABSOLUT SICHER?'
     )
     
@@ -694,7 +648,7 @@ const SettingsTab = () => {
       const allEvents = await eventsAPI.getAll()
       
       if (allEvents.length === 0) {
-        alert('ℹ️ Keine Events zum Löschen gefunden.')
+        alert('ℹ️ Keine Veranstaltungen zum Löschen gefunden.')
         return
       }
 
@@ -840,7 +794,7 @@ const SettingsTab = () => {
             Benachrichtigungen
           </h3>
           <p className={`text-xs text-[#A58C81] dark:text-[#EBE9E9] mb-4`}>
-            E-Mail-Benachrichtigungen für neue Event-Anfragen und Statusänderungen
+            E-Mail-Benachrichtigungen für neue Veranstaltungs-Anfragen und Statusänderungen
           </p>
 
           <div className="space-y-3 mt-4">
@@ -874,7 +828,7 @@ const SettingsTab = () => {
               Admin E-Mail-Adressen für Benachrichtigungen
             </h4>
               <p className={`text-xs text-[#A58C81] dark:text-[#EBE9E9] mb-3`}>
-              Diese E-Mail-Adressen erhalten Benachrichtigungen bei neuen Event-Anfragen. 
+              Diese E-Mail-Adressen erhalten Benachrichtigungen bei neuen Veranstaltungs-Anfragen. 
               Sie können mehrere E-Mails gleichzeitig hinzufügen (durch Komma getrennt).
             </p>
 
@@ -1001,7 +955,7 @@ const SettingsTab = () => {
                 className="w-4 h-4 text-[#6054d9] border-[#A58C81] rounded focus:ring-[#6054d9]"
               />
               <span className={`text-sm text-[#252422] dark:text-[#F4F1E8]`}>
-                Private Events im öffentlichen Kalender anzeigen
+                Private Veranstaltungen im öffentlichen Kalender anzeigen
               </span>
             </label>
             <label className="flex items-center space-x-3 cursor-pointer">
@@ -1046,7 +1000,7 @@ const SettingsTab = () => {
               className="inline-flex items-center px-4 py-2 text-sm font-medium text-[#252422] dark:text-[#F4F1E8] bg-white dark:bg-[#1a1a1a] border-2 border-[#A58C81] dark:border-[#6a6a6a] rounded-lg hover:bg-gray-50 dark:hover:bg-[#252422] transition-colors"
             >
               <Download className="h-4 w-4 mr-2" />
-              Alle Events exportieren (CSV)
+              Alle Veranstaltungen exportieren (CSV)
             </button>
             <button
               onClick={handleExportData}
@@ -1115,13 +1069,13 @@ const SettingsTab = () => {
               className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-red-600 dark:bg-red-700 border-2 border-red-700 dark:border-red-900 rounded-lg hover:bg-red-700 dark:hover:bg-red-800 transition-colors shadow-md"
             >
               <X className="h-4 w-4 mr-2" />
-              Alle Events löschen
+              Alle Veranstaltungen löschen
             </button>
           </div>
           
           <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/10 border-l-4 border-red-500 rounded">
             <p className="text-xs text-red-700 dark:text-red-400">
-              <strong>⚠️ Warnung:</strong> Der Button "Alle Events löschen" erfordert eine 3-fache Bestätigung und löscht unwiderruflich alle Events aus der Datenbank. Verwenden Sie diese Funktion nur zum Testen oder bei einem kompletten Neustart!
+              <strong>⚠️ Warnung:</strong> Der Button "Alle Veranstaltungen löschen" erfordert eine 3-fache Bestätigung und löscht unwiderruflich alle Veranstaltungen aus der Datenbank. Verwenden Sie diese Funktion nur zum Testen oder bei einem kompletten Neustart!
             </p>
           </div>
         </div>

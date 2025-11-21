@@ -12,7 +12,8 @@ test.describe('Homepage Visual Regression', () => {
     await page.goto('/');
     
     // Wait for page to fully load
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(3000);
     
     // Take screenshot and compare with baseline
     await expect(page).toHaveScreenshot('homepage.png', {
@@ -26,7 +27,8 @@ test.describe('Homepage Visual Regression', () => {
     await page.setViewportSize({ width: 375, height: 667 });
     
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(3000);
     
     await expect(page).toHaveScreenshot('homepage-mobile.png', {
       fullPage: true,
@@ -36,7 +38,8 @@ test.describe('Homepage Visual Regression', () => {
 
   test('login page should match baseline snapshot', async ({ page }) => {
     await page.goto('/login');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(2000);
     
     await expect(page).toHaveScreenshot('login-page.png', {
       fullPage: true,

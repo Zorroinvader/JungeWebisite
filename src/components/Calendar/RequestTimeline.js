@@ -109,7 +109,8 @@ const RequestTimeline = ({ request }) => {
                 {status === 'current' && (
                   <p className={`text-xs text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mt-1`}>
                     {request.request_stage === 'initial' && 'Wird gerade geprüft...'}
-                    {request.request_stage === 'initial_accepted' && 'Bitte Details ausfüllen →'}
+                    {request.request_stage === 'initial_accepted' && !request.details_submitted_at && 'Bitte Details ausfüllen →'}
+                    {request.request_stage === 'initial_accepted' && request.details_submitted_at && 'Details bereits eingereicht ✓'}
                     {request.request_stage === 'details_submitted' && 'Wird final geprüft...'}
                     {request.request_stage === 'final_accepted' && 'Freigegeben ✓'}
                   </p>

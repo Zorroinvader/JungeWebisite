@@ -6,6 +6,19 @@ module.exports = {
     configure: (webpackConfig, { env, paths }) => {
       // Only apply in production
       if (env === 'production') {
+        // SECURITY: Disable source maps completely to prevent source code exposure in dev tools
+        webpackConfig.devtool = false;
+        
+        // Remove source map generation from all plugins
+        if (webpackConfig.plugins) {
+          webpackConfig.plugins = webpackConfig.plugins.map(plugin => {
+            if (plugin && plugin.constructor && plugin.constructor.name === 'SourceMapDevToolPlugin') {
+              return null;
+            }
+            return plugin;
+          }).filter(Boolean);
+        }
+
         // Add JavaScript Obfuscator
         webpackConfig.plugins.push(
           new JavaScriptObfuscator({
@@ -33,7 +46,9 @@ module.exports = {
             stringArrayWrappersChainedCalls: true,
             stringArrayWrappersParametersMaxCount: 4,
             stringArrayWrappersType: 'function',
-            unicodeEscapeSequence: true
+            unicodeEscapeSequence: true,
+            sourceMap: false, // Explicitly disable source maps in obfuscator
+            sourceMapMode: 'separate'
           }, ['main.*.js'])
         );
 
@@ -61,16 +76,14 @@ module.exports = {
               },
               output: {
                 ecma: 5,
-                comments: false,
+                comments: false, // Remove all comments including sourceMappingURL
                 ascii_only: true,
               },
+              sourceMap: false, // Explicitly disable source maps
             },
             extractComments: false,
           }),
         ];
-
-        // Disable source maps completely
-        webpackConfig.devtool = false;
       }
 
       return webpackConfig;

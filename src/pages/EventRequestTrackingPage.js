@@ -25,11 +25,6 @@ const EventRequestTrackingPage = () => {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [requestToCancel, setRequestToCancel] = useState(null);
 
-  // Prefill email if logged in
-  useEffect(() => {
-    if (user?.email && !email) setEmail(user.email);
-  }, [user, email]);
-
   const handleSearch = async (e) => {
     e.preventDefault();
     setError('');
@@ -46,33 +41,85 @@ const EventRequestTrackingPage = () => {
     }
   };
 
+  // Prefill email if logged in or from URL parameter
+  useEffect(() => {
+    // Check URL parameters for email
+    const urlParams = new URLSearchParams(window.location.search);
+    const emailParam = urlParams.get('email');
+    
+    if (emailParam && !email) {
+      setEmail(emailParam);
+    } else if (user?.email && !email) {
+      setEmail(user.email);
+    }
+  }, [user, email]);
+
+  // Auto-search when email is set from URL parameter
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const emailParam = urlParams.get('email');
+    
+    // Only auto-search if email came from URL and we haven't searched yet
+    if (emailParam && emailParam === email && !searched && email && !loading) {
+      handleSearch({ preventDefault: () => {} });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email, searched, loading]);
+
   const handleFillDetails = (request) => {
+    // Prevent opening form if details are already submitted
+    const isAlreadySubmitted = request.request_stage === 'details_submitted' || 
+                              request.request_stage === 'final_accepted' ||
+                              request.details_submitted_at ||
+                              (request.request_stage !== 'initial_accepted');
+    
+    if (isAlreadySubmitted) {
+      setError('Die Details wurden bereits eingereicht. Bitte warten Sie auf die finale Prüfung.');
+      return;
+    }
     setSelectedRequest(request);
     setShowDetailedForm(true);
   };
 
   const handleLoadMyRequests = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setRequests([]);
+      setLoading(false);
+      return;
+    }
     setError('');
     setLoading(true);
     setSearched(true);
     try {
-      const data = await eventRequestsAPI.getByUser(user.id);
-      setRequests(data || []);
+      // Add timeout wrapper to prevent hanging
+      const loadPromise = eventRequestsAPI.getByUser(user.id);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Lade-Timeout')), 4000)
+      );
+      
+      const data = await Promise.race([loadPromise, timeoutPromise]);
+      setRequests(Array.isArray(data) ? data : []);
       // Do not overwrite the email input; keep what the user typed
     } catch (err) {
       setError('Fehler beim Laden Ihrer Anfragen: ' + err.message);
+      setRequests([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDetailsSubmitted = () => {
+  const handleDetailsSubmitted = async () => {
     setShowDetailedForm(false);
     setSelectedRequest(null);
-    // Refresh the list
+    
+    // Wait a moment for database to update
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Refresh the list to get updated request_stage and details_submitted_at
     if (email) {
-      handleSearch({ preventDefault: () => {} });
+      await handleSearch({ preventDefault: () => {} });
+    } else if (user?.id) {
+      await handleLoadMyRequests();
     }
   };
 
@@ -113,10 +160,10 @@ const EventRequestTrackingPage = () => {
           {/* Header */}
           <div className="text-center mb-12">
             <h1 className={`text-4xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} mb-4`}>
-              Event-Anfrage verfolgen
+              Veranstaltungs-Anfrage verfolgen
             </h1>
             <p className={`text-lg text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>
-              Geben Sie Ihre E-Mail-Adresse ein, um den Status Ihrer Event-Anfragen zu sehen
+              Geben Sie Ihre E-Mail-Adresse ein, um den Status Ihrer Veranstaltungs-Anfragen zu sehen
             </p>
           </div>
 
@@ -174,7 +221,7 @@ const EventRequestTrackingPage = () => {
                     Keine Anfragen gefunden
                   </h3>
                   <p className={`text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>
-                    Für diese E-Mail-Adresse gibt es keine Event-Anfragen.
+                    Für diese E-Mail-Adresse gibt es keine Veranstaltungs-Anfragen.
                   </p>
                 </div>
               ) : (
@@ -210,13 +257,21 @@ const EventRequestTrackingPage = () => {
 
                           {/* Action Buttons */}
                           <div className="flex gap-3">
-                            {request.request_stage === 'initial_accepted' && (
+                            {/* Only show button if stage is initial_accepted and details haven't been submitted yet */}
+                            {request.request_stage === 'initial_accepted' && !request.details_submitted_at && request.request_stage !== 'details_submitted' && (
                               <button
                                 onClick={() => handleFillDetails(request)}
                                 className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold shadow-lg animate-pulse"
                               >
                                 Details ausfüllen →
                               </button>
+                            )}
+                            
+                            {/* Show message if details already submitted */}
+                            {(request.request_stage === 'details_submitted' || request.request_stage === 'final_accepted' || request.details_submitted_at) && (
+                              <div className="px-6 py-3 bg-purple-100 dark:bg-purple-900/20 border-2 border-purple-300 dark:border-purple-700 text-purple-800 dark:text-purple-300 rounded-lg font-semibold">
+                                ✓ Details bereits eingereicht
+                              </div>
                             )}
                             
                             {canCancelRequest(request) && (
@@ -242,7 +297,7 @@ const EventRequestTrackingPage = () => {
                               Ihre Anfrage wurde akzeptiert!
                             </p>
                             <p className="text-sm text-green-700 dark:text-green-400">
-                              Bitte füllen Sie nun die detaillierten Informationen aus und laden Sie den signierten Mietvertrag hoch, damit Ihr Event endgültig freigegeben werden kann.
+                              Bitte füllen Sie nun die detaillierten Informationen aus und laden Sie den signierten Mietvertrag hoch, damit Ihre Veranstaltung endgültig freigegeben werden kann.
                             </p>
                           </div>
                         )}
@@ -261,10 +316,10 @@ const EventRequestTrackingPage = () => {
                         {request.request_stage === 'final_accepted' && (
                           <div className="mt-6 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
                             <p className="text-green-800 dark:text-green-300 font-medium mb-2">
-                              Event freigegeben!
+                              Veranstaltung freigegeben!
                             </p>
                             <p className="text-sm text-green-700 dark:text-green-400">
-                              Ihr Event wurde endgültig freigegeben und ist nun im Kalender sichtbar. Viel Erfolg mit Ihrem Event!
+                              Ihre Veranstaltung wurde endgültig freigegeben und ist nun im Kalender sichtbar. Viel Erfolg mit Ihrer Veranstaltung!
                             </p>
                           </div>
                         )}
@@ -306,7 +361,7 @@ const EventRequestTrackingPage = () => {
             <ol className="space-y-2 text-sm text-blue-800 dark:text-blue-400">
               <li className="flex items-start">
                 <span className="font-bold mr-2">1.</span>
-                <span>Sie stellen eine initiale Event-Anfrage mit grundlegenden Informationen</span>
+                <span>Sie stellen eine initiale Veranstaltungs-Anfrage mit grundlegenden Informationen</span>
               </li>
               <li className="flex items-start">
                 <span className="font-bold mr-2">2.</span>
@@ -318,7 +373,7 @@ const EventRequestTrackingPage = () => {
               </li>
               <li className="flex items-start">
                 <span className="font-bold mr-2">4.</span>
-                <span>Der Administrator gibt das Event endgültig frei und es erscheint im Kalender</span>
+                <span>Der Administrator gibt die Veranstaltung endgültig frei und sie erscheint im Kalender</span>
               </li>
             </ol>
             <div className="mt-4 space-y-2">

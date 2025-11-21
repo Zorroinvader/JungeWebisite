@@ -3,7 +3,7 @@
 // - Used by: settingsHelper.js, admin settings, and email configuration flows for sending emails and managing admin recipient lists.
 // - Notes: Production service file. Consolidates email sending and admin email management. Uses secureConfig for safe key access.
 
-import { getSupabaseUrl, getSupabaseAnonKey, sanitizeError, secureLog } from '../utils/secureConfig'
+import { getSupabaseUrl, getSupabaseAnonKey, getSiteUrl, sanitizeError, secureLog } from '../utils/secureConfig'
 import { supabase } from '../lib/supabase'
 
 /**
@@ -85,9 +85,9 @@ export const sendUserNotification = async (userEmail, eventData, type = 'initial
 
   switch (type) {
     case 'initial_request':
-      subject = 'Ihre Event-Anfrage wurde empfangen';
+      subject = 'Ihre Veranstaltungs-Anfrage wurde empfangen';
       message = `Guten Tag ${eventData.requester_name || ''},\n\n` +
-                `vielen Dank für Ihre Event-Anfrage!\n\n` +
+                `vielen Dank für Ihre Veranstaltungs-Anfrage!\n\n` +
                 `EVENT-DETAILS\n` +
                 `${'-'.repeat(50)}\n` +
                 `Event: ${eventData.title || eventData.event_name}\n` +
@@ -104,23 +104,23 @@ export const sendUserNotification = async (userEmail, eventData, type = 'initial
       break;
 
     case 'accepted':
-      subject = 'Ihre Event-Anfrage wurde akzeptiert';
+      subject = 'Ihre Veranstaltungs-Anfrage wurde akzeptiert';
       message = `Guten Tag ${eventData.requester_name || ''},\n\n` +
-                `gute Neuigkeiten! Ihre Event-Anfrage wurde akzeptiert.\n\n` +
+                `gute Neuigkeiten! Ihre Veranstaltungs-Anfrage wurde akzeptiert.\n\n` +
                 `EVENT-DETAILS\n` +
                 `${'-'.repeat(50)}\n` +
                 `Event: ${eventData.title || eventData.event_name}\n` +
                 `Start: ${eventData.start_datetime ? new Date(eventData.start_datetime).toLocaleString('de-DE') : eventData.start_date}\n` +
                 `Ende: ${eventData.end_datetime ? new Date(eventData.end_datetime).toLocaleString('de-DE') : eventData.end_date}\n\n` +
-                `Ihr Event ist jetzt im Kalender eingetragen.\n\n` +
+                `Ihre Veranstaltung ist jetzt im Kalender eingetragen.\n\n` +
                 `Mit freundlichen Grüßen\n` +
                 `Junge Gesellschaft Wedes-Wedel`;
       break;
 
     case 'rejected':
-      subject = 'Ihre Event-Anfrage - Update';
+      subject = 'Ihre Veranstaltungs-Anfrage - Update';
       message = `Guten Tag ${eventData.requester_name || ''},\n\n` +
-                `leider konnte Ihre Event-Anfrage nicht angenommen werden.\n\n` +
+                `leider konnte Ihre Veranstaltungs-Anfrage nicht angenommen werden.\n\n` +
                 `Event: ${eventData.title || eventData.event_name}\n` +
                 `Zeitraum: ${eventData.start_date ? new Date(eventData.start_date).toLocaleDateString('de-DE') : ''}\n\n` +
                 `Für Rückfragen kontaktieren Sie uns bitte.\n\n` +
@@ -129,8 +129,8 @@ export const sendUserNotification = async (userEmail, eventData, type = 'initial
       break;
 
     default:
-      subject = 'Update zu Ihrer Event-Anfrage';
-      message = `Guten Tag,\n\nEs gibt ein Update zu Ihrer Event-Anfrage.\n\nMit freundlichen Grüßen\nIhr Event-Management-Team`;
+      subject = 'Update zu Ihrer Veranstaltungs-Anfrage';
+      message = `Guten Tag,\n\nEs gibt ein Update zu Ihrer Veranstaltungs-Anfrage.\n\nMit freundlichen Grüßen\nIhr Veranstaltungs-Team`;
   }
 
   // Generate HTML content
@@ -155,14 +155,17 @@ export const sendAdminNotificationEmail = async (adminEmails, eventData, type = 
     return;
   }
 
+  // Get the site URL for admin panel links
+  const siteUrl = getSiteUrl();
+
   let subject = '';
   let message = '';
 
   switch (type) {
     case 'new_request':
-      subject = 'Neue Event-Anfrage';
+      subject = 'Neue Veranstaltungs-Anfrage';
       message = `Guten Tag,\n\n` +
-                `eine neue Event-Anfrage steht zur Bearbeitung bereit.\n\n` +
+                `eine neue Veranstaltungs-Anfrage steht zur Bearbeitung bereit.\n\n` +
                 `EVENT-DETAILS\n` +
                 `${'-'.repeat(50)}\n` +
                 `Event: ${eventData.title || eventData.event_name || 'Unbekannt'}\n` +
@@ -170,13 +173,13 @@ export const sendAdminNotificationEmail = async (adminEmails, eventData, type = 
                 `Kontakt: ${eventData.requester_email}\n` +
                 `Zeitraum: ${eventData.start_date ? new Date(eventData.start_date).toLocaleDateString('de-DE') : 'N/A'}\n` +
                 `Kategorie: ${eventData.event_type || 'N/A'}\n\n` +
-                `Zum Admin-Panel: ${window.location.origin}/admin\n\n` +
+                `Zum Admin-Panel: ${siteUrl}/admin\n\n` +
                 `Mit freundlichen Grüßen\n` +
                 `Das System :D`;
       break;
 
     default:
-      subject = 'Event-Anfrage Update';
+      subject = 'Veranstaltungs-Anfrage Update';
       message = `Event: ${eventData.title || eventData.event_name}\n` +
                 `Von: ${eventData.requester_name}\n\n` +
                 `Weitere Details im Admin-Panel.`;
@@ -198,7 +201,7 @@ export const sendAdminNotificationEmail = async (adminEmails, eventData, type = 
  * @param {string} testEmail - Email address to send test to
  */
 export const sendTestEmail = async (testEmail) => {
-  const subject = 'Test-E-Mail vom Event-Management-System';
+  const subject = 'Test-E-Mail vom Veranstaltungs-System';
   const message = `Guten Tag,\n\n` +
                   `dies ist eine Test-E-Mail.\n\n` +
                   `Wenn Sie diese E-Mail erhalten, funktioniert Ihr E-Mail-System korrekt.\n\n` +

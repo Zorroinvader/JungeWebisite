@@ -9,7 +9,7 @@ import { Settings, Save, AlertCircle, CheckCircle } from 'lucide-react'
 const AdminSettings = () => {
   const [settings, setSettings] = useState({
     siteName: 'Jungengesellschaft',
-    siteDescription: 'Ihre Plattform für Events und Veranstaltungen',
+    siteDescription: 'Ihre Plattform für Veranstaltungen',
     contactEmail: 'info@jungengesellschaft.de',
     maxEventParticipants: 50,
     eventApprovalRequired: true,
@@ -137,7 +137,7 @@ const AdminSettings = () => {
 
         {/* Event Settings */}
         <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Event-Einstellungen</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Veranstaltungs-Einstellungen</h3>
           
           <div className="space-y-6">
             <div>
@@ -180,7 +180,7 @@ const AdminSettings = () => {
                 className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
               />
               <label htmlFor="allowPublicEventRequests" className="ml-2 block text-sm text-gray-900">
-                Öffentliche Event-Anfragen erlauben
+                Öffentliche Veranstaltungs-Anfragen erlauben
               </label>
             </div>
           </div>
@@ -203,7 +203,7 @@ const AdminSettings = () => {
               className="w-full px-3 py-2 border border-gray-300 dark:border-[#6a6a6a] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-[#8a8a8a] focus:border-primary-500 dark:focus:border-[#8a8a8a] bg-white dark:bg-[#1a1a1a] text-[#252422] dark:text-[#e0e0e0] placeholder-gray-500 dark:placeholder-gray-400"
             />
             <p className="mt-1 text-sm text-gray-500">
-              E-Mail-Adresse für Benachrichtigungen über neue Event-Anfragen
+              E-Mail-Adresse für Benachrichtigungen über neue Veranstaltungs-Anfragen
             </p>
           </div>
         </div>

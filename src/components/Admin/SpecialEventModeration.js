@@ -100,7 +100,7 @@ const SpecialEventModeration = () => {
     <div className="min-h-screen bg-[#F4F1E8] dark:bg-[#252422] p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="bg-white dark:bg-[#2a2a2a] border-2 border-[#A58C81] dark:border-[#EBE9E9] rounded-2xl p-4 md:p-6 shadow-lg">
-          <h2 className="text-2xl md:text-3xl font-bold text-[#252422] dark:text-[#F4F1E8] mb-6">Special Event Moderation</h2>
+          <h2 className="text-2xl md:text-3xl font-bold text-[#252422] dark:text-[#F4F1E8] mb-6">Moderation besonderer Veranstaltungen</h2>
           {error && (
             <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg text-red-700 dark:text-red-300 text-sm">
               <div className="font-semibold mb-1">Es ist ein Fehler aufgetreten</div>
@@ -123,14 +123,14 @@ const SpecialEventModeration = () => {
           )}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <label className="text-sm font-semibold text-[#252422] dark:text-[#F4F1E8] sm:w-auto">
-              Event wählen:
+              Veranstaltung wählen:
             </label>
             <select 
               className="flex-1 sm:flex-initial border-2 border-[#A58C81]/40 dark:border-[#EBE9E9]/40 focus:border-[#A58C81] dark:focus:border-[#EBE9E9] rounded-lg px-4 py-2 bg-white dark:bg-[#1a1a1a] text-[#252422] dark:text-[#F4F1E8] font-medium" 
               value={selectedEventId} 
               onChange={e => setSelectedEventId(e.target.value)}
             >
-              <option value="">— Event auswählen —</option>
+              <option value="">— Veranstaltung auswählen —</option>
               {events.map(ev => (
                 <option key={ev.id} value={ev.id}>{ev.title}</option>
               ))}
@@ -361,7 +361,7 @@ const SpecialEventModeration = () => {
 
             {activeTab === 'results' && voteStats.length === 0 && (
               <div className="col-span-full text-center py-12">
-                <div className="text-[#A58C81] dark:text-[#EBE9E9] font-semibold">Noch keine Abstimmungen.</div>
+                <div className="text-[#A58C81] dark:text-[#EBE9E9] font-semibold">Noch keine Abstimmungen vorhanden.</div>
               </div>
             )}
           </div>

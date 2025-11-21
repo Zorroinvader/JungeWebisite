@@ -27,11 +27,16 @@ const UserManagement = () => {
       setLoading(true)
       setError('')
       
-      let data = []
+      // Add timeout wrapper to prevent hanging
+      const loadPromise = profilesAPI.getAll()
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Lade-Timeout')), 4000)
+      )
       
-      // getAll() now uses Supabase client as primary with HTTP fallback built-in
+      let data = []
       try {
-        data = await profilesAPI.getAll()
+        data = await Promise.race([loadPromise, timeoutPromise])
+        data = Array.isArray(data) ? data : []
       } catch (error) {
         secureLog('error', 'Failed to load profiles', sanitizeError(error))
         data = []
@@ -40,6 +45,7 @@ const UserManagement = () => {
       setUsers(data || [])
     } catch (err) {
       setError('Fehler beim Laden der Benutzer')
+      setUsers([])
     } finally {
       setLoading(false)
     }
@@ -327,9 +333,20 @@ const UserManagement = () => {
       )}
 
       {/* Register Form Modal */}
+      {/* MOBILE RESPONSIVE: Register Form Modal with proper mobile sizing */}
       {showRegisterForm && (
-        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-          <div className="relative w-full max-w-lg bg-white dark:bg-[#252422] rounded-2xl shadow-2xl border border-gray-200 dark:border-[#EBE9E9]/20">
+        <div 
+          className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-2 sm:p-3 md:p-4"
+          style={{ touchAction: 'pan-y', overscrollBehavior: 'contain' }}
+        >
+          <div 
+            className="relative w-full max-w-lg bg-white dark:bg-[#252422] rounded-xl sm:rounded-2xl shadow-2xl border border-gray-200 dark:border-[#EBE9E9]/20 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto"
+            style={{ 
+              WebkitOverflowScrolling: 'touch',
+              touchAction: 'pan-y',
+              overscrollBehavior: 'contain'
+            }}
+          >
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-[#EBE9E9]/20">
               <div>
@@ -432,9 +449,20 @@ const RoleChangeModal = ({ user, onClose, onUpdateRole }) => {
     }
   }
 
+  // MOBILE RESPONSIVE: Role change modal with proper mobile sizing
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-black/70 flex items-center justify-center p-4 z-50">
-      <div className="bg-white dark:bg-[#2a2a2a] rounded-lg max-w-md w-full border-2 border-[#A58C81] dark:border-[#4a4a4a]">
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 dark:bg-black/70 flex items-center justify-center p-2 sm:p-3 md:p-4 z-50"
+      style={{ touchAction: 'pan-y', overscrollBehavior: 'contain' }}
+    >
+      <div 
+        className="bg-white dark:bg-[#2a2a2a] rounded-xl sm:rounded-lg max-w-md w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto border-2 border-[#A58C81] dark:border-[#4a4a4a]"
+        style={{ 
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y',
+          overscrollBehavior: 'contain'
+        }}
+      >
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold text-[#252422] dark:text-[#F4F1E8]">
@@ -484,18 +512,21 @@ const RoleChangeModal = ({ user, onClose, onUpdateRole }) => {
               </div>
             </div>
 
-            <div className="flex justify-end space-x-3 pt-4 border-t border-[#A58C81] dark:border-[#EBE9E9]">
+            {/* MOBILE RESPONSIVE: Buttons stack on mobile */}
+            <div className="flex flex-col sm:flex-row justify-end gap-3 sm:space-x-3 pt-4 border-t border-[#A58C81] dark:border-[#EBE9E9]">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-[#252422] dark:text-[#e0e0e0] bg-white dark:bg-[#1a1a1a] border-2 border-[#A58C81] dark:border-[#6a6a6a] rounded-lg hover:bg-gray-50 dark:hover:bg-[#252422] transition-colors"
+                className="w-full sm:w-auto px-4 py-2 min-h-[44px] text-base font-medium text-[#252422] dark:text-[#e0e0e0] bg-white dark:bg-[#1a1a1a] border-2 border-[#A58C81] dark:border-[#6a6a6a] rounded-lg hover:bg-gray-50 dark:hover:bg-[#252422] active:scale-95 transition-all touch-manipulation"
+                style={{ touchAction: 'manipulation' }}
               >
                 Abbrechen
               </button>
               <button
                 type="submit"
                 disabled={loading || selectedRole === user.role}
-                className="px-4 py-2 text-sm font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto px-4 py-2 min-h-[44px] text-base font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+                style={{ touchAction: 'manipulation' }}
               >
                 {loading ? 'Wird aktualisiert...' : 'Rolle aktualisieren'}
               </button>
@@ -567,10 +598,9 @@ const SuperAdminUserForm = ({ onClose, onSuccess }) => {
       
       // Create user with signUp and immediately confirm email
       
-      // Use site origin as redirect URL to match Supabase allow list
-      const redirectTo = typeof window !== 'undefined' 
-        ? window.location.origin 
-        : undefined
+      // Use production site URL for email redirect to match Supabase allow list
+      const { getSiteUrl } = await import('../../utils/secureConfig')
+      const redirectTo = getSiteUrl()
 
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
@@ -653,8 +683,15 @@ const SuperAdminUserForm = ({ onClose, onSuccess }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-      <div className="relative w-full max-w-lg bg-white dark:bg-[#252422] rounded-2xl shadow-2xl border border-gray-200 dark:border-[#EBE9E9]/20">
+    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-2 sm:p-3 md:p-4" style={{ touchAction: 'pan-y', overscrollBehavior: 'contain' }}>
+      <div 
+        className="relative w-full max-w-lg bg-white dark:bg-[#252422] rounded-xl sm:rounded-2xl shadow-2xl border border-gray-200 dark:border-[#EBE9E9]/20 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto"
+        style={{ 
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y',
+          overscrollBehavior: 'contain'
+        }}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-[#EBE9E9]/20">
           <div>

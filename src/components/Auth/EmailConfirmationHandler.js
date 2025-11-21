@@ -26,20 +26,23 @@ const EmailConfirmationHandler = () => {
     errorRef.current = error;
   }, [confirmed, error]);
 
-  // Navigate to login and force reload if already on /login
+  // Navigate to login with activation notification
   const goToLogin = useCallback(() => {
     try {
       if (typeof window !== 'undefined') {
+        // Redirect to login page with activation notification
+        const loginUrl = '/login?activated=true';
         if (window.location.pathname === '/login') {
-          window.location.reload();
+          // If already on login, reload with the parameter
+          window.location.href = loginUrl;
         } else {
-          window.location.assign('/login');
+          window.location.assign(loginUrl);
         }
       } else {
-        navigate('/login', { replace: true });
+        navigate('/login?activated=true', { replace: true });
       }
     } catch (e) {
-      navigate('/login', { replace: true });
+      navigate('/login?activated=true', { replace: true });
     }
   }, [navigate]);
 
@@ -84,10 +87,10 @@ const EmailConfirmationHandler = () => {
                 window.history.replaceState({}, document.title, window.location.pathname);
               }, 100);
               
-              // Redirect to login page after 5 seconds (give user time to see success message)
+              // Redirect to login page immediately with activation notification
               redirectTimerRef.current = setTimeout(() => {
                 goToLogin();
-              }, 5000);
+              }, 2000); // Reduced to 2 seconds for faster redirect
             } else {
             }
           } else {
@@ -114,10 +117,10 @@ const EmailConfirmationHandler = () => {
               window.history.replaceState({}, document.title, window.location.pathname);
             }, 100);
             
-            // Redirect to login page after 5 seconds (give user time to see success message)
+            // Redirect to login page immediately with activation notification
             redirectTimerRef.current = setTimeout(() => {
               goToLogin();
-            }, 5000);
+            }, 2000); // Reduced to 2 seconds for faster redirect
             return;
           }
         }
@@ -137,10 +140,10 @@ const EmailConfirmationHandler = () => {
               window.history.replaceState({}, document.title, window.location.pathname);
             }, 100);
             
-            // Redirect to login page after 5 seconds (give user time to see success message)
+            // Redirect to login page immediately with activation notification
             redirectTimerRef.current = setTimeout(() => {
               goToLogin();
-            }, 5000);
+            }, 2000); // Reduced to 2 seconds for faster redirect
             return;
           }
         }

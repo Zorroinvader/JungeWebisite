@@ -31,26 +31,30 @@ const QuickEventEditModal = ({ isOpen, onClose, onSuccess, event }) => {
       setSuccess(false);
       setLoading(false);
       
-      // Parse dates properly - handle both date-only and datetime formats
+      // Parse dates properly - handle multiple date field formats
       let startDate, endDate;
       
-      if (event.start_date) {
+      // Try multiple date sources in order of preference
+      const startDateStr = event.exact_start_datetime || event.start_date || (event.startDate ? event.startDate.toISOString() : null)
+      const endDateStr = event.exact_end_datetime || event.end_date || (event.endDate ? event.endDate.toISOString() : null)
+      
+      if (startDateStr) {
         // Check if date includes time component
-        if (event.start_date.includes('T')) {
-          startDate = new Date(event.start_date);
+        if (startDateStr.includes('T')) {
+          startDate = new Date(startDateStr);
         } else {
-          // Date-only format - assume midnight UTC
-          startDate = new Date(event.start_date + 'T00:00:00Z');
+          // Date-only format - assume midnight local time
+          startDate = new Date(startDateStr + 'T00:00:00');
         }
       } else {
         startDate = new Date();
       }
       
-      if (event.end_date) {
-        if (event.end_date.includes('T')) {
-          endDate = new Date(event.end_date);
+      if (endDateStr) {
+        if (endDateStr.includes('T')) {
+          endDate = new Date(endDateStr);
         } else {
-          endDate = new Date(event.end_date + 'T00:00:00Z');
+          endDate = new Date(endDateStr + 'T00:00:00');
         }
       } else {
         endDate = new Date();
@@ -106,30 +110,45 @@ const QuickEventEditModal = ({ isOpen, onClose, onSuccess, event }) => {
     try {
       // Validate required fields
       if (!formData.title.trim()) {
-        throw new Error('Bitte geben Sie einen Event-Namen ein');
+        throw new Error('Bitte geben Sie einen Namen für die Veranstaltung ein');
       }
 
-      // Combine date and time
+      // Combine date and time - ensure proper ISO format
       const startDatetime = `${formData.event_start_date}T${formData.event_start_time}:00`;
       const endDatetime = `${formData.event_end_date}T${formData.event_end_time}:00`;
+      
+      // Convert to ISO string to ensure proper timezone handling
+      const startDateObj = new Date(startDatetime);
+      const endDateObj = new Date(endDatetime);
+      
+      // Use ISO strings for database
+      const startDatetimeISO = startDateObj.toISOString();
+      const endDatetimeISO = endDateObj.toISOString();
 
       // Validate dates
-      const startDate = new Date(startDatetime);
-      const endDate = new Date(endDatetime);
-
-      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) {
         throw new Error('Ungültige Datums- oder Zeitangaben');
       }
 
-      if (startDate >= endDate) {
+      if (startDateObj >= endDateObj) {
         throw new Error('Das Enddatum muss nach dem Startdatum liegen');
       }
+      
       // Update title and date/time
-      await eventsAPI.update(event.id, {
+      // Update start_date and end_date (events table may not have exact_start_datetime/exact_end_datetime)
+      const updateData = {
         title: formData.title.trim(),
-        start_date: startDatetime,
-        end_date: endDatetime
-      });
+        start_date: startDatetimeISO,
+        end_date: endDatetimeISO
+      }
+      
+      // Only add exact fields if they exist in the event (for event_requests compatibility)
+      if (event.exact_start_datetime !== undefined || event.exact_end_datetime !== undefined) {
+        updateData.exact_start_datetime = startDatetimeISO
+        updateData.exact_end_datetime = endDatetimeISO
+      }
+      
+      await eventsAPI.update(event.id, updateData);
       // Show success message
       setSuccess(true);
       
@@ -138,13 +157,18 @@ const QuickEventEditModal = ({ isOpen, onClose, onSuccess, event }) => {
         onSuccess();
       }
       
+      // Also dispatch refresh event for calendar
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('refreshCalendar'))
+      }
+      
       // Wait a moment to show success message, then close
       setTimeout(() => {
         if (onClose) onClose();
       }, 1000);
 
     } catch (err) {
-      setError(err.message || 'Fehler beim Aktualisieren des Events');
+      setError(err.message || 'Fehler beim Aktualisieren der Veranstaltung');
     } finally {
       setLoading(false);
     }
@@ -152,28 +176,43 @@ const QuickEventEditModal = ({ isOpen, onClose, onSuccess, event }) => {
 
   if (!isOpen) return null;
 
+  // MOBILE RESPONSIVE: Modal with proper mobile sizing and touch-friendly interactions
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-2xl shadow-xl max-w-md w-full border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#4a4a4a]' : ''}`}>
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-3 md:p-4"
+      style={{ touchAction: 'pan-y', overscrollBehavior: 'contain' }}
+    >
+      <div 
+        className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-xl sm:rounded-2xl shadow-xl max-w-md w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#4a4a4a]' : ''}`}
+        style={{ 
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y',
+          overscrollBehavior: 'contain'
+        }}
+      >
         {/* Header */}
-        <div className={`flex items-center justify-between p-6 border-b border-[#A58C81] ${isDarkMode ? 'dark:border-[#EBE9E9]' : ''}`}>
-          <div>
-            <h2 className={`text-xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
+        {/* MOBILE RESPONSIVE: Header with responsive padding */}
+        <div className={`flex items-center justify-between p-4 sm:p-6 border-b border-[#A58C81] ${isDarkMode ? 'dark:border-[#EBE9E9]' : ''}`}>
+          <div className="flex-1 min-w-0 pr-2">
+            <h2 className={`text-lg sm:text-xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} truncate`}>
               {event?.title}
             </h2>
-            <p className={`text-sm mt-1 text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>
-              Event bearbeiten
+            <p className={`text-xs sm:text-sm mt-1 text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>
+              Veranstaltung bearbeiten
             </p>
           </div>
           <button
             onClick={onClose}
-            className={`p-2 hover:opacity-70 transition-opacity rounded-lg text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}
+            className={`min-w-[44px] min-h-[44px] p-2 hover:opacity-70 active:scale-95 transition-all rounded-lg text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} touch-manipulation flex items-center justify-center flex-shrink-0`}
+            aria-label="Schließen"
+            style={{ touchAction: 'manipulation' }}
           >
             <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        {/* MOBILE RESPONSIVE: Form with responsive padding */}
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
           {error && (
             <div className={`rounded-lg p-3 bg-red-50 ${isDarkMode ? 'dark:bg-red-900/20' : ''} border border-red-200 ${isDarkMode ? 'dark:border-red-800' : ''}`}>
               <p className={`text-sm text-red-600 ${isDarkMode ? 'dark:text-red-400' : ''}`}>{error}</p>
@@ -191,7 +230,7 @@ const QuickEventEditModal = ({ isOpen, onClose, onSuccess, event }) => {
           {/* Event Title */}
           <div>
             <label className={`block text-sm font-semibold mb-2 text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
-              Event-Name *
+              Veranstaltungs-Name *
             </label>
             <input
               type="text"
@@ -199,8 +238,9 @@ const QuickEventEditModal = ({ isOpen, onClose, onSuccess, event }) => {
               value={formData.title}
               onChange={handleChange}
               required
-              className={`w-full px-3 py-2 border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
-              placeholder="Event-Name eingeben"
+              className={`w-full px-3 py-2 min-h-[44px] text-base border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+              style={{ fontSize: '16px' }}
+              placeholder="Veranstaltungs-Name eingeben"
             />
           </div>
 
@@ -209,14 +249,16 @@ const QuickEventEditModal = ({ isOpen, onClose, onSuccess, event }) => {
             <label className={`block text-sm font-semibold mb-2 text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
               Von *
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            {/* MOBILE RESPONSIVE: Stack on mobile, side-by-side on desktop */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <input
                 type="date"
                 name="event_start_date"
                 value={formData.event_start_date}
                 onChange={handleChange}
                 required
-                className={`w-full px-3 py-2 border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+                className={`w-full px-3 py-2 min-h-[44px] text-base border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+              style={{ fontSize: '16px' }}
               />
               <input
                 type="time"
@@ -224,7 +266,8 @@ const QuickEventEditModal = ({ isOpen, onClose, onSuccess, event }) => {
                 value={formData.event_start_time}
                 onChange={handleChange}
                 required
-                className={`w-full px-3 py-2 border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+                className={`w-full px-3 py-2 min-h-[44px] text-base border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+              style={{ fontSize: '16px' }}
               />
             </div>
           </div>
@@ -234,14 +277,16 @@ const QuickEventEditModal = ({ isOpen, onClose, onSuccess, event }) => {
             <label className={`block text-sm font-semibold mb-2 text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
               Bis *
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            {/* MOBILE RESPONSIVE: Stack on mobile, side-by-side on desktop */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <input
                 type="date"
                 name="event_end_date"
                 value={formData.event_end_date}
                 onChange={handleChange}
                 required
-                className={`w-full px-3 py-2 border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+                className={`w-full px-3 py-2 min-h-[44px] text-base border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+              style={{ fontSize: '16px' }}
               />
               <input
                 type="time"
@@ -249,25 +294,28 @@ const QuickEventEditModal = ({ isOpen, onClose, onSuccess, event }) => {
                 value={formData.event_end_time}
                 onChange={handleChange}
                 required
-                className={`w-full px-3 py-2 border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+                className={`w-full px-3 py-2 min-h-[44px] text-base border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+              style={{ fontSize: '16px' }}
               />
             </div>
           </div>
 
-          {/* Buttons */}
-          <div className={`flex justify-end gap-3 pt-4 border-t border-[#A58C81] ${isDarkMode ? 'dark:border-[#EBE9E9]' : ''}`}>
+          {/* MOBILE RESPONSIVE: Buttons stack on mobile, side-by-side on desktop */}
+          <div className={`flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-[#A58C81] ${isDarkMode ? 'dark:border-[#EBE9E9]' : ''}`}>
             <button
               type="button"
               onClick={onClose}
               disabled={loading}
-              className={`px-4 py-2 text-sm font-medium rounded-lg border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} hover:bg-gray-50 ${isDarkMode ? 'dark:hover:bg-[#1a1a1a]' : ''} transition-colors`}
+              className={`w-full sm:w-auto px-4 py-2 min-h-[44px] text-base font-medium rounded-lg border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} hover:bg-gray-50 ${isDarkMode ? 'dark:hover:bg-[#1a1a1a]' : ''} active:scale-95 transition-all touch-manipulation`}
+              style={{ touchAction: 'manipulation' }}
             >
               Abbrechen
             </button>
             <button
               type="submit"
               disabled={loading || success}
-              className={`px-4 py-2 text-sm font-medium text-white rounded-lg ${success ? 'bg-green-600' : 'bg-[#A58C81]'} ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} hover:opacity-90 disabled:opacity-50 flex items-center transition-opacity`}
+              className={`w-full sm:w-auto px-4 py-2 min-h-[44px] text-base font-medium text-white rounded-lg ${success ? 'bg-green-600' : 'bg-[#A58C81]'} ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} hover:opacity-90 active:scale-95 disabled:opacity-50 flex items-center justify-center transition-all touch-manipulation`}
+              style={{ touchAction: 'manipulation' }}
             >
               {loading ? (
                 <>

@@ -12,7 +12,6 @@ import SimpleMonthCalendar from '../components/Calendar/SimpleMonthCalendar'
 import TypewriterText from '../components/UI/TypewriterText'
 import NextEventInfo from '../components/UI/NextEventInfo'
 import ClubStatusIndicator from '../components/UI/ClubStatusIndicator'
-import { getActiveSpecialEvents } from '../services/specialEventsApi'
 import PublicEventRequestForm from '../components/Calendar/PublicEventRequestForm'
 import GuestOrRegisterModal from '../components/Calendar/GuestOrRegisterModal'
 
@@ -23,7 +22,6 @@ const HomePage = () => {
   const [showPublicRequestForm, setShowPublicRequestForm] = useState(false)
   const [showGuestOrRegister, setShowGuestOrRegister] = useState(false)
   const [selectedDate, setSelectedDate] = useState(null)
-  const [specialEvents, setSpecialEvents] = useState([])
   const [currentDate, setCurrentDate] = useState(new Date())
 
   const handleFirstTextComplete = () => {
@@ -74,14 +72,6 @@ const HomePage = () => {
     }
   }, [user])
 
-  // Load active special events (cached) for CTA target
-  useEffect(() => {
-    let mounted = true
-    getActiveSpecialEvents({ useCache: true })
-      .then(list => { if (mounted) setSpecialEvents(list || []) })
-      .catch(() => {})
-    return () => { mounted = false }
-  }, [])
 
   return (
     <div className="min-h-screen">
@@ -136,15 +126,6 @@ const HomePage = () => {
               <ClubStatusIndicator />
             </div>
 
-            {/* Mobile Special Events CTA: always visible on home */}
-            <div className="mt-4 md:hidden">
-              <Link
-                to="/kostuemwettbewerb-ergebnisse"
-                className="inline-flex items-center justify-center px-4 py-3 text-base font-semibold text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg shadow-md w-full"
-              >
-                Kostümwettbewerb Ergebnisse
-              </Link>
-            </div>
           </div>
         </div>
       </div>
@@ -177,26 +158,18 @@ const HomePage = () => {
               className="group inline-flex items-center justify-center px-[7vw] sm:px-[5.5vw] md:px-[4.5vw] lg:px-[3.5vw] py-[2.2vh] sm:py-[2vh] md:py-[1.8vh] text-[3.2vw] sm:text-[2.7vw] md:text-[2.2vw] lg:text-[1.8vw] xl:text-[1.5vw] font-semibold text-white bg-[#6054d9] hover:bg-[#4f44c7] dark:bg-[#6054d9] dark:hover:bg-[#4f44c7] rounded-lg transition-colors duration-200 shadow-xl"
             >
               <Calendar className="h-[4.5vw] sm:h-[4vw] md:h-[3.5vw] lg:h-[2.8vw] xl:h-[2.2vw] w-[4.5vw] sm:w-[4vw] md:w-[3.5vw] lg:w-[2.8vw] xl:w-[2.2vw] mr-[2vw] sm:mr-[1.8vw] md:mr-[1.5vw] lg:mr-[1.2vw]" />
-              Event anfragen
+              Veranstaltung anfragen
             </button>
-            <div className="mt-3 flex items-center justify-center gap-[1vw]">
-              <span className={`text-[2.2vw] sm:text-[1.8vw] md:text-[1.4vw] lg:text-[1.1vw] xl:text-[0.9vw] text-[#252422] dark:text-[#F4F1E8]`}>
+            <div className="mt-3 flex items-baseline justify-center gap-[1vw] flex-wrap">
+              <span className={`inline-block text-[2.2vw] sm:text-[1.8vw] md:text-[1.4vw] lg:text-[1.1vw] xl:text-[0.9vw] text-[#252422] dark:text-[#F4F1E8]`} style={{ lineHeight: '1' }}>
                 oder
               </span>
               <Link 
                 to="/event-tracking"
-                className={`text-[2.5vw] sm:text-[2vw] md:text-[1.6vw] lg:text-[1.3vw] xl:text-[1.1vw] font-medium text-[#252422] dark:text-[#F4F1E8] hover:text-[#A58C81] dark:hover:text-[#EBE9E9] transition-colors underline decoration-2 underline-offset-4 decoration-[#A58C81] dark:decoration-[#EBE9E9]`}
+                className={`inline-block text-[2.2vw] sm:text-[1.8vw] md:text-[1.4vw] lg:text-[1.1vw] xl:text-[0.9vw] font-medium text-[#252422] dark:text-[#F4F1E8] hover:text-[#A58C81] dark:hover:text-[#EBE9E9] transition-colors underline decoration-2 underline-offset-2 decoration-[#A58C81] dark:decoration-[#EBE9E9]`}
+                style={{ lineHeight: '1' }}
               >
                 Status verfolgen
-              </Link>
-              <span className={`text-[2.2vw] sm:text-[1.8vw] md:text-[1.4vw] lg:text-[1.1vw] xl:text-[0.9vw] text-[#252422] dark:text-[#F4F1E8]`}>
-                oder
-              </span>
-              <Link 
-                to="/kostuemwettbewerb-ergebnisse"
-                className={`text-[2.5vw] sm:text-[2vw] md:text-[1.6vw] lg:text-[1.3vw] xl:text-[1.1vw] font-medium text-[#252422] dark:text-[#F4F1E8] hover:text-[#A58C81] dark:hover:text-[#EBE9E9] transition-colors underline decoration-2 underline-offset-4 decoration-[#A58C81] dark:decoration-[#EBE9E9]`}
-              >
-                Ergebnisse ansehen
               </Link>
             </div>
           </div>
@@ -207,12 +180,12 @@ const HomePage = () => {
       <div className="w-full h-[0.5vh] sm:h-[0.8vh] md:h-[1vh] lg:h-[1.2vh] xl:h-[1.5vh] 2xl:h-[1.8vh] bg-[#F4F1E8] dark:bg-[#252422]"></div>
 
       {/* Main Content */}
-      <div className="w-full px-[2vw] sm:px-[3vw] md:px-[4vw] lg:px-[5vw] xl:px-[6vw] py-[1vh] sm:py-[1.5vh] md:py-[2vh] lg:py-[2.5vh] xl:py-[3vh] 2xl:py-[3.5vh] bg-[#F4F1E8] dark:bg-[#252422]">
-        <div className="mx-auto space-y-[0.5vh] sm:space-y-[0.8vh] md:space-y-[1vh] lg:space-y-[1.2vh] xl:space-y-[1.5vh] 2xl:space-y-[1.8vh] max-w-[98vw] sm:max-w-[95vw] md:max-w-[90vw] lg:max-w-[85vw] xl:max-w-[80vw] 2xl:max-w-[75vw]">
+      <div className="w-full px-4 sm:px-[3vw] md:px-[4vw] lg:px-[5vw] xl:px-[6vw] py-4 sm:py-[1.5vh] md:py-[2vh] lg:py-[2.5vh] xl:py-[3vh] 2xl:py-[3.5vh] bg-[#F4F1E8] dark:bg-[#252422]">
+        <div className="mx-auto space-y-3 sm:space-y-[0.8vh] md:space-y-[1vh] lg:space-y-[1.2vh] xl:space-y-[1.5vh] 2xl:space-y-[1.8vh] max-w-[98vw] sm:max-w-[95vw] md:max-w-[90vw] lg:max-w-[85vw] xl:max-w-[80vw] 2xl:max-w-[75vw]">
           {/* Calendar Section */}
-          <div className="bg-white dark:bg-[#252422] rounded-2xl shadow-xl p-[2vw] sm:p-[1.5vw] md:p-[1vw] lg:p-[0.8vw] xl:p-[0.6vw] 2xl:p-[0.5vw] relative border-2 border-[#A58C81] dark:border-[#EBE9E9]">
+          <div className="bg-white dark:bg-[#252422] rounded-2xl sm:rounded-2xl shadow-xl p-4 sm:p-[1.5vw] md:p-[1vw] lg:p-[0.8vw] xl:p-[0.6vw] 2xl:p-[0.5vw] relative border-2 border-[#A58C81] dark:border-[#EBE9E9]">
             {/* Make calendar header usable on small screens */}
-            <div className="w-full touch-pan-x">
+            <div className="w-full touch-pan-x" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y pinch-zoom' }}>
               <SimpleMonthCalendar 
                 currentDate={currentDate}
                 onNavigate={(date) => setCurrentDate(date)}

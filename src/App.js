@@ -14,6 +14,8 @@ import FAQPage from './pages/FAQPage'
 import ContactPage from './pages/ContactPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import ProfilePage from './pages/ProfilePage'
 import EventRequestTrackingPage from './pages/EventRequestTrackingPage'
 import EmailConfirmationHandler from './components/Auth/EmailConfirmationHandler'
@@ -22,7 +24,6 @@ import SpecialEventsPage from './pages/SpecialEventsPage'
 import SpecialEventDetailPage from './pages/SpecialEventDetailPage'
 import CostumeContestResultsPage from './pages/CostumeContestResultsPage'
 import './index.css'
-// import { Analytics } from '@vercel/analytics/react' // Commented out - package not installed
 import { prefetchActiveSpecialEvents } from './services/specialEventsApi'
 
 // Protected Route Component
@@ -43,7 +44,7 @@ const ProtectedRoute = ({ children, requireAuth = true, requireAdmin = false }) 
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-        <p className="ml-3 text-gray-600">Loading...</p>
+        <p className="ml-3 text-gray-600">Wird geladen...</p>
       </div>
     )
   }
@@ -74,13 +75,16 @@ const AppContent = () => {
     prefetchActiveSpecialEvents()
   }, [])
 
-  // Check if URL has email confirmation
+  // Check if URL has email confirmation (but not password recovery)
   const urlParams = new URLSearchParams(window.location.search);
-  const hasConfirmation = urlParams.has('token') || 
+  const hashParams = new URLSearchParams(window.location.hash.substring(1));
+  const type = hashParams.get('type') || urlParams.get('type');
+  const isRecovery = type === 'recovery';
+  const hasConfirmation = (urlParams.has('token') || 
                          urlParams.has('type') || 
-                         window.location.hash.includes('access_token');
+                         window.location.hash.includes('access_token')) && !isRecovery;
 
-  // Show confirmation handler if coming from email
+  // Show confirmation handler if coming from email (but not recovery)
   if (hasConfirmation) {
     return (
       <Router>
@@ -103,12 +107,14 @@ const AppContent = () => {
         <Route path="/kostuemwettbewerb-ergebnisse" element={<Layout><CostumeContestResultsPage /></Layout>} />
         
         {/* Test Route */}
-        <Route path="/test" element={<div>Test Route Works!</div>} />
+        <Route path="/test" element={<div>Test-Route funktioniert!</div>} />
         <Route path="/admin-test" element={<Layout><AdminPanelClean /></Layout>} />
         
         {/* Auth Routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         
         {/* Protected Routes */}
         <Route 

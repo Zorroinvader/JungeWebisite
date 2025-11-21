@@ -20,7 +20,8 @@ test.describe('Expanded Visual Regression Tests', () => {
   test.describe('Forms', () => {
     test('event request form should match baseline', async ({ page }) => {
       await page.goto(`${baseURL}/event-tracking`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
       
       await expect(page).toHaveScreenshot('event-request-form.png', {
         fullPage: true,
@@ -30,7 +31,8 @@ test.describe('Expanded Visual Regression Tests', () => {
 
     test('login form should match baseline', async ({ page }) => {
       await page.goto(`${baseURL}/login`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
       
       await expect(page).toHaveScreenshot('login-form.png', {
         fullPage: true,
@@ -40,7 +42,8 @@ test.describe('Expanded Visual Regression Tests', () => {
 
     test('registration form should match baseline', async ({ page }) => {
       await page.goto(`${baseURL}/register`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
       
       await expect(page).toHaveScreenshot('registration-form.png', {
         fullPage: true,
@@ -50,7 +53,8 @@ test.describe('Expanded Visual Regression Tests', () => {
 
     test('profile form should match baseline', async ({ page }) => {
       await page.goto(`${baseURL}/profile`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
       
       await expect(page).toHaveScreenshot('profile-form.png', {
         fullPage: true,
@@ -62,10 +66,10 @@ test.describe('Expanded Visual Regression Tests', () => {
   test.describe('Calendar Views', () => {
     test('calendar month view should match baseline', async ({ page }) => {
       await page.goto(`${baseURL}/`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
       
       // Wait for calendar to render
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(3000);
       
       await expect(page).toHaveScreenshot('calendar-month-view.png', {
         fullPage: true,
@@ -76,8 +80,8 @@ test.describe('Expanded Visual Regression Tests', () => {
     test('calendar mobile view should match baseline', async ({ page }) => {
       await page.setViewportSize({ width: 375, height: 667 });
       await page.goto(`${baseURL}/`);
-      await page.waitForLoadState('networkidle');
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(3000);
       
       await expect(page).toHaveScreenshot('calendar-mobile-view.png', {
         fullPage: true,
@@ -89,7 +93,8 @@ test.describe('Expanded Visual Regression Tests', () => {
   test.describe('Modals and Dialogs', () => {
     test('event details modal should match baseline', async ({ page }) => {
       await page.goto(`${baseURL}/`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
       
       // Try to find and click an event to open modal
       const eventElement = page.locator('.rbc-event, [data-event], .calendar-event').first();
@@ -108,7 +113,8 @@ test.describe('Expanded Visual Regression Tests', () => {
 
     test('confirmation dialog should match baseline', async ({ page }) => {
       await page.goto(`${baseURL}/admin`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
       
       // Try to trigger a confirmation dialog
       const deleteButton = page.locator('button:has-text("Delete"), button[aria-label*="delete"]').first();
@@ -129,7 +135,8 @@ test.describe('Expanded Visual Regression Tests', () => {
   test.describe('User Profile Pages', () => {
     test('profile page should match baseline', async ({ page }) => {
       await page.goto(`${baseURL}/profile`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
       
       await expect(page).toHaveScreenshot('profile-page.png', {
         fullPage: true,
@@ -140,7 +147,8 @@ test.describe('Expanded Visual Regression Tests', () => {
     test('profile page mobile view should match baseline', async ({ page }) => {
       await page.setViewportSize({ width: 375, height: 667 });
       await page.goto(`${baseURL}/profile`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
       
       await expect(page).toHaveScreenshot('profile-page-mobile.png', {
         fullPage: true,
@@ -152,7 +160,8 @@ test.describe('Expanded Visual Regression Tests', () => {
   test.describe('Admin Panels', () => {
     test('admin panel should match baseline', async ({ page }) => {
       await page.goto(`${baseURL}/admin`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
       
       await expect(page).toHaveScreenshot('admin-panel.png', {
         fullPage: true,
@@ -162,7 +171,7 @@ test.describe('Expanded Visual Regression Tests', () => {
 
     test('event requests list should match baseline', async ({ page }) => {
       await page.goto(`${baseURL}/admin`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
       
       // Wait for requests to load
       await page.waitForTimeout(2000);
@@ -177,7 +186,8 @@ test.describe('Expanded Visual Regression Tests', () => {
   test.describe('Special Events Pages', () => {
     test('special events page should match baseline', async ({ page }) => {
       await page.goto(`${baseURL}/special-events`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
       
       await expect(page).toHaveScreenshot('special-events-page.png', {
         fullPage: true,
@@ -187,13 +197,15 @@ test.describe('Expanded Visual Regression Tests', () => {
 
     test('special event detail page should match baseline', async ({ page }) => {
       await page.goto(`${baseURL}/special-events`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
       
       // Try to click on an event
       const eventLink = page.locator('a[href*="/special-events/"], .event-card, .event-item').first();
       if (await eventLink.isVisible({ timeout: 5000 }).catch(() => false)) {
         await eventLink.click();
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('domcontentloaded');
+        await page.waitForTimeout(2000);
         
         await expect(page).toHaveScreenshot('special-event-detail.png', {
           fullPage: true,
@@ -206,7 +218,8 @@ test.describe('Expanded Visual Regression Tests', () => {
   test.describe('Error States', () => {
     test('404 error page should match baseline', async ({ page }) => {
       await page.goto(`${baseURL}/non-existent-page`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
       
       await expect(page).toHaveScreenshot('404-error-page.png', {
         fullPage: true,
@@ -216,7 +229,8 @@ test.describe('Expanded Visual Regression Tests', () => {
 
     test('form validation errors should match baseline', async ({ page }) => {
       await page.goto(`${baseURL}/login`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
       
       // Submit form without filling it to trigger validation errors
       const submitButton = page.locator('button[type="submit"]').first();
@@ -253,7 +267,8 @@ test.describe('Expanded Visual Regression Tests', () => {
     test('tablet view should match baseline', async ({ page }) => {
       await page.setViewportSize({ width: 768, height: 1024 });
       await page.goto(`${baseURL}/`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(3000);
       
       await expect(page).toHaveScreenshot('homepage-tablet.png', {
         fullPage: true,
@@ -264,7 +279,8 @@ test.describe('Expanded Visual Regression Tests', () => {
     test('desktop large view should match baseline', async ({ page }) => {
       await page.setViewportSize({ width: 1920, height: 1080 });
       await page.goto(`${baseURL}/`);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(3000);
       
       await expect(page).toHaveScreenshot('homepage-desktop-large.png', {
         fullPage: true,

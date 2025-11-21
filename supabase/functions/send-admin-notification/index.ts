@@ -11,13 +11,36 @@ declare global {
   }
 }
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+// CORS configuration with origin whitelist
+const getAllowedOrigins = () => {
+  const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
+  if (envOrigins) {
+    return envOrigins.split(',').map(o => o.trim())
+  }
+  return [
+    Deno.env.get('ALLOWED_ORIGIN') || 'https://your-production-domain.com',
+    'http://localhost:3000', // Development
+  ]
+}
+
+const getCorsHeaders = (req: Request) => {
+  const allowedOrigins = getAllowedOrigins()
+  const origin = req.headers.get('origin')
+  const corsOrigin = origin && allowedOrigins.includes(origin) 
+    ? origin 
+    : allowedOrigins[0]
+  
+  return {
+    'Access-Control-Allow-Origin': corsOrigin,
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Credentials': 'true',
+  }
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req)
+  
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -111,11 +134,13 @@ Deno.serve(async (req) => {
     )
 
   } catch (error) {
+    const isProduction = Deno.env.get('ENVIRONMENT') === 'production'
+    
     return new Response(
       JSON.stringify({ 
         success: false, 
         error: error.message,
-        details: error.stack 
+        ...(isProduction ? {} : { details: error.stack })
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

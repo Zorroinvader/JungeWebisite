@@ -20,17 +20,25 @@ const EventRequestManagement = () => {
   const loadRequests = async () => {
     try {
       setLoading(true)
-      const allRequests = await eventRequestsAPI.getAll()
+      
+      // Add timeout wrapper to prevent hanging
+      const loadPromise = eventRequestsAPI.getAll()
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Lade-Timeout')), 4000)
+      )
+      
+      const allRequests = await Promise.race([loadPromise, timeoutPromise])
+      const requestsArray = Array.isArray(allRequests) ? allRequests : []
       
       // Filter by status if not 'all'
       const filteredRequests = filter === 'all' 
-        ? allRequests 
-        : allRequests.filter(request => request.status === filter)
-      
+        ? requestsArray 
+        : requestsArray.filter(request => request.status === filter)
       
       setRequests(filteredRequests || [])
     } catch (err) {
-      setError('Fehler beim Laden der Event-Anfragen')
+      setError('Fehler beim Laden der Veranstaltungs-Anfragen')
+      setRequests([])
     } finally {
       setLoading(false)
     }
@@ -50,7 +58,7 @@ const EventRequestManagement = () => {
       await eventRequestsAPI.update(requestId, {
         status: 'approved',
         reviewed_by: 'admin',
-        review_notes: 'Event approved by admin',
+        review_notes: 'Veranstaltung von Admin genehmigt',
         updated_at: new Date().toISOString()
       })
 
@@ -169,7 +177,7 @@ const EventRequestManagement = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">Event-Anfragen verwalten</h2>
+          <h2 className="text-xl font-semibold text-gray-900">Veranstaltungs-Anfragen verwalten</h2>
           <p className="text-sm text-gray-600">
             {requests.length} Anfrage{requests.length !== 1 ? 'n' : ''} gefunden
           </p>
@@ -226,7 +234,7 @@ const EventRequestManagement = () => {
           <h3 className="mt-2 text-sm font-medium text-gray-900">Keine Anfragen</h3>
           <p className="mt-1 text-sm text-gray-500">
             {filter === 'all' 
-              ? 'Es sind keine Event-Anfragen vorhanden.'
+              ? 'Es sind keine Veranstaltungs-Anfragen vorhanden.'
               : `Es sind keine ${getStatusLabel(filter).toLowerCase()} Anfragen vorhanden.`
             }
           </p>
@@ -452,12 +460,23 @@ const ReviewModal = ({ request, onClose, onApprove, onReject }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    {/* MOBILE RESPONSIVE: Modal with proper mobile sizing */}
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-3 md:p-4 z-50"
+      style={{ touchAction: 'pan-y', overscrollBehavior: 'contain' }}
+    >
+      <div 
+        className="bg-white rounded-xl sm:rounded-lg max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto"
+        style={{ 
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y',
+          overscrollBehavior: 'contain'
+        }}
+      >
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold text-gray-900">
-              Event-Anfrage bewerten
+              Veranstaltungs-Anfrage bewerten
             </h2>
             <button
               onClick={onClose}

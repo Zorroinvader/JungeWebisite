@@ -3,80 +3,56 @@
 // - Used by: HomePage and other public pages
 // - Notes: Shows German messages based on device status
 
-import React, { useState, useEffect } from 'react'
-import { supabase } from '../../lib/supabase'
+import React, { useState, useEffect, useCallback } from 'react'
+import { getSupabaseUrl, getSupabaseAnonKey, secureLog, sanitizeError } from '../../utils/secureConfig'
 import { useDarkMode } from '../../contexts/DarkModeContext'
 
 const ClubStatusIndicator = () => {
   const { isDarkMode } = useDarkMode()
   const [isOccupied, setIsOccupied] = useState(false)
-  const [message, setMessage] = useState('Niemand ist gerade im Club')
+  const [message, setMessage] = useState('Fehler beim Abrufen der Anwesenheit')
   const [isLoading, setIsLoading] = useState(true)
-  const [lastChecked, setLastChecked] = useState(null)
 
-  useEffect(() => {
-    // Fetch initial status
-    fetchStatus()
-
-    // Set up realtime subscription to listen for changes
-    const channel = supabase
-      .channel('club_status_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'club_status'
-        },
-        (payload) => {
-          console.log('Club status changed:', payload)
-          if (payload.new) {
-            setIsOccupied(payload.new.is_occupied)
-            setMessage(payload.new.message || 'Niemand ist gerade im Club')
-            setLastChecked(payload.new.last_checked)
-          } else {
-            fetchStatus()
-          }
-        }
-      )
-      .subscribe()
-
-    // Poll every 30 seconds as backup (in case realtime fails)
-    const interval = setInterval(() => {
-      fetchStatus()
-    }, 30000)
-
-    return () => {
-      supabase.removeChannel(channel)
-      clearInterval(interval)
-    }
-  }, [])
-
-  const fetchStatus = async () => {
+  // Call edge function for device check and update label based on result
+  const checkDevices = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('club_status')
-        .select('is_occupied, has_new_devices, message, last_checked')
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .single()
+      setIsLoading(true)
+      const supabaseUrl = getSupabaseUrl()
+      const supabaseAnonKey = getSupabaseAnonKey()
+      
+      const response = await fetch(`${supabaseUrl}/functions/v1/check-devices`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`
+        }
+      })
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching club status:', error)
-        return
+      if (!response.ok) {
+        throw new Error(`Failed to check devices: ${response.statusText}`)
       }
 
-      if (data) {
+      const data = await response.json()
+      
+      // Update label based on edge request result
+      if (data.success) {
         setIsOccupied(data.is_occupied)
-        setMessage(data.message || 'Niemand ist gerade im Club')
-        setLastChecked(data.last_checked)
+        setMessage(data.message || 'aktuell ist niemand im Club')
       }
     } catch (error) {
-      console.error('Error fetching club status:', error)
+      secureLog('error', '[ClubStatusIndicator] Error checking devices', { error: sanitizeError(error) })
+      // Keep default message on error
+      setIsOccupied(false)
+      setMessage('Fehler beim Abrufen der Anwesenheit')
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    // Call edge function when site is opened
+    checkDevices()
+  }, [checkDevices])
 
   if (isLoading) {
     return (
@@ -96,7 +72,7 @@ const ClubStatusIndicator = () => {
             ? 'bg-green-500 shadow-lg shadow-green-500/50'
             : 'bg-red-500 shadow-lg shadow-red-500/50'
         }`}
-        title={isOccupied ? 'Jemand ist im Club' : 'Niemand ist gerade im Club'}
+        title={isOccupied ? 'aktuell ist jemand im club' : 'aktuell ist niemand im Club'}
       />
       
       {/* Status text */}

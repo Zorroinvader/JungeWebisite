@@ -27,7 +27,7 @@ const FAQPage = () => {
     },
     {
       question: "Kann ich den Pferdestall für private Feiern mieten?",
-      answer: "Ja, der Pferdestall kann für private Feiern gemietet werden. Bitte kontaktieren Sie uns über das Event-Anfrage-Formular auf unserer Website oder per E-Mail, um Verfügbarkeit und Konditionen zu besprechen."
+      answer: "Ja, der Pferdestall kann für private Feiern gemietet werden. Bitte kontaktieren Sie uns über das Veranstaltungs-Anfrage-Formular auf unserer Website oder per E-Mail, um Verfügbarkeit und Konditionen zu besprechen."
     },
     {
       question: "Gibt es Altersbeschränkungen?",
@@ -35,7 +35,7 @@ const FAQPage = () => {
     },
     {
       question: "Wie kann ich mich über aktuelle Veranstaltungen informieren?",
-      answer: "Sie können sich über unseren Event-Kalender auf der Website informieren oder uns per E-Mail kontaktieren. Wir senden auch regelmäßig Newsletter mit aktuellen Informationen an unsere Mitglieder."
+      answer: "Sie können sich über unseren Veranstaltungs-Kalender auf der Website informieren oder uns per E-Mail kontaktieren. Wir senden auch regelmäßig Newsletter mit aktuellen Informationen an unsere Mitglieder."
     },
     {
       question: "Welche Kosten entstehen für die Mitgliedschaft?",
@@ -187,7 +187,7 @@ const FAQPage = () => {
                   <div className="flex items-center mb-6">
                     <Calendar className="h-8 w-8 mr-4 text-[#A58C81]" />
                     <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                      Event-Anfrage
+                      Veranstaltungs-Anfrage
                     </h3>
                   </div>
                   <p className="text-lg text-gray-700 dark:text-gray-300 mb-6">
@@ -206,7 +206,7 @@ const FAQPage = () => {
                     className="inline-flex items-center px-6 py-3 bg-[#252422] hover:bg-[#A58C81] text-white rounded-xl transition-colors font-semibold"
                   >
                     <Calendar className="h-5 w-5 mr-2" />
-                    Event anfragen
+                    Veranstaltung anfragen
                   </button>
                 </div>
               </div>

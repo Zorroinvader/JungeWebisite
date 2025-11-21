@@ -4,7 +4,7 @@
 // - Notes: Production library file. Core dependency; uses secureConfig for safe key access.
 
 import { createClient } from '@supabase/supabase-js'
-import { getSupabaseUrl, getSupabaseAnonKey } from '../utils/secureConfig'
+import { getSupabaseUrl, getSupabaseAnonKey, getSiteUrl } from '../utils/secureConfig'
 
 // SECURITY: Use secure getters to prevent key exposure
 const supabaseUrl = getSupabaseUrl()
@@ -16,7 +16,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
-    redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined
+    redirectTo: getSiteUrl()
   },
   db: {
     schema: 'public'

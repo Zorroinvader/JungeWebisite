@@ -12,6 +12,7 @@ import { useDarkMode } from '../../contexts/DarkModeContext'
 import httpAPI from '../../services/databaseApi'
 import EventDetailsModal from './EventDetailsModal'
 import PublicEventRequestForm from './PublicEventRequestForm'
+import EventListView from './EventListView'
 import { secureLog, sanitizeError } from '../../utils/secureConfig'
 
 // Set up moment.js for react-big-calendar
@@ -34,6 +35,7 @@ const SimpleMonthCalendar = ({
   const [selectedDate, setSelectedDate] = useState(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [calendarDate, setCalendarDate] = useState(currentDate || new Date())
+  const [isMobile, setIsMobile] = useState(false)
 
 
   // Load all events and requests - Optimized for calendar view
@@ -44,21 +46,43 @@ const SimpleMonthCalendar = ({
     }
     
     setIsRefreshing(true)
+    setLoading(true)
+    
     try {
-      setLoading(true)
       
       // Load all events (not just current month) to show all available events
       let allEvents = []
       
       try {
         // getAll() now uses Supabase client as primary with HTTP fallback built-in
-        const apiEvents = await httpAPI.events.getAll()
+        // executeWithFallback already has a 5s timeout, so just call it directly
+        const apiEventsResult = await httpAPI.events.getAll()
         
-        if (apiEvents && Array.isArray(apiEvents) && apiEvents.length > 0) {
-          allEvents = [...allEvents, ...apiEvents]
+        // Handle both { data, error } format and direct array
+        let apiEvents = apiEventsResult
+        if (apiEventsResult && typeof apiEventsResult === 'object') {
+          // If it's { data, error } format, extract data
+          if (apiEventsResult.data !== undefined) {
+            apiEvents = apiEventsResult.data
+          }
+          // If it's already an array, use it
+          else if (Array.isArray(apiEventsResult)) {
+            apiEvents = apiEventsResult
+          }
+        }
+        
+        // Ensure apiEvents is an array and add to allEvents
+        if (Array.isArray(apiEvents)) {
+          allEvents = apiEvents // Use the events from API
+        } else if (apiEvents) {
+          // If it's not an array but has data, try to convert
+          allEvents = Array.isArray(apiEvents) ? apiEvents : []
         }
       } catch (error) {
         secureLog('error', 'Failed to load events', sanitizeError(error))
+        // Set empty array on error to prevent stale data
+        allEvents = []
+        // Don't throw - continue with empty events
       }
       
       // Load pending requests (admin only) - DISABLED to remove requests from calendar
@@ -71,8 +95,15 @@ const SimpleMonthCalendar = ({
       //   }
       // }
       
-      // Load temporarily blocked dates (these show as orange blockers in calendar) - DISABLED for speed
-      const temporarilyBlocked = []
+      // Load temporarily blocked dates (these show as orange blockers in calendar)
+      // These are created when admin initially accepts a request to block the time slot
+      let temporarilyBlocked = []
+      try {
+        temporarilyBlocked = await httpAPI.blockedDates.getTemporarilyBlocked() || []
+      } catch (blockError) {
+        secureLog('warn', 'Failed to load temporarily blocked dates', sanitizeError(blockError))
+        temporarilyBlocked = []
+      }
       
       const calendarEvents = []
       
@@ -279,22 +310,57 @@ const SimpleMonthCalendar = ({
       secureLog('error', 'Failed to load calendar events', sanitizeError(error))
       setEvents([]) // Set empty array on error to prevent stale data
     } finally {
+      // Always clear loading state, even on error
       setLoading(false)
       setIsRefreshing(false)
     }
   }, [isAdmin, calendarDate, user, isRefreshing])
 
-  // Load events on component mount only - wait for auth to complete
+  // Detect mobile viewport - run FIRST to avoid loading calendar on mobile
   useEffect(() => {
+    const checkMobile = () => {
+      if (typeof window !== 'undefined') {
+        const mobile = window.innerWidth < 768 // md breakpoint
+        setIsMobile(mobile)
+        // If mobile, set loading to false immediately
+        if (mobile) {
+          setLoading(false)
+          setIsRefreshing(false)
+        }
+      }
+    }
+    
+    // Check immediately on mount
+    checkMobile()
+    
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', checkMobile)
+    }
+    
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('resize', checkMobile)
+      }
+    }
+  }, []) // Run only once on mount
+
+  // Load events on component mount - only for desktop (mobile uses EventListView)
+  useEffect(() => {
+    // Skip if mobile - EventListView handles its own loading
+    if (isMobile) {
+      return
+    }
+    
     let mounted = true
     
     const loadEventsSafely = async () => {
       // Load events regardless of authentication status
       // Events should be visible to all users (logged in or not)
-      if (mounted) {
+      if (mounted && !isMobile) {
         try {
           await loadAllEvents()
         } catch (error) {
+          secureLog('error', 'loadEventsSafely error', sanitizeError(error))
           if (mounted) {
             setLoading(false)
             setIsRefreshing(false)
@@ -303,23 +369,43 @@ const SimpleMonthCalendar = ({
       }
     }
 
-    // Load events immediately - no need to wait for auth
+    // Load events immediately for desktop
     loadEventsSafely()
     
-    // Safety timeout to prevent infinite loading - reduced to 3 seconds for faster response
-        const timeout = setTimeout(() => {
-          if (mounted) {
-            setLoading(false)
-            setIsRefreshing(false)
-          }
-        }, 1500) // 1.5 second timeout for faster loading
+    // Listen for custom refresh event (triggered by admin panel after final acceptance)
+    const handleRefreshCalendar = () => {
+      if (mounted && !isMobile) {
+        loadEventsSafely()
+      }
+    }
+    
+    if (typeof window !== 'undefined') {
+      window.addEventListener('refreshCalendar', handleRefreshCalendar)
+    }
+    
+    // No auto-refresh - events only load on mount and manual refresh
+    // User requested: events should only load when site is called, not while site is open
+    
+    // Safety timeout to prevent infinite loading
+    // This is a backup in case both Supabase client (5s) and HTTP fallback (5s) both fail
+    const timeout = setTimeout(() => {
+      if (mounted && !isMobile) {
+        secureLog('warn', 'Calendar loading timeout - forcing loading state to false')
+        setLoading(false)
+        setIsRefreshing(false)
+      }
+    }, 10000) // 10 second timeout (5s primary + 5s fallback + buffer)
     
     return () => {
       mounted = false
       clearTimeout(timeout)
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('refreshCalendar', handleRefreshCalendar)
+      }
     }
+    
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [isMobile]) // Only depend on isMobile, loadAllEvents is stable
 
   // Update calendar date when currentDate prop changes
   useEffect(() => {
@@ -418,7 +504,58 @@ const SimpleMonthCalendar = ({
 
 
 
-  if (loading) {
+  // Show list view on mobile, calendar on desktop
+  // Don't wait for loading on mobile - show list immediately
+  if (isMobile) {
+    return (
+      <div className="w-full">
+        <div className="mb-5 sm:mb-4 px-1">
+          <h2 className={`text-2xl sm:text-xl font-bold mb-2.5 sm:mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+            Bevorstehende Events
+          </h2>
+          <p className={`text-base sm:text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'} leading-relaxed`}>
+            Tippen Sie auf eine Veranstaltung für Details
+          </p>
+        </div>
+        <EventListView 
+          onEventClick={(event) => {
+            setSelectedEvent(event)
+            setShowEventDetails(true)
+          }}
+          onDateClick={onDateClick}
+        />
+        {showEventDetails && selectedEvent && (
+          <EventDetailsModal
+            event={selectedEvent}
+            isOpen={showEventDetails}
+            onClose={() => {
+              setShowEventDetails(false)
+              setSelectedEvent(null)
+            }}
+            onEventUpdated={() => {
+              loadAllEvents()
+              if (onEventUpdated) {
+                onEventUpdated()
+              }
+            }}
+          />
+        )}
+        {showEventRequestForm && (
+          <PublicEventRequestForm
+            isOpen={showEventRequestForm}
+            onClose={() => {
+              setShowEventRequestForm(false)
+              setSelectedDate(null)
+            }}
+            selectedDate={selectedDate}
+          />
+        )}
+      </div>
+    )
+  }
+
+  // Only show loading for desktop calendar view
+  if (loading && !isMobile) {
     return (
       <div style={{
         display: 'flex',
@@ -437,10 +574,10 @@ const SimpleMonthCalendar = ({
       {/* Legend */}
       <div className="mb-6">
         <h2 className={`text-2xl font-bold mb-3 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-          Event-Kalender
+          Veranstaltungs-Kalender
         </h2>
         <p className={`text-sm mb-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-          Klicken Sie auf einen Tag, um ein Event anzufragen (keine Anmeldung erforderlich!)
+          Klicken Sie auf einen Tag, um eine Veranstaltung anzufragen (keine Anmeldung erforderlich!)
         </p>
         <div className="flex flex-wrap gap-4">
           <div className="flex items-center space-x-2">

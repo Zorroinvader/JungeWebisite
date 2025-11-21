@@ -63,7 +63,7 @@ const NextEventInfo = () => {
       if (loading) {
         return (
           <div className="min-h-[6vw] sm:min-h-[5vw] md:min-h-[4vw] lg:min-h-[3vw] xl:min-h-[2.5vw] 2xl:min-h-[2vw] flex items-center">
-            <div className="animate-pulse text-[#252422] dark:text-[#F4F1E8] text-[2.5vw] sm:text-[2vw] md:text-[1.5vw] lg:text-[1.2vw] xl:text-[1vw] 2xl:text-[0.8vw]">
+            <div className="animate-pulse text-[#252422] dark:text-[#F4F1E8] text-[3vw] sm:text-[2vw] md:text-[1.5vw] lg:text-[1.2vw] xl:text-[1vw] 2xl:text-[0.8vw] leading-relaxed">
               Lade nächste Veranstaltung...
             </div>
           </div>
@@ -73,7 +73,7 @@ const NextEventInfo = () => {
       if (error) {
         return (
           <div className="min-h-[6vw] sm:min-h-[5vw] md:min-h-[4vw] lg:min-h-[3vw] xl:min-h-[2.5vw] 2xl:min-h-[2vw] flex items-center">
-            <div className="text-[#252422] dark:text-[#F4F1E8] text-[2.5vw] sm:text-[2vw] md:text-[1.5vw] lg:text-[1.2vw] xl:text-[1vw] 2xl:text-[0.8vw]">
+            <div className="text-[#252422] dark:text-[#F4F1E8] text-[3vw] sm:text-[2vw] md:text-[1.5vw] lg:text-[1.2vw] xl:text-[1vw] 2xl:text-[0.8vw] leading-relaxed break-words">
               Fehler beim Laden der Veranstaltungen
             </div>
           </div>
@@ -83,7 +83,7 @@ const NextEventInfo = () => {
       if (!nextEvent) {
         return (
           <div className="min-h-[6vw] sm:min-h-[5vw] md:min-h-[4vw] lg:min-h-[3vw] xl:min-h-[2.5vw] 2xl:min-h-[2vw] flex items-center">
-            <div className="text-[#252422] dark:text-[#F4F1E8] text-[2.5vw] sm:text-[2vw] md:text-[1.5vw] lg:text-[1.2vw] xl:text-[1vw] 2xl:text-[0.8vw]">
+            <div className="text-[#252422] dark:text-[#F4F1E8] text-[3vw] sm:text-[2vw] md:text-[1.5vw] lg:text-[1.2vw] xl:text-[1vw] 2xl:text-[0.8vw] leading-relaxed break-words">
               Keine kommenden Veranstaltungen geplant
             </div>
           </div>
@@ -92,14 +92,14 @@ const NextEventInfo = () => {
 
       return (
         <div className="min-h-[6vw] sm:min-h-[5vw] md:min-h-[4vw] lg:min-h-[3vw] xl:min-h-[2.5vw] 2xl:min-h-[2vw]">
-          <div className="space-y-[0.5vh] sm:space-y-[0.6vh] md:space-y-[0.7vh] text-right">
-            <h3 className="text-[3vw] sm:text-[2.5vw] md:text-[2vw] lg:text-[1.5vw] xl:text-[1.2vw] 2xl:text-[1vw] font-bold text-[#252422] dark:text-[#F4F1E8]">
+          <div className="space-y-[0.8vh] sm:space-y-[0.6vh] md:space-y-[0.7vh] text-right">
+            <h3 className="text-[3.5vw] sm:text-[2.5vw] md:text-[2vw] lg:text-[1.5vw] xl:text-[1.2vw] 2xl:text-[1vw] font-bold text-[#252422] dark:text-[#F4F1E8] leading-tight">
               Nächste Veranstaltung
             </h3>
-            <h4 className="text-[2.5vw] sm:text-[2vw] md:text-[1.6vw] lg:text-[1.3vw] xl:text-[1.1vw] 2xl:text-[0.9vw] font-semibold text-[#252422] dark:text-[#F4F1E8]">
+            <h4 className="text-[3vw] sm:text-[2vw] md:text-[1.6vw] lg:text-[1.3vw] xl:text-[1.1vw] 2xl:text-[0.9vw] font-semibold text-[#252422] dark:text-[#F4F1E8] leading-tight break-words">
               {nextEvent.title}
             </h4>
-            <div className="text-[1.8vw] sm:text-[1.5vw] md:text-[1.2vw] lg:text-[1vw] xl:text-[0.8vw] 2xl:text-[0.7vw] text-[#252422] dark:text-[#F4F1E8]">
+            <div className="text-[2.2vw] sm:text-[1.5vw] md:text-[1.2vw] lg:text-[1vw] xl:text-[0.8vw] 2xl:text-[0.7vw] text-[#252422] dark:text-[#F4F1E8] leading-relaxed">
               {formatDate(nextEvent.start_date)} um {formatTime(nextEvent.start_date)}
             </div>
           </div>

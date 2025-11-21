@@ -60,6 +60,37 @@ export const getSupabaseAnonKey = () => {
   return key
 }
 
+/**
+ * Get the site base URL for email redirects and links
+ * Uses production domain in production, current origin in development
+ * @returns {string} Base URL for the site
+ */
+export const getSiteUrl = () => {
+  // In browser, check if we're in development or production
+  if (typeof window !== 'undefined') {
+    const origin = window.location.origin
+    
+    // Development/localhost
+    if (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('192.168.')) {
+      return origin
+    }
+    
+    // Production - use the primary domain
+    // Primary: www.jg-wedeswedel.de
+    // Fallback: junge-webisite-mvn3.vercel.app
+    if (origin.includes('jg-wedeswedel.de') || origin.includes('junge-webisite-mvn3.vercel.app')) {
+      // Use the primary production domain
+      return 'https://www.jg-wedeswedel.de'
+    }
+    
+    // For any other production-like environment, use current origin
+    return origin
+  }
+  
+  // Fallback for server-side: use primary production domain
+  return 'https://www.jg-wedeswedel.de'
+}
+
 // ============================================================================
 // SECURITY VALIDATION
 // ============================================================================

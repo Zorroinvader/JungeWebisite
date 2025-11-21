@@ -44,8 +44,8 @@ BEGIN
     has_new_devices_value,
     COALESCE(message_value, 
       CASE 
-        WHEN has_new_devices_value THEN 'Neue Geräte die nicht zum Baseline gehören'
-        ELSE 'Außer den Baseline Geräten ist niemand im Club'
+        WHEN has_new_devices_value THEN 'aktuell ist jemand im club'
+        ELSE 'aktuell ist niemand im Club'
       END
     ),
     NOW(),
@@ -60,8 +60,8 @@ BEGIN
       has_new_devices_value,
       COALESCE(message_value, 
         CASE 
-          WHEN has_new_devices_value THEN 'Neue Geräte die nicht zum Baseline gehören'
-          ELSE 'Außer den Baseline Geräten ist niemand im Club'
+          WHEN has_new_devices_value THEN 'aktuell ist jemand im club'
+          ELSE 'aktuell ist niemand im Club'
         END
       ),
       NOW(),
@@ -104,7 +104,7 @@ CREATE POLICY "Allow service role to update club_status"
 
 -- Insert initial status
 INSERT INTO club_status (is_occupied, has_new_devices, message, last_checked) 
-VALUES (false, false, 'Außer den Baseline Geräten ist niemand im Club', NOW())
+VALUES (false, false, 'aktuell ist niemand im Club', NOW())
 ON CONFLICT DO NOTHING;
 ```
 
