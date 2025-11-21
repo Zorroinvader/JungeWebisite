@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Helper utilities for reading, writing, and interpreting admin settings and for generating email content/links.
+// - Used by: Admin UI components and email/notification services when sending user or admin emails and reading settings.
+// - Notes: Production helper file. Relies on localStorage and Supabase Edge Functions; edits can affect email behavior. Uses secureConfig for safe key access.
+
 // Helper functions for reading and managing admin settings
 
 /**
@@ -11,7 +16,6 @@ export const getAdminSettings = () => {
       return JSON.parse(savedSettings)
     }
   } catch (error) {
-    console.error('Error loading admin settings:', error)
   }
   
   // Return default settings if none exist
@@ -26,14 +30,27 @@ export const getAdminSettings = () => {
 }
 
 // Resolve the correct public base URL for links in emails (prod-safe)
+// This matches the logic in secureConfig.getSiteUrl() for consistency
 const getBaseUrl = () => {
   try {
-    if (typeof window !== 'undefined' && window.location?.origin) {
-      return window.location.origin
+    if (typeof window !== 'undefined') {
+      const origin = window.location.origin
+      // Development/localhost
+      if (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('192.168.')) {
+        return origin
+      }
+      // Production - use primary domain (www.jg-wedeswedel.de)
+      if (origin.includes('jg-wedeswedel.de') || origin.includes('junge-webisite-mvn3.vercel.app')) {
+        return 'https://www.jg-wedeswedel.de'
+      }
+      return origin
     }
-  } catch (_) {}
-  // Fallback to production domain if not running in browser
-  return 'https://jungengesellschaft-website.vercel.app'
+    // Fallback to production domain
+    return 'https://www.jg-wedeswedel.de'
+  } catch (_) {
+    // Fallback to production domain if anything fails
+    return 'https://www.jg-wedeswedel.de'
+  }
 }
 
 /**
@@ -44,10 +61,10 @@ export const getAdminNotificationEmails = () => {
   const settings = getAdminSettings()
   const emails = settings.adminEmails || []
   
-  // If no emails configured, use admin@admin.com as default
+  // DEVELOPMENT: Use Juan.Wiegmann@web.de for testing
+  // If no emails configured, use development admin email
   if (emails.length === 0) {
-    console.warn('No admin emails configured, using default: zorro.invader@gmail.com')
-    return ['zorro.invader@gmail.com', 'jungegesellschaft@wedelheine.de']
+    return ['Juan.Wiegmann@web.de']
   }
   
   return emails
@@ -106,21 +123,17 @@ export const getDefaultCalendarView = () => {
  */
 export const sendUserNotification = async (userEmail, eventData, type) => {
   if (!userEmail) {
-    console.warn('No user email provided for notification')
     return
   }
-
-  console.log('[USER NOTIFICATION] Sending to:', userEmail)
-  console.log('[USER NOTIFICATION] Type:', type)
 
   let subject = ''
   let message = ''
 
   switch (type) {
     case 'initial_request_received':
-      subject = 'Ihre Event-Anfrage wurde empfangen'
+      subject = 'Ihre Veranstaltungs-Anfrage wurde empfangen'
       message = `Guten Tag ${eventData.requester_name || ''},\n\n` +
-                `vielen Dank für Ihre Event-Anfrage!\n\n` +
+                `vielen Dank für Ihre Veranstaltungs-Anfrage!\n\n` +
                 `EVENT-DETAILS\n` +
                 `${'-'.repeat(50)}\n` +
                 `Event: ${eventData.title || eventData.event_name}\n` +
@@ -134,36 +147,39 @@ export const sendUserNotification = async (userEmail, eventData, type) => {
                 `Sie erhalten eine weitere E-Mail, sobald Ihre Anfrage bearbeitet wurde.\n\n` +
                 `Status verfolgen: ${getBaseUrl()}/event-tracking\n\n` +
                 `Mit freundlichen Grüßen\n` +
-                `Ihr Event-Management-Team\n\n` +
+                `Ihr Veranstaltungs-Team\n\n` +
                 `Junge Gesellschaft Pferdestall Wedes Wedel\n` +
-                `Event-Anfragen: kontakt@junge-gesellschaft-wedel.de`
+                `Veranstaltungs-Anfragen: kontakt@junge-gesellschaft-wedel.de`
       break
 
     case 'initial_request_accepted':
-      subject = 'Ihre Event-Anfrage wurde akzeptiert - Weitere Informationen erforderlich'
+      subject = 'Ihre Veranstaltungs-Anfrage wurde akzeptiert - Weitere Informationen erforderlich'
+      // Generate a link with email parameter for easy access
+      const trackingUrl = `${getBaseUrl()}/event-tracking?email=${encodeURIComponent(eventData.requester_email || '')}`
       message = `Guten Tag ${eventData.requester_name || ''},\n\n` +
-                `gute Neuigkeiten! Ihre Event-Anfrage wurde initial akzeptiert.\n\n` +
+                `gute Neuigkeiten! Ihre Veranstaltungs-Anfrage wurde initial akzeptiert.\n\n` +
                 `EVENT-DETAILS\n` +
                 `${'-'.repeat(50)}\n` +
                 `Event: ${eventData.title || eventData.event_name}\n` +
                 `Zeitraum: ${eventData.start_date ? new Date(eventData.start_date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''}${eventData.end_date && eventData.end_date !== eventData.start_date ? ' - ' + new Date(eventData.end_date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''}\n\n` +
+                `WICHTIG: Der Zeitraum ist jetzt für Sie blockiert und reserviert.\n\n` +
                 `NÄCHSTE SCHRITTE\n` +
                 `${'-'.repeat(50)}\n` +
                 `Um Ihre Buchung abzuschließen, benötigen wir:\n\n` +
                 `1. Genaue Start- und Endzeiten\n` +
                 `2. Gewünschte Schlüsselübergabe- und Rückgabezeiten\n` +
                 `3. Signierter Mietvertrag (als PDF)\n\n` +
-                `Details ergänzen: ${getBaseUrl()}/event-tracking\n\n` +
+                `Bitte füllen Sie das Formular aus:\n${trackingUrl}\n\n` +
                 `Mit freundlichen Grüßen\n` +
-                `Ihr Event-Management-Team\n\n` +
+                `Ihr Veranstaltungs-Team\n\n` +
                 `Junge Gesellschaft Pferdestall Wedes Wedel\n` +
-                `Event-Anfragen: kontakt@junge-gesellschaft-wedel.de`
+                `Veranstaltungs-Anfragen: kontakt@junge-gesellschaft-wedel.de`
       break
 
     case 'final_approval':
-      subject = 'Ihre Event-Buchung wurde final genehmigt!'
+      subject = 'Ihre Veranstaltungs-Buchung wurde final genehmigt!'
       message = `Guten Tag ${eventData.requester_name || ''},\n\n` +
-                `herzlichen Glückwunsch! Ihre Event-Buchung wurde final genehmigt.\n\n` +
+                `herzlichen Glückwunsch! Ihre Veranstaltungs-Buchung wurde final genehmigt.\n\n` +
                 `EVENT-DETAILS\n` +
                 `${'-'.repeat(50)}\n` +
                 `Event: ${eventData.title || eventData.event_name}\n` +
@@ -171,32 +187,29 @@ export const sendUserNotification = async (userEmail, eventData, type) => {
                 `Ende: ${eventData.end_datetime ? new Date(eventData.end_datetime).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' Uhr' : eventData.end_date}\n\n` +
                 `BESTÄTIGUNG\n` +
                 `${'-'.repeat(50)}\n` +
-                `Ihr Event ist jetzt im Kalender eingetragen und reserviert.\n` +
+                `Ihre Veranstaltung ist jetzt im Kalender eingetragen und reserviert.\n` +
                 `Alle Details wurden bestätigt.\n\n` +
                 `Kalender ansehen: ${getBaseUrl()}/\n\n` +
                 `Wir wünschen Ihnen eine erfolgreiche Veranstaltung!\n\n` +
                 `Mit freundlichen Grüßen\n` +
-                `Ihr Event-Management-Team\n\n` +
+                `Ihr Veranstaltungs-Team\n\n` +
                 `Junge Gesellschaft Pferdestall Wedes Wedel\n` +
-                `Event-Anfragen: kontakt@junge-gesellschaft-wedel.de`
+                `Veranstaltungs-Anfragen: kontakt@junge-gesellschaft-wedel.de`
       break
 
     default:
-      subject = 'Update zu Ihrer Event-Anfrage'
-      message = `Guten Tag,\n\nEs gibt ein Update zu Ihrer Event-Anfrage.\n\nMit freundlichen Grüßen\nIhr Event-Management-Team`
+      subject = 'Update zu Ihrer Veranstaltungs-Anfrage'
+      message = `Guten Tag,\n\nEs gibt ein Update zu Ihrer Veranstaltungs-Anfrage.\n\nMit freundlichen Grüßen\nIhr Veranstaltungs-Team`
   }
 
   const htmlContent = generateUserEmailHTML(subject, message, eventData, type)
 
   // Send via Supabase Edge Function
+  // SECURITY: Use secure getters to prevent key exposure
   try {
-    const supabaseUrl = process.env.REACT_APP_SUPABASE_URL
-    const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY
-
-    if (!supabaseUrl || !supabaseKey) {
-      console.warn('⚠️ Supabase credentials not found')
-      return
-    }
+    const { getSupabaseUrl, getSupabaseAnonKey } = await import('../utils/secureConfig')
+    const supabaseUrl = getSupabaseUrl()
+    const supabaseKey = getSupabaseAnonKey()
 
     const response = await fetch(`${supabaseUrl}/functions/v1/send-admin-notification`, {
       method: 'POST',
@@ -215,10 +228,8 @@ export const sendUserNotification = async (userEmail, eventData, type) => {
     })
 
     if (response.ok) {
-      console.log('✅ User notification sent successfully!')
     }
   } catch (error) {
-    console.error('❌ Failed to send user notification:', error)
   }
 }
 
@@ -229,20 +240,14 @@ export const sendUserNotification = async (userEmail, eventData, type) => {
  */
 export const sendAdminNotification = async (eventData, type = 'initial_request') => {
   if (!areNotificationsEnabled()) {
-    console.log('Notifications disabled, skipping email')
     return
   }
 
   const adminEmails = getAdminNotificationEmails()
   
   if (adminEmails.length === 0) {
-    console.warn('No admin emails configured for notifications')
     return
   }
-
-  console.log('[NOTIFICATION] Sending to:', adminEmails)
-  console.log('[NOTIFICATION] Event:', eventData)
-  console.log('[NOTIFICATION] Type:', type)
   
   // Format notification message based on type
   let subject = ''
@@ -250,9 +255,10 @@ export const sendAdminNotification = async (eventData, type = 'initial_request')
   
   switch (type) {
     case 'initial_request':
-      subject = 'Neue Event-Anfrage - Aktion erforderlich (Schritt 1/3)'
+      subject = 'Neue Veranstaltungs-Anfrage eingegangen - Initiale Überprüfung erforderlich'
+      const adminUrl = `${getBaseUrl()}/admin`
       message = `Guten Tag,\n\n` +
-                `eine neue Event-Anfrage steht zur Bearbeitung bereit.\n\n` +
+                `eine neue Veranstaltungs-Anfrage wurde eingereicht und benötigt Ihre Überprüfung.\n\n` +
                 `EVENT-DETAILS\n` +
                 `${'-'.repeat(50)}\n` +
                 `Event: ${eventData.title || eventData.event_name || 'Unbekannt'}\n` +
@@ -260,17 +266,22 @@ export const sendAdminNotification = async (eventData, type = 'initial_request')
                 `Kontakt: ${eventData.requester_email}\n` +
                 `Zeitraum: ${eventData.start_date ? new Date(eventData.start_date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''}${eventData.end_date && eventData.end_date !== eventData.start_date ? ' - ' + new Date(eventData.end_date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''}\n` +
                 `Kategorie: ${eventData.event_type}\n\n` +
-                `Zum Admin-Panel: http://localhost:3000/admin\n\n` +
+                `AKTION ERFORDERLICH\n` +
+                `${'-'.repeat(50)}\n` +
+                `Bitte überprüfen Sie die Anfrage und führen Sie die initiale Akzeptanz durch.\n` +
+                `Nach der initialen Akzeptanz wird der Zeitraum blockiert und der Benutzer kann Details einreichen.\n\n` +
+                `Zum Admin-Panel: ${adminUrl}\n\n` +
                 `Mit freundlichen Grüßen\n` +
-                `Ihr Event-Management-System\n\n` +
+                `Ihr Veranstaltungs-System\n\n` +
                 `Junge Gesellschaft Pferdestall Wedes Wedel\n` +
-                `Event-Anfragen: kontakt@junge-gesellschaft-wedel.de`
+                `Veranstaltungs-Anfragen: kontakt@junge-gesellschaft-wedel.de`
       break
       
     case 'detailed_info_submitted':
-      subject = 'Detaillierte Event-Informationen eingereicht (Schritt 2/3)'
+      subject = 'Detaillierte Veranstaltungs-Informationen eingereicht - Finale Überprüfung erforderlich'
+      const adminPanelUrl = `${getBaseUrl()}/admin`
       message = `Guten Tag,\n\n` +
-                `ein Antragsteller hat die detaillierten Informationen eingereicht.\n\n` +
+                `ein Antragsteller hat die detaillierten Informationen für eine Veranstaltungs-Anfrage eingereicht.\n\n` +
                 `EVENT-DETAILS\n` +
                 `${'-'.repeat(50)}\n` +
                 `Event: ${eventData.title || eventData.event_name || 'Unbekannt'}\n` +
@@ -281,60 +292,55 @@ export const sendAdminNotification = async (eventData, type = 'initial_request')
                 `Kategorie: ${eventData.event_type}\n\n` +
                 `STATUS\n` +
                 `${'-'.repeat(50)}\n` +
-                `Mietvertrag hochgeladen: Ja\n\n` +
-                `Zum Admin-Panel: http://localhost:3000/admin\n\n` +
+                `Mietvertrag hochgeladen: Ja\n` +
+                `Zeitraum blockiert: Ja (seit initialer Akzeptanz)\n\n` +
+                `AKTION ERFORDERLICH\n` +
+                `${'-'.repeat(50)}\n` +
+                `Bitte überprüfen Sie die Details und führen Sie die finale Freigabe durch.\n\n` +
+                `Zum Admin-Panel: ${adminPanelUrl}\n\n` +
                 `Mit freundlichen Grüßen\n` +
-                `Ihr Event-Management-System\n\n` +
+                `Ihr Veranstaltungs-System\n\n` +
                 `Junge Gesellschaft Pferdestall Wedes Wedel\n` +
-                `Event-Anfragen: kontakt@junge-gesellschaft-wedel.de`
+                `Veranstaltungs-Anfragen: kontakt@junge-gesellschaft-wedel.de`
       break
       
     case 'final_acceptance':
-      subject = 'Event genehmigt und aktiviert (Schritt 3/3)'
+      subject = 'Veranstaltung genehmigt und aktiviert (Schritt 3/3)'
       message = `Guten Tag,\n\n` +
-                `ein Event wurde final genehmigt und ist nun im Kalender aktiv.\n\n` +
+                `eine Veranstaltung wurde final genehmigt und ist nun im Kalender aktiv.\n\n` +
                 `EVENT-DETAILS\n` +
                 `${'-'.repeat(50)}\n` +
                 `Event: ${eventData.title || eventData.event_name || 'Unbekannt'}\n` +
                 `Antragsteller: ${eventData.requester_name}\n` +
                 `Kontakt: ${eventData.requester_email}\n\n` +
-                `Das Event ist jetzt für alle Benutzer im Kalender sichtbar.\n\n` +
+                `Die Veranstaltung ist jetzt für alle Benutzer im Kalender sichtbar.\n\n` +
                 `Mit freundlichen Grüßen\n` +
-                `Ihr Event-Management-System\n\n` +
+                `Ihr Veranstaltungs-System\n\n` +
                 `Junge Gesellschaft Pferdestall Wedes Wedel\n` +
-                `Event-Anfragen: kontakt@junge-gesellschaft-wedel.de`
+                `Veranstaltungs-Anfragen: kontakt@junge-gesellschaft-wedel.de`
       break
       
     default:
-      subject = 'Event-Management - Neue Benachrichtigung'
+      subject = 'Veranstaltungs-Management - Neue Benachrichtigung'
       message = `Guten Tag,\n\n` +
                 `Event: ${eventData.title || eventData.event_name || 'Neues Event'}\n` +
                 `Von: ${eventData.requester_name || 'Unbekannt'}\n\n` +
                 `Weitere Details finden Sie im Admin-Panel.\n\n` +
                 `Mit freundlichen Grüßen\n` +
-                `Ihr Event-Management-System`
+                `Ihr Veranstaltungs-Management-System`
   }
-  
-  // Log notification details
-  console.log('\n' + '='.repeat(60))
-  console.log('EMAIL NOTIFICATION')
-  console.log('='.repeat(60))
-  console.log('To:', adminEmails.join(', '))
-  console.log('Subject:', subject)
-  console.log('-'.repeat(60))
-  console.log(message)
-  console.log('='.repeat(60) + '\n')
   
   // Generate HTML email content
   const htmlContent = generateEmailHTML(subject, message, eventData, type)
   
   // Send email via Supabase Edge Function
   try {
-    const supabaseUrl = process.env.REACT_APP_SUPABASE_URL
-    const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY
+    // SECURITY: Use secure getters to prevent key exposure
+    const { getSupabaseUrl, getSupabaseAnonKey } = await import('../utils/secureConfig')
+    const supabaseUrl = getSupabaseUrl()
+    const supabaseKey = getSupabaseAnonKey()
     
     if (!supabaseUrl || !supabaseKey) {
-      console.warn('⚠️ Supabase credentials not found, showing alert instead')
       alert(`E-MAIL BENACHRICHTIGUNG\n\n` +
             `An: ${adminEmails.join(', ')}\n` +
             `Betreff: ${subject}\n\n` +
@@ -366,14 +372,12 @@ export const sendAdminNotification = async (eventData, type = 'initial_request')
     const result = await response.json()
     
     if (result.success) {
-      console.log('✅ Email sent successfully!')
       // Optionally show a subtle success notification
     } else {
       throw new Error(result.error || 'Unknown error')
     }
     
   } catch (error) {
-    console.error('❌ Failed to send email:', error)
     // Show alert as fallback
     alert(`E-MAIL BENACHRICHTIGUNG (Versand fehlgeschlagen)\n\n` +
           `An: ${adminEmails.join(', ')}\n` +
@@ -388,8 +392,26 @@ export const sendAdminNotification = async (eventData, type = 'initial_request')
  * Generate HTML email template for user notifications
  */
 export const generateUserEmailHTML = (subject, message, eventData, type) => {
-  const buttonUrl = type === 'initial_request_accepted' ? `${getBaseUrl()}/event-tracking` : `${getBaseUrl()}/`
-  const buttonText = type === 'initial_request_accepted' ? 'Details ergänzen' : type === 'final_approval' ? 'Kalender ansehen' : 'Status verfolgen'
+  // Generate proper URLs with email parameter for easy access
+  const trackingUrlWithEmail = eventData.requester_email 
+    ? `${getBaseUrl()}/event-tracking?email=${encodeURIComponent(eventData.requester_email)}`
+    : `${getBaseUrl()}/event-tracking`
+  
+  const buttonUrl = type === 'initial_request_accepted' 
+    ? trackingUrlWithEmail 
+    : type === 'final_approval' 
+    ? `${getBaseUrl()}/`
+    : `${getBaseUrl()}/event-tracking`
+  const buttonText = type === 'initial_request_accepted' 
+    ? 'Details ergänzen' 
+    : type === 'final_approval' 
+    ? 'Kalender ansehen' 
+    : 'Status verfolgen'
+  
+  // Add note about blocking for initial acceptance
+  const blockingNote = type === 'initial_request_accepted' 
+    ? '<div class="info-box" style="background: #e8f5e9; border-left-color: #4CAF50; margin: 20px 0;"><p style="margin: 0; color: #2e7d32; font-weight: 600;">✓ Ihr Zeitraum ist jetzt reserviert und blockiert</p></div>'
+    : ''
   
   // Format dates nicely
   const formatDate = (date) => {
@@ -443,12 +465,12 @@ export const generateUserEmailHTML = (subject, message, eventData, type) => {
         
         <p>Guten Tag ${eventData.requester_name || ''},</p>
         
-        ${type === 'initial_request_received' ? '<p>vielen Dank für Ihre Event-Anfrage!</p>' : ''}
-        ${type === 'initial_request_accepted' ? '<p>gute Neuigkeiten! Ihre Event-Anfrage wurde initial akzeptiert.</p>' : ''}
-        ${type === 'final_approval' ? '<p>herzlichen Glückwunsch! Ihre Event-Buchung wurde final genehmigt.</p>' : ''}
+        ${type === 'initial_request_received' ? '<p>vielen Dank für Ihre Veranstaltungs-Anfrage!</p>' : ''}
+        ${type === 'initial_request_accepted' ? '<p>gute Neuigkeiten! Ihre Veranstaltungs-Anfrage wurde initial akzeptiert.</p>' : ''}
+        ${type === 'final_approval' ? '<p>herzlichen Glückwunsch! Ihre Veranstaltungs-Buchung wurde final genehmigt.</p>' : ''}
         
         <div class="info-box">
-          <div class="section-title">Event-Details</div>
+          <div class="section-title">Veranstaltungs-Details</div>
           <div class="info-row"><span class="info-label">Event:</span> ${eventData.title || eventData.event_name}</div>
           ${eventData.start_date ? `<div class="info-row"><span class="info-label">Zeitraum:</span> ${formatDate(eventData.start_date)}${eventData.end_date && eventData.end_date !== eventData.start_date ? ' - ' + formatDate(eventData.end_date) : ''}</div>` : ''}
           ${eventData.start_datetime ? `<div class="info-row"><span class="info-label">Start:</span> ${formatDateTime(eventData.start_datetime)}</div>` : ''}
@@ -467,6 +489,7 @@ export const generateUserEmailHTML = (subject, message, eventData, type) => {
         ` : ''}
         
         ${type === 'initial_request_accepted' ? `
+          ${blockingNote}
           <div class="section-title">Nächste Schritte</div>
           <p>Um Ihre Buchung abzuschließen, benötigen wir:</p>
           <ul style="color: #252422; line-height: 1.8;">
@@ -474,11 +497,12 @@ export const generateUserEmailHTML = (subject, message, eventData, type) => {
             <li>Gewünschte Schlüsselübergabe- und Rückgabezeiten</li>
             <li>Signierter Mietvertrag (als PDF)</li>
           </ul>
+          <p style="color: #2e7d32; font-weight: 600; margin-top: 15px;">Ihr gewünschter Zeitraum ist jetzt für Sie reserviert und blockiert.</p>
         ` : ''}
         
         ${type === 'final_approval' ? `
           <div class="section-title">Bestätigung</div>
-          <p>Ihr Event ist jetzt im Kalender eingetragen und reserviert. Alle Details wurden bestätigt.</p>
+          <p>Ihre Veranstaltung ist jetzt im Kalender eingetragen und reserviert. Alle Details wurden bestätigt.</p>
         ` : ''}
         
         <center>
@@ -487,7 +511,7 @@ export const generateUserEmailHTML = (subject, message, eventData, type) => {
         
         <p style="margin-top: 30px; color: #A58C81; font-size: 14px;">
           Mit freundlichen Grüßen<br>
-          Ihr Event-Management-Team
+          Ihr Veranstaltungs-Team
         </p>
       </div>
     </div>
@@ -568,12 +592,12 @@ export const generateEmailHTML = (subject, message, eventData, type) => {
         
         <p>Guten Tag,</p>
         
-        ${type === 'initial_request' ? '<p>eine neue Event-Anfrage steht zur Bearbeitung bereit.</p>' : ''}
+        ${type === 'initial_request' ? '<p>eine neue Veranstaltungs-Anfrage steht zur Bearbeitung bereit.</p>' : ''}
         ${type === 'detailed_info_submitted' ? '<p>ein Antragsteller hat die detaillierten Informationen eingereicht.</p>' : ''}
-        ${type === 'final_acceptance' ? '<p>ein Event wurde final genehmigt und ist nun im Kalender aktiv.</p>' : ''}
+        ${type === 'final_acceptance' ? '<p>eine Veranstaltung wurde final genehmigt und ist nun im Kalender aktiv.</p>' : ''}
         
         <div class="info-box">
-          <div class="section-title">Event-Details</div>
+          <div class="section-title">Veranstaltungs-Details</div>
           <div class="info-row"><span class="info-label">Event:</span> ${eventData.title || eventData.event_name || 'Unbekannt'}</div>
           <div class="info-row"><span class="info-label">Antragsteller:</span> ${eventData.requester_name}</div>
           <div class="info-row"><span class="info-label">Kontakt:</span> ${eventData.requester_email}</div>
@@ -595,7 +619,7 @@ export const generateEmailHTML = (subject, message, eventData, type) => {
         
         <p style="margin-top: 20px; color: #A58C81; font-size: 14px;">
           Mit freundlichen Grüßen<br>
-          Ihr Event-Management-System
+          Ihr Veranstaltungs-System
         </p>
       </div>
     </div>
@@ -628,7 +652,6 @@ export const saveAdminSettings = (settings) => {
     localStorage.setItem('adminSettings', JSON.stringify(settingsWithTimestamp))
     return true
   } catch (error) {
-    console.error('Error saving admin settings:', error)
     return false
   }
 }

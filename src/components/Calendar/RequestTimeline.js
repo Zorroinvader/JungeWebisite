@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Visual timeline component for a single event request, showing stages like requested, accepted, details, and final approval.
+// - Used by: Event request tracking / profile views to show the current status of a user’s request.
+// - Notes: Production UI component. Styling depends on dark mode and request.request_stage values.
+
 import React from 'react';
 import { useDarkMode } from '../../contexts/DarkModeContext';
 
@@ -104,7 +109,8 @@ const RequestTimeline = ({ request }) => {
                 {status === 'current' && (
                   <p className={`text-xs text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mt-1`}>
                     {request.request_stage === 'initial' && 'Wird gerade geprüft...'}
-                    {request.request_stage === 'initial_accepted' && 'Bitte Details ausfüllen →'}
+                    {request.request_stage === 'initial_accepted' && !request.details_submitted_at && 'Bitte Details ausfüllen →'}
+                    {request.request_stage === 'initial_accepted' && request.details_submitted_at && 'Details bereits eingereicht ✓'}
                     {request.request_stage === 'details_submitted' && 'Wird final geprüft...'}
                     {request.request_stage === 'final_accepted' && 'Freigegeben ✓'}
                   </p>

@@ -1,7 +1,12 @@
-import React, { useState, useEffect } from 'react';
+// FILE OVERVIEW
+// - Purpose: Component displaying user's event requests with timeline, status, and action buttons (fill details, cancel).
+// - Used by: ProfilePage to show all event requests for the logged-in user; displays RequestTimeline for each request.
+// - Notes: Production component. Loads requests via eventRequestsAPI.getByUser; handles cancellation and detail submission flows.
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDarkMode } from '../../contexts/DarkModeContext';
-import { eventRequestsAPI } from '../../services/httpApi';
+import { eventRequestsAPI } from '../../services/databaseApi';
 import RequestTimeline from '../Calendar/RequestTimeline';
 import DetailedEventForm from '../Calendar/DetailedEventForm';
 import { Clock, CheckCircle, XCircle } from 'lucide-react';
@@ -17,38 +22,66 @@ const MyEventRequests = () => {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [requestToCancel, setRequestToCancel] = useState(null);
 
-  const loadMyRequests = async () => {
-    if (!user) return;
+  const loadMyRequests = useCallback(async () => {
+    if (!user?.id) {
+      setRequests([]);
+      setLoading(false);
+      return;
+    }
     
     try {
       setLoading(true);
-      // Get requests by user ID or email
-      const data = await eventRequestsAPI.getByUser(user.id);
+      
+      // Add timeout wrapper to prevent hanging
+      const loadPromise = eventRequestsAPI.getByUser(user.id);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Lade-Timeout')), 4000)
+      );
+      
+      const data = await Promise.race([loadPromise, timeoutPromise]);
+      
+      // Ensure data is an array
+      const requestsData = Array.isArray(data) ? data : [];
       
       // Sort by created_at, newest first
-      data.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      requestsData.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
       
-      setRequests(data || []);
+      setRequests(requestsData);
     } catch (err) {
-      console.error('Error loading my requests:', err);
+      setRequests([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
   useEffect(() => {
     loadMyRequests();
-  }, [user]);
+  }, [user, loadMyRequests]);
 
   const handleFillDetails = (request) => {
+    // Prevent opening form if details are already submitted
+    const isAlreadySubmitted = request.request_stage === 'details_submitted' || 
+                              request.request_stage === 'final_accepted' ||
+                              request.details_submitted_at ||
+                              (request.request_stage !== 'initial_accepted');
+    
+    if (isAlreadySubmitted) {
+      alert('Die Details wurden bereits eingereicht. Bitte warten Sie auf die finale Prüfung.');
+      return;
+    }
     setSelectedRequest(request);
     setShowDetailedForm(true);
   };
 
-  const handleDetailsSubmitted = () => {
+  const handleDetailsSubmitted = async () => {
     setShowDetailedForm(false);
     setSelectedRequest(null);
-    loadMyRequests();
+    
+    // Wait a moment for database to update
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Refresh to get updated request_stage and details_submitted_at
+    await loadMyRequests();
   };
 
   const handleCancelRequest = (request) => {
@@ -67,7 +100,6 @@ const MyEventRequests = () => {
       setRequestToCancel(null);
       loadMyRequests();
     } catch (err) {
-      console.error('Error cancelling request:', err);
       alert('Fehler beim Stornieren der Anfrage');
     } finally {
       setCancellingId(null);
@@ -76,17 +108,6 @@ const MyEventRequests = () => {
 
   const canCancelRequest = (request) => {
     return !['final_accepted', 'rejected', 'cancelled'].includes(request.request_stage);
-  };
-
-  const getStageColor = (stage) => {
-    const colors = {
-      'initial': 'border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/10',
-      'initial_accepted': 'border-l-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/10',
-      'details_submitted': 'border-l-4 border-purple-500 bg-purple-50 dark:bg-purple-900/10',
-      'final_accepted': 'border-l-4 border-green-500 bg-green-50 dark:bg-green-900/10',
-      'rejected': 'border-l-4 border-red-500 bg-red-50 dark:bg-red-900/10'
-    };
-    return colors[stage] || 'border-l-4 border-gray-300';
   };
 
   const getStageIcon = (stage) => {
@@ -118,10 +139,10 @@ const MyEventRequests = () => {
     <div className="space-y-6">
       <div>
         <h3 className={`text-xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} mb-2`}>
-          Meine Event-Anfragen
+          Meine Veranstaltungs-Anfragen
         </h3>
         <p className={`text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>
-          Hier sehen Sie alle Ihre Event-Anfragen und deren Status
+          Hier sehen Sie alle Ihre Veranstaltungs-Anfragen und deren Status
         </p>
       </div>
 
@@ -132,7 +153,7 @@ const MyEventRequests = () => {
             Keine Anfragen vorhanden
           </h3>
           <p className={`text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>
-            Sie haben noch keine Event-Anfragen gestellt.
+            Sie haben noch keine Veranstaltungs-Anfragen gestellt.
           </p>
         </div>
       ) : (
@@ -165,13 +186,21 @@ const MyEventRequests = () => {
 
                   {/* Action Buttons */}
                   <div className="flex gap-3">
-                    {request.request_stage === 'initial_accepted' && (
+                    {/* Only show button if stage is initial_accepted and details haven't been submitted yet */}
+                    {request.request_stage === 'initial_accepted' && !request.details_submitted_at && request.request_stage !== 'details_submitted' && (
                       <button
                         onClick={() => handleFillDetails(request)}
                         className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold shadow-lg animate-pulse"
                       >
                         Details ausfüllen →
                       </button>
+                    )}
+                    
+                    {/* Show message if details already submitted */}
+                    {(request.request_stage === 'details_submitted' || request.request_stage === 'final_accepted' || request.details_submitted_at) && (
+                      <div className="px-6 py-3 bg-purple-100 dark:bg-purple-900/20 border-2 border-purple-300 dark:border-purple-700 text-purple-800 dark:text-purple-300 rounded-lg font-semibold">
+                        ✓ Details bereits eingereicht
+                      </div>
                     )}
                     
                     {canCancelRequest(request) && (
@@ -223,10 +252,10 @@ const MyEventRequests = () => {
                 {request.request_stage === 'final_accepted' && (
                   <div className="mt-4 bg-green-100 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
                     <p className="text-green-800 dark:text-green-300 font-medium mb-2">
-                      Event freigegeben!
+                      Veranstaltung freigegeben!
                     </p>
                     <p className="text-sm text-green-700 dark:text-green-400">
-                      Ihr Event wurde endgültig freigegeben und ist nun im Kalender sichtbar. Viel Erfolg!
+                      Ihre Veranstaltung wurde endgültig freigegeben und ist nun im Kalender sichtbar. Viel Erfolg!
                     </p>
                   </div>
                 )}
@@ -255,10 +284,20 @@ const MyEventRequests = () => {
         </div>
       )}
 
-      {/* Cancel Confirmation Modal */}
+      {/* MOBILE RESPONSIVE: Cancel Confirmation Modal with proper mobile sizing */}
       {showCancelConfirm && requestToCancel && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-2xl shadow-xl max-w-md w-full p-8 border-2 border-red-500 ${isDarkMode ? 'dark:border-red-400' : ''}`}>
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-3 md:p-4"
+          style={{ touchAction: 'pan-y', overscrollBehavior: 'contain' }}
+        >
+          <div 
+            className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-xl sm:rounded-2xl shadow-xl max-w-md w-full p-4 sm:p-6 md:p-8 border-2 border-red-500 ${isDarkMode ? 'dark:border-red-400' : ''}`}
+            style={{ 
+              WebkitOverflowScrolling: 'touch',
+              touchAction: 'pan-y',
+              overscrollBehavior: 'contain'
+            }}
+          >
             <h3 className={`text-2xl font-bold text-red-600 ${isDarkMode ? 'dark:text-red-400' : ''} mb-4`}>
               Anfrage stornieren?
             </h3>

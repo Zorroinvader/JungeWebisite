@@ -1,13 +1,19 @@
+// FILE OVERVIEW
+// - Purpose: Login form component with email/password fields, password visibility toggle, dark mode toggle, and redirect handling.
+// - Used by: LoginPage (route '/login') and can be used as modal in other contexts.
+// - Notes: Production component. Handles authentication via AuthContext.signIn and redirects after successful login.
+
 import React, { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDarkMode } from '../../contexts/DarkModeContext'
-import { Eye, EyeOff, Mail, Lock, AlertCircle, Moon, Sun } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, AlertCircle, Moon, Sun, CheckCircle } from 'lucide-react'
 
 const LoginForm = () => {
   const { signIn, user } = useAuth()
   const { isDarkMode, toggleDarkMode } = useDarkMode()
   const navigate = useNavigate()
+  const location = useLocation()
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -15,12 +21,38 @@ const LoginForm = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [activationSuccess, setActivationSuccess] = useState(false)
+  const [passwordResetSuccess, setPasswordResetSuccess] = useState(false)
+
+  // Check for activation notification from URL and password reset from location state
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    
+    if (urlParams.get('activated') === 'true') {
+      setActivationSuccess(true)
+      // Remove the parameter from URL
+      window.history.replaceState({}, document.title, window.location.pathname)
+      // Auto-hide after 10 seconds
+      const timer = setTimeout(() => setActivationSuccess(false), 10000)
+      return () => clearTimeout(timer)
+    }
+  }, [])
+
+  // Check for password reset success from location state separately
+  useEffect(() => {
+    if (location.state?.passwordReset) {
+      setPasswordResetSuccess(true)
+      // Clear the state to prevent showing message on refresh
+      window.history.replaceState({}, document.title, window.location.pathname)
+      // Auto-hide after 10 seconds
+      const timer = setTimeout(() => setPasswordResetSuccess(false), 10000)
+      return () => clearTimeout(timer)
+    }
+  }, [location.state])
 
   // Reset loading when user logs in successfully
   useEffect(() => {
-    console.log('LoginForm useEffect - user:', user)
     if (user) {
-      console.log('User logged in, navigating to home page')
       setLoading(false)
       navigate('/')
     }
@@ -38,31 +70,24 @@ const LoginForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    console.log('Login form submitted with:', formData)
     setLoading(true)
     setError('')
 
     try {
-      console.log('Calling signIn...')
-      const { data, error } = await signIn(formData.email, formData.password)
-      console.log('SignIn result:', { data, error })
+      const { error } = await signIn(formData.email, formData.password)
       
       if (error) {
-        console.log('Login error:', error)
         setError(error.message)
         setLoading(false)
       } else {
-        console.log('Login successful, waiting for auth state change...')
       }
       // If successful, the useEffect will handle navigation and loading state
     } catch (err) {
-      console.log('Login exception:', err)
       setError('Ein unerwarteter Fehler ist aufgetreten')
       setLoading(false)
     }
   }
 
-  console.log('LoginForm rendering, loading:', loading, 'error:', error)
   
   return (
     <div className="min-h-screen bg-[#F4F1E8] dark:bg-[#252422]">
@@ -84,6 +109,7 @@ const LoginForm = () => {
             <div className="flex items-center space-x-4">
               <button
                 onClick={toggleDarkMode}
+                aria-label={isDarkMode ? 'Zu hellem Modus wechseln' : 'Zu dunklem Modus wechseln'}
                 className="p-2 hover:opacity-70 transition-opacity rounded-lg text-[#252422] dark:text-[#F4F1E8]"
               >
                 {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
@@ -116,12 +142,36 @@ const LoginForm = () => {
             </div>
 
             <form className="space-y-6" onSubmit={handleSubmit}>
+              {activationSuccess && (
+                <div className="rounded-lg p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                  <div className="flex items-start">
+                    <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                    <div className="ml-3 flex-1 min-w-0">
+                      <p className="text-sm font-medium text-green-800 dark:text-green-300">
+                        Der Account ist aktiviert. Sie können sich nun einloggen.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {passwordResetSuccess && (
+                <div className="rounded-lg p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                  <div className="flex items-start">
+                    <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                    <div className="ml-3 flex-1 min-w-0">
+                      <p className="text-sm font-medium text-green-800 dark:text-green-300">
+                        Passwort erfolgreich zurückgesetzt! Sie können sich nun mit Ihrem neuen Passwort einloggen.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
               {error && (
                 <div className="rounded-lg p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-                  <div className="flex">
-                    <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
-                    <div className="ml-3">
-                      <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+                  <div className="flex items-start">
+                    <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                    <div className="ml-3 flex-1 min-w-0">
+                      <p className="text-sm text-red-600 dark:text-red-400 break-words">{error}</p>
                     </div>
                   </div>
                 </div>
@@ -133,8 +183,8 @@ const LoginForm = () => {
                     E-Mail-Adresse
                   </label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Mail className="h-5 w-5 text-[#A58C81] dark:text-[#EBE9E9]" />
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
+                      <Mail className="h-5 w-5 text-[#A58C81] dark:text-[#EBE9E9] flex-shrink-0" />
                     </div>
                     <input
                       id="email"
@@ -144,7 +194,8 @@ const LoginForm = () => {
                       required
                       value={formData.email}
                       onChange={handleChange}
-                      className="w-full px-3 py-3 pl-10 border border-[#A58C81] dark:border-[#EBE9E9] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] dark:focus:ring-[#EBE9E9] focus:ring-opacity-50 transition-colors bg-white dark:bg-[#252422] text-[#252422] dark:text-[#F4F1E8]"
+                      className="w-full py-3 pr-4 min-h-[44px] text-base border border-[#A58C81] dark:border-[#EBE9E9] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] dark:focus:ring-[#EBE9E9] focus:ring-opacity-50 transition-colors bg-white dark:bg-[#252422] text-[#252422] dark:text-[#F4F1E8]"
+                      style={{ fontSize: '16px', paddingLeft: '3.5rem' }}
                       placeholder="ihre@email.de"
                     />
                   </div>
@@ -155,8 +206,8 @@ const LoginForm = () => {
                     Passwort
                   </label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Lock className="h-5 w-5 text-[#A58C81] dark:text-[#EBE9E9]" />
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
+                      <Lock className="h-5 w-5 text-[#A58C81] dark:text-[#EBE9E9] flex-shrink-0" />
                     </div>
                     <input
                       id="password"
@@ -166,18 +217,20 @@ const LoginForm = () => {
                       required
                       value={formData.password}
                       onChange={handleChange}
-                      className="w-full px-3 py-3 pl-10 pr-10 border border-[#A58C81] dark:border-[#EBE9E9] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] dark:focus:ring-[#EBE9E9] focus:ring-opacity-50 transition-colors bg-white dark:bg-[#252422] text-[#252422] dark:text-[#F4F1E8]"
+                      className="w-full py-3 border border-[#A58C81] dark:border-[#EBE9E9] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] dark:focus:ring-[#EBE9E9] focus:ring-opacity-50 transition-colors bg-white dark:bg-[#252422] text-[#252422] dark:text-[#F4F1E8]"
+                      style={{ paddingLeft: '3.5rem', paddingRight: '3rem', minHeight: '44px' }}
                       placeholder="Ihr Passwort"
                     />
                     <button
                       type="button"
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center hover:opacity-70 transition-opacity text-[#A58C81] dark:text-[#EBE9E9]"
+                      aria-label={showPassword ? 'Passwort ausblenden' : 'Passwort anzeigen'}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center hover:opacity-70 transition-opacity text-[#A58C81] dark:text-[#EBE9E9] z-10"
                       onClick={() => setShowPassword(!showPassword)}
                     >
                       {showPassword ? (
-                        <EyeOff className="h-5 w-5" />
+                        <EyeOff className="h-5 w-5 flex-shrink-0" />
                       ) : (
-                        <Eye className="h-5 w-5" />
+                        <Eye className="h-5 w-5 flex-shrink-0" />
                       )}
                     </button>
                   </div>
@@ -186,12 +239,12 @@ const LoginForm = () => {
 
               <div className="flex items-center justify-between">
                 <div className="text-sm">
-                  <a
-                    href="/forgot-password"
+                  <Link
+                    to="/forgot-password"
                     className="font-medium hover:opacity-80 transition-opacity text-[#A58C81] dark:text-[#EBE9E9]"
                   >
                     Passwort vergessen?
-                  </a>
+                  </Link>
                 </div>
               </div>
 
@@ -199,12 +252,13 @@ const LoginForm = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full flex justify-center py-3 px-4 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity bg-[#2E07D4] hover:bg-[#2506B8]"
+                  className="w-full flex justify-center py-3 px-4 min-h-[44px] text-base font-medium text-white rounded-lg hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all bg-[#2E07D4] hover:bg-[#2506B8] touch-manipulation"
+                  style={{ touchAction: 'manipulation' }}
                 >
                   {loading ? (
                     <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white dark:border-[#252422] mr-2"></div>
-                      Wird angemeldet...
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white dark:border-[#252422] mr-2 flex-shrink-0"></div>
+                      <span>Wird angemeldet...</span>
                     </>
                   ) : (
                     'Anmelden'

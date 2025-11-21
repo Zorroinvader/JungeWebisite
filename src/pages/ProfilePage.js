@@ -1,16 +1,19 @@
+// FILE OVERVIEW
+// - Purpose: Haupt-Profilseite für eingeloggte Nutzer mit Übersicht zu persönlichen Daten und Event-Anfragen.
+// - Used by: Route '/profile' (geschützt) in App.js; aufgerufen nach erfolgreicher Anmeldung/Registrierung.
+// - Notes: Production member/admin page. Nutzt AuthContext, eventRequestsAPI, MyEventRequests und eventBus. This is the currently used profile page. A simplified test version ProfilePageSimple exists in Non-PROD/pages/ but is not used in production.
+
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { eventRequestsAPI } from '../services/httpApi'
+import { eventRequestsAPI } from '../services/databaseApi'
 import { User, Mail } from 'lucide-react'
 import eventBus from '../utils/eventBus'
 import MyEventRequests from '../components/Profile/MyEventRequests'
-import DSGVOCompliance from '../components/Profile/DSGVOCompliance'
 
 const ProfilePage = () => {
   const { user, profile, loading: authLoading } = useAuth()
   const [loading, setLoading] = useState(true)
   const [isLoadingRequests, setIsLoadingRequests] = useState(false)
-  const [profileError, setProfileError] = useState(null)
 
   const loadEventRequests = useCallback(async () => {
     if (isLoadingRequests || !user?.id) {
@@ -18,12 +21,17 @@ const ProfilePage = () => {
     }
     setIsLoadingRequests(true)
     try {
-      const data = await eventRequestsAPI.getByUser(user.id)
+      // Add timeout wrapper to prevent hanging
+      const loadPromise = eventRequestsAPI.getByUser(user.id)
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Lade-Timeout')), 4000)
+      )
+      
+      const data = await Promise.race([loadPromise, timeoutPromise])
       if (data) {
         setLoading(false)
       }
     } catch (err) {
-      console.error('Error loading event requests:', err)
       setLoading(false)
     } finally {
       setIsLoadingRequests(false)
@@ -35,8 +43,8 @@ const ProfilePage = () => {
     
     loadEventRequests()
     
-    // Set up periodic refresh every 60 seconds
-    const refreshInterval = setInterval(() => { loadEventRequests() }, 60000)
+    // Remove auto-refresh to improve performance - user can manually refresh
+    // const refreshInterval = setInterval(() => { loadEventRequests() }, 60000)
     
     // Listen for new event request creation
     const handleEventRequestCreated = (data) => {
@@ -49,10 +57,10 @@ const ProfilePage = () => {
     const safetyTimeout = setTimeout(() => {
       setLoading(false)
       setIsLoadingRequests(false)
-    }, 5000) // 5 second timeout
+    }, 3000) // 3 second timeout
     
     return () => {
-      clearInterval(refreshInterval)
+      // clearInterval(refreshInterval)
       clearTimeout(safetyTimeout)
       eventBus.off('eventRequestCreated', handleEventRequestCreated)
     }
@@ -126,10 +134,10 @@ const ProfilePage = () => {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-bold mb-2 text-[#252422] dark:text-[#F4F1E8]">
-                  Meine Event-Anfragen
+                  Meine Veranstaltungs-Anfragen
                 </h2>
                 <p className="text-base text-[#A58C81] dark:text-[#EBE9E9]">
-                  Hier sehen Sie alle Ihre eingereichten Event-Anfragen und deren Status
+                  Hier sehen Sie alle Ihre eingereichten Veranstaltungs-Anfragen und deren Status
                 </p>
               </div>
               <button
@@ -147,11 +155,6 @@ const ProfilePage = () => {
 
           <div className="p-8">
             <MyEventRequests />
-          </div>
-
-          {/* DSGVO Compliance Section */}
-          <div className="p-8 border-t border-[#A58C81] dark:border-[#A58C81]">
-            <DSGVOCompliance userId={user?.id} userEmail={user?.email} />
           </div>
         </div>
       </div>

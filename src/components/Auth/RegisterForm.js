@@ -1,14 +1,19 @@
+// FILE OVERVIEW
+// - Purpose: Registration form component with email/password/full name fields, validation, password visibility toggle, and email confirmation handling.
+// - Used by: RegisterPage (route '/register') and can be used as modal; handles pending event requests after registration.
+// - Notes: Production component. Uses AuthContext.signUp and creates profile via profilesAPI; checks for pending event requests from sessionStorage.
+
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDarkMode } from '../../contexts/DarkModeContext'
-import { profilesAPI } from '../../services/httpApi'
+import { profilesAPI } from '../../services/databaseApi'
+import { secureLog, sanitizeError } from '../../utils/secureConfig'
 import { Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle, Moon, Sun } from 'lucide-react'
 
 const RegisterForm = ({ onSuccess, isModal = false }) => {
   const { signUp } = useAuth()
   const { isDarkMode, toggleDarkMode } = useDarkMode()
-  const navigate = useNavigate()
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -61,30 +66,25 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    console.log('Form submitted!', formData)
     setIsSubmitting(true)
     setError('')
 
     if (!validateForm()) {
-      console.log('Form validation failed')
       setIsSubmitting(false)
       return
     }
     
-    console.log('Form validation passed, proceeding with registration')
 
     try {
       if (isModal) {
         // Admin panel mode - create user without signing in
-        console.log('Creating user via admin panel (no sign-in)')
-        const result = await profilesAPI.createUser({
+        await profilesAPI.createUser({
           email: formData.email,
           password: formData.password,
           full_name: formData.fullName,
           role: 'member' // Default role for admin-created users
         })
         
-        console.log('User created successfully:', result)
         setSuccess(true)
         
         // Use callback to close modal and refresh user list
@@ -92,24 +92,28 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
           onSuccess()
         }, 500)
       } else {
-        // Public registration mode - sign up and sign in
-        console.log('Calling signUp with:', { email: formData.email, password: formData.password, fullName: formData.fullName })
+        // Public registration mode - sign up and send confirmation email
+        
+        secureLog('log', '[RegisterForm] Attempting to register user', { email: formData.email.substring(0, 3) + '***' })
         
         // Call signup without timeout - let it complete naturally
-        const { data, error } = await signUp(formData.email, formData.password, formData.fullName)
-        console.log('SignUp response:', { data, error })
+        const { error, data } = await signUp(formData.email, formData.password, formData.fullName)
         
         if (error) {
-          console.log('SignUp error:', error)
+          secureLog('error', '[RegisterForm] Registration error', { error: sanitizeError(error) })
           
           // Handle email sending errors
-          if (error.message && error.message.includes('Error sending confirmation email')) {
+          if (error.message && (
+            error.message.includes('Error sending confirmation email') ||
+            error.message.includes('Fehler beim Senden der Bestätigungs-E-Mail') ||
+            error.message.includes('email')
+          )) {
             setError('Es gab ein Problem beim Senden der Bestätigungs-E-Mail. Bitte versuchen Sie sich anzumelden, um zu überprüfen, ob Ihr Konto existiert. Falls das Problem weiterhin besteht, kontaktieren Sie bitte den Administrator.')
           } else {
             setError(error.message)
           }
         } else {
-          console.log('SignUp successful')
+          secureLog('log', '[RegisterForm] Registration successful', { email: formData.email.substring(0, 3) + '***' })
           setSuccess(true)
           
           // Don't auto-redirect - let user see the email verification message
@@ -117,7 +121,6 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
         }
       }
     } catch (err) {
-      console.error('Registration error:', err)
       
       if (isModal) {
         // Admin panel error handling
@@ -136,7 +139,6 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
   }
 
   if (success) {
-    console.log('Success screen is being rendered!')
     
     if (isModal) {
       // Modal success screen
@@ -192,7 +194,7 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
                 Bitte bestätigen Sie Ihre E-Mail-Adresse
               </p>
               <p className="text-base mb-6 text-[#A58C81] dark:text-[#EBE9E9]">
-                Wir haben eine Bestätigungs-E-Mail an <strong>{formData.email}</strong> gesendet.
+                Wir haben eine Bestätigungs-E-Mail an <strong className="break-all">{formData.email}</strong> gesendet.
                 <br/><br/>
                 Klicken Sie auf den Link in der E-Mail, um Ihr Konto zu aktivieren.
               </p>
@@ -205,7 +207,8 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
 
               <Link
                 to="/"
-                className="inline-block px-6 py-3 bg-[#A58C81] dark:bg-[#6a6a6a] text-white rounded-lg hover:opacity-90 transition-opacity font-semibold"
+                className="inline-block px-6 py-3 min-h-[44px] text-base bg-[#A58C81] dark:bg-[#6a6a6a] text-white rounded-lg hover:opacity-90 active:scale-95 transition-all font-semibold touch-manipulation"
+                style={{ touchAction: 'manipulation' }}
               >
                 Zur Startseite
               </Link>
@@ -249,7 +252,8 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
                   required
                   value={formData.fullName}
                   onChange={handleChange}
-                  className="w-full px-3 py-3 pl-10 border border-[#A58C81] dark:border-[#EBE9E9] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] dark:focus:ring-[#EBE9E9] focus:ring-opacity-50 transition-colors bg-white dark:bg-[#252422] text-[#252422] dark:text-[#F4F1E8]"
+                  className="w-full px-3 py-3 pl-10 min-h-[44px] text-base border border-[#A58C81] dark:border-[#EBE9E9] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] dark:focus:ring-[#EBE9E9] focus:ring-opacity-50 transition-colors bg-white dark:bg-[#252422] text-[#252422] dark:text-[#F4F1E8]"
+                  style={{ fontSize: '16px' }}
                   placeholder="Max Mustermann"
                 />
               </div>
@@ -271,7 +275,8 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
                   value={formData.email}
                   onChange={handleChange}
                   required
-                  className="w-full px-3 py-3 pl-10 border border-[#A58C81] dark:border-[#EBE9E9] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] dark:focus:ring-[#EBE9E9] focus:ring-opacity-50 transition-colors bg-white dark:bg-[#252422] text-[#252422] dark:text-[#F4F1E8]"
+                  className="w-full px-3 py-3 pl-10 min-h-[44px] text-base border border-[#A58C81] dark:border-[#EBE9E9] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] dark:focus:ring-[#EBE9E9] focus:ring-opacity-50 transition-colors bg-white dark:bg-[#252422] text-[#252422] dark:text-[#F4F1E8]"
+                  style={{ fontSize: '16px' }}
                   placeholder="ihre@email.de"
                 />
               </div>
@@ -351,7 +356,8 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full flex justify-center py-3 px-4 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity bg-[#2E07D4] hover:bg-[#2506B8]"
+              className="w-full flex justify-center py-3 px-4 min-h-[44px] text-base font-medium text-white rounded-lg hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all bg-[#2E07D4] hover:bg-[#2506B8] touch-manipulation"
+              style={{ touchAction: 'manipulation' }}
             >
               {isSubmitting ? (
                 <span className="flex items-center">
@@ -459,7 +465,8 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
                       required
                       value={formData.fullName}
                       onChange={handleChange}
-                      className="w-full px-3 py-3 pl-10 border border-[#A58C81] dark:border-[#EBE9E9] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] dark:focus:ring-[#EBE9E9] focus:ring-opacity-50 transition-colors bg-white dark:bg-[#252422] text-[#252422] dark:text-[#F4F1E8]"
+                      className="w-full px-3 py-3 pl-10 min-h-[44px] text-base border border-[#A58C81] dark:border-[#EBE9E9] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] dark:focus:ring-[#EBE9E9] focus:ring-opacity-50 transition-colors bg-white dark:bg-[#252422] text-[#252422] dark:text-[#F4F1E8]"
+                  style={{ fontSize: '16px' }}
                       placeholder="Max Mustermann"
                     />
                   </div>
@@ -481,7 +488,8 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
                       value={formData.email}
                       onChange={handleChange}
                       required
-                      className="w-full px-3 py-3 pl-10 border border-[#A58C81] dark:border-[#EBE9E9] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] dark:focus:ring-[#EBE9E9] focus:ring-opacity-50 transition-colors bg-white dark:bg-[#252422] text-[#252422] dark:text-[#F4F1E8]"
+                      className="w-full px-3 py-3 pl-10 min-h-[44px] text-base border border-[#A58C81] dark:border-[#EBE9E9] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] dark:focus:ring-[#EBE9E9] focus:ring-opacity-50 transition-colors bg-white dark:bg-[#252422] text-[#252422] dark:text-[#F4F1E8]"
+                  style={{ fontSize: '16px' }}
                       placeholder="ihre@email.de"
                     />
                   </div>
@@ -561,8 +569,8 @@ const RegisterForm = ({ onSuccess, isModal = false }) => {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  onClick={() => console.log('Register button clicked!')}
-                  className="w-full flex justify-center py-3 px-4 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity bg-[#2E07D4] hover:bg-[#2506B8]"
+                  className="w-full flex justify-center py-3 px-4 min-h-[44px] text-base font-medium text-white rounded-lg hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all bg-[#2E07D4] hover:bg-[#2506B8] touch-manipulation"
+              style={{ touchAction: 'manipulation' }}
                 >
                   {isSubmitting ? (
                     <span className="flex items-center">

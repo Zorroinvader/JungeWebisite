@@ -1,6 +1,13 @@
+// FILE OVERVIEW
+// - Purpose: Global authentication and authorization context (user session, profile, roles, sign-in/out, admin checks).
+// - Used by: Entire app via useAuth() hook and AuthProvider in App.js.
+// - Notes: Production file. Changes affect login flow, email confirmation handling, and admin/member permissions.
+
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase, USER_ROLES } from '../lib/supabase'
+import { profilesAPI } from '../services/databaseApi'
+import { secureLog, sanitizeError } from '../utils/secureConfig'
 
 // Create AuthContext
 const AuthContext = createContext({})
@@ -21,26 +28,51 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true)
 
   // Get user profile from database
+  // Uses profilesAPI which has HTTP-first approach with timeout to avoid hanging
   const getProfile = async (userId) => {
+    if (!userId) return null
+    
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single()
-
-      if (error) {
-        console.error('Error fetching profile:', error)
-        // If profile doesn't exist, create it
-        if (error.code === 'PGRST116') {
-          return await createProfile(userId)
-        }
-        return null
+      // Use profilesAPI which has executeWithFallback with HTTP-first approach
+      // Add timeout wrapper to prevent hanging
+      const profilePromise = profilesAPI.getById(userId)
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Profile load timeout')), 5000)
+      )
+      
+      const result = await Promise.race([profilePromise, timeoutPromise])
+      
+      // Handle result format from executeWithFallback
+      let profileData = result
+      if (result && typeof result === 'object' && result.data !== undefined) {
+        profileData = result.data
       }
-
-      return data
+      
+      // If result is an array, take first element
+      if (Array.isArray(profileData)) {
+        profileData = profileData[0] || null
+      }
+      
+      // If profile doesn't exist, create it
+      if (!profileData) {
+        return await createProfile(userId)
+      }
+      
+      return profileData
     } catch (error) {
-      console.error('Error in getProfile:', error)
+      // If timeout or error, try to create profile if it's a "not found" error
+      if (error.message && error.message.includes('timeout')) {
+        // On timeout, try creating profile
+        try {
+          return await createProfile(userId)
+        } catch (createError) {
+          return null
+        }
+      }
+      // For other errors, check if it's a "not found" error
+      if (error.code === 'PGRST116' || (error.message && error.message.includes('not found'))) {
+        return await createProfile(userId)
+      }
       return null
     }
   }
@@ -48,28 +80,56 @@ export const AuthProvider = ({ children }) => {
   // Create profile if it doesn't exist
   const createProfile = async (userId) => {
     try {
-      const { data: user } = await supabase.auth.getUser()
-      if (!user?.user) return null
+      // Add timeout to prevent hanging
+      const getUserPromise = supabase.auth.getUser()
+      const getUserTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('getUser timeout')), 2000)
+      )
+      
+      let userData = null
+      try {
+        const { data: user } = await Promise.race([getUserPromise, getUserTimeout])
+        userData = user?.user
+      } catch (getUserError) {
+        // If getUser fails, try to get email from session
+        try {
+          const sessionPromise = supabase.auth.getSession()
+          const sessionTimeout = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('getSession timeout')), 2000)
+          )
+          const { data: { session } } = await Promise.race([sessionPromise, sessionTimeout])
+          userData = session?.user
+        } catch (e) {
+          return null
+        }
+      }
+      
+      if (!userData) return null
 
-      const { data, error } = await supabase
+      // Add timeout for insert
+      const insertPromise = supabase
         .from('profiles')
         .insert([{
           id: userId,
-          email: user.user.email,
-          full_name: user.user.user_metadata?.full_name || null,
+          email: userData.email,
+          full_name: userData.user_metadata?.full_name || null,
           role: 'member'
         }])
         .select()
         .single()
+      
+      const insertTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Insert timeout')), 3000)
+      )
+
+      const { data, error } = await Promise.race([insertPromise, insertTimeout])
 
       if (error) {
-        console.error('Error creating profile:', error)
         return null
       }
 
       return data
     } catch (error) {
-      console.error('Error in createProfile:', error)
       return null
     }
   }
@@ -79,13 +139,26 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true)
       
-      // Generate a unique email if none provided
-      const userEmail = email || `user_${Date.now()}@temp.local`
+      // Validate email is provided and not empty
+      if (!email || !email.trim()) {
+        throw new Error('E-Mail-Adresse ist erforderlich')
+      }
       
-      // Use site origin as redirect URL (avoids path mismatches in allow list)
-      const redirectTo = typeof window !== 'undefined' 
-        ? window.location.origin 
-        : undefined
+      // Trim and validate email format
+      const userEmail = email.trim().toLowerCase()
+      
+      // Basic email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(userEmail)) {
+        throw new Error('Bitte geben Sie eine gültige E-Mail-Adresse ein')
+      }
+      
+      // Use production site URL + /login as redirect URL (redirects to login page after activation)
+      const { getSiteUrl } = await import('../utils/secureConfig')
+      const siteUrl = getSiteUrl()
+      const redirectTo = `${siteUrl}/login?activated=true`
+
+      secureLog('log', '[signUp] Sending confirmation email', { email: userEmail.substring(0, 3) + '***', redirectTo })
 
       const { data, error } = await supabase.auth.signUp({
         email: userEmail,
@@ -93,24 +166,47 @@ export const AuthProvider = ({ children }) => {
         options: {
           data: {
             full_name: fullName,
-            original_email: email || null // Store original email if provided
+            original_email: userEmail
           },
-          emailRedirectTo: redirectTo // Explicitly set redirect URL for email confirmation
+          emailRedirectTo: redirectTo // Redirect to login page with activation notification
         }
       })
 
       if (error) {
+        secureLog('error', '[signUp] Error during signup', { error: sanitizeError(error) })
+        
         // If user already exists, try to handle it gracefully
         if (error.message && error.message.includes('already registered')) {
-          console.log('User already exists - may need profile creation')
+          throw new Error('Diese E-Mail-Adresse ist bereits registriert')
         }
+        
+        // Check for email sending errors
+        if (error.message && (
+          error.message.includes('email') || 
+          error.message.includes('Email') ||
+          error.message.includes('confirmation')
+        )) {
+          throw new Error(`Fehler beim Senden der Bestätigungs-E-Mail: ${error.message}`)
+        }
+        
         throw error
+      }
+
+      // Verify that user was created and email will be sent
+      if (data?.user) {
+        secureLog('log', '[signUp] User created successfully', { 
+          email: data.user.email ? data.user.email.substring(0, 3) + '***' : 'unknown',
+          userId: data.user.id,
+          emailConfirmed: !!data.user.email_confirmed_at
+        })
+      } else {
+        secureLog('warn', '[signUp] No user data returned from signup')
       }
 
       // Profile will be created automatically by the database trigger
       return { data, error: null }
     } catch (error) {
-      console.error('Sign up error:', error)
+      secureLog('error', '[signUp] Signup failed', { error: sanitizeError(error) })
       return { data: null, error }
     } finally {
       setLoading(false)
@@ -130,7 +226,6 @@ export const AuthProvider = ({ children }) => {
 
       return { data, error: null }
     } catch (error) {
-      console.error('Sign in error:', error)
       return { data: null, error }
     } finally {
       setLoading(false)
@@ -140,11 +235,9 @@ export const AuthProvider = ({ children }) => {
   // Sign out function
   const signOut = async () => {
     try {
-      console.log('🔴 AuthContext signOut called - starting sign out...')
       setLoading(true)
       
       // Add timeout to prevent hanging
-      console.log('🔴 Calling supabase.auth.signOut() with timeout...')
       const signOutPromise = supabase.auth.signOut()
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('SignOut timeout after 3 seconds')), 3000)
@@ -153,27 +246,20 @@ export const AuthProvider = ({ children }) => {
       const { error } = await Promise.race([signOutPromise, timeoutPromise])
       
       if (error) {
-        console.error('🔴 Supabase signOut error:', error)
         throw error
       }
       
-      console.log('🔴 Supabase sign out successful, clearing local state...')
       // Clear local state
       setUser(null)
       setProfile(null)
-      console.log('🔴 Sign out completed successfully - user and profile cleared')
     } catch (error) {
-      console.error('🔴 Sign out error:', error)
       
       // Even if signOut fails, clear local state
       if (error.message.includes('SignOut timeout')) {
-        console.log('🔴 SignOut timed out, clearing local state anyway...')
         setUser(null)
         setProfile(null)
-        console.log('🔴 Local state cleared despite timeout')
       }
     } finally {
-      console.log('🔴 Setting loading to false')
       setLoading(false)
     }
   }
@@ -195,7 +281,6 @@ export const AuthProvider = ({ children }) => {
       setProfile(data)
       return { data, error: null }
     } catch (error) {
-      console.error('Update profile error:', error)
       return { data: null, error }
     }
   }
@@ -235,37 +320,56 @@ export const AuthProvider = ({ children }) => {
         
         if (hasConfirmation) {
           // User is coming back from email confirmation - let Supabase handle it
-          console.log('Email confirmation detected - preserving session')
           
           // Get the current session (Supabase will auto-exchange the token)
-          const { data: { session }, error } = await supabase.auth.getSession()
+          // Add timeout to prevent hanging
+          const sessionPromise = supabase.auth.getSession()
+          const sessionTimeout = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('getSession timeout')), 3000)
+          )
           
-          if (session?.user) {
-            console.log('User confirmed email and logged in:', session.user.email)
-            setUser(session.user)
-            const userProfile = await getProfile(session.user.id)
-            setProfile(userProfile)
+          try {
+            const { data: { session } } = await Promise.race([sessionPromise, sessionTimeout])
             
-            // Clean up URL parameters
-            window.history.replaceState({}, document.title, window.location.pathname)
+            if (session?.user) {
+              setUser(session.user)
+              const userProfile = await getProfile(session.user.id)
+              setProfile(userProfile)
+              
+              // Clean up URL parameters
+              window.history.replaceState({}, document.title, window.location.pathname)
+            }
+          } catch (sessionError) {
+            // Session check failed or timed out
+            setUser(null)
+            setProfile(null)
           }
         } else {
           // Normal page load - check for existing session
-          const { data: { session }, error } = await supabase.auth.getSession()
+          // Add timeout to prevent hanging
+          const sessionPromise = supabase.auth.getSession()
+          const sessionTimeout = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('getSession timeout')), 3000)
+          )
           
-          if (session?.user) {
-            console.log('Existing session found:', session.user.email)
-            setUser(session.user)
-            const userProfile = await getProfile(session.user.id)
-            setProfile(userProfile)
-          } else {
-            console.log('No existing session found')
+          try {
+            const { data: { session } } = await Promise.race([sessionPromise, sessionTimeout])
+            
+            if (session?.user) {
+              setUser(session.user)
+              const userProfile = await getProfile(session.user.id)
+              setProfile(userProfile)
+            } else {
+              setUser(null)
+              setProfile(null)
+            }
+          } catch (sessionError) {
+            // Session check failed or timed out
             setUser(null)
             setProfile(null)
           }
         }
       } catch (error) {
-        console.error('Error during auth initialization:', error)
         setUser(null)
         setProfile(null)
       } finally {
@@ -279,18 +383,15 @@ export const AuthProvider = ({ children }) => {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log(`Auth state change:`, event, session?.user?.email)
         
         // Handle sign in events (including email confirmation)
         if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session?.user) {
           setUser(session.user)
           const userProfile = await getProfile(session.user.id)
           setProfile(userProfile)
-          console.log('User authenticated:', session.user.email)
         } else if (event === 'SIGNED_OUT') {
           setUser(null)
           setProfile(null)
-          console.log('User signed out')
         }
       }
     )

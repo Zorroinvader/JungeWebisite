@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Animated typewriter effect component that displays text character by character with optional cursor.
+// - Used by: HomePage for animated title and subtitle display; provides visual appeal on landing page.
+// - Notes: Production component. Configurable speed and cursor display; calls onComplete callback when animation finishes.
+
 import React, { useState, useEffect } from 'react'
 
 const TypewriterText = ({ text, speed = 100, className = '', showCursor = true, onComplete }) => {

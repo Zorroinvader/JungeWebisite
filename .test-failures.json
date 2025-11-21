@@ -1,0 +1,32 @@
+[
+  {
+    "name": "API Tests",
+    "command": "npm",
+    "args": [
+      "run",
+      "test:api"
+    ],
+    "category": "api",
+    "severity": "high"
+  },
+  {
+    "name": "E2E Tests",
+    "command": "npm",
+    "args": [
+      "run",
+      "test:e2e"
+    ],
+    "category": "security",
+    "severity": "critical"
+  },
+  {
+    "name": "Visual Regression Tests",
+    "command": "npm",
+    "args": [
+      "run",
+      "test:visual"
+    ],
+    "category": "e2e",
+    "severity": "low"
+  }
+]

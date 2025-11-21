@@ -1,4 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react'
+// FILE OVERVIEW
+// - Purpose: Image gallery component for displaying clubhouse photos with lightbox, navigation, and download features.
+// - Used by: AboutPage to show clubhouse images; provides full-screen viewing and image navigation.
+// - Notes: Production component. Supports keyboard navigation, zoom, and download; shows image metadata and location info.
+
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { X, ChevronLeft, ChevronRight, ZoomIn, Download, Eye, Info, MapPin, Users, Calendar } from 'lucide-react'
 
 const MuseumGallery = ({ images = [], title = "Unser Clubhaus - Eine visuelle Entdeckungsreise", showFullGalleryButton = false }) => {
@@ -6,7 +11,6 @@ const MuseumGallery = ({ images = [], title = "Unser Clubhaus - Eine visuelle En
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
-  const [hoveredImage, setHoveredImage] = useState(null)
   const modalRef = useRef(null)
 
   // Museum-style gallery images with detailed descriptions
@@ -117,14 +121,15 @@ const MuseumGallery = ({ images = [], title = "Unser Clubhaus - Eine visuelle En
     document.body.style.overflow = 'unset'
   }
 
-  const navigateImage = (direction) => {
-    const newIndex = direction === 'next' 
-      ? (currentIndex + 1) % filteredImages.length
-      : (currentIndex - 1 + filteredImages.length) % filteredImages.length
-    
-    setCurrentIndex(newIndex)
-    setSelectedImage(filteredImages[newIndex])
-  }
+  const navigateImage = useCallback((direction) => {
+    setCurrentIndex(prevIndex => {
+      const newIndex = direction === 'next' 
+        ? (prevIndex + 1) % filteredImages.length
+        : (prevIndex - 1 + filteredImages.length) % filteredImages.length
+      setSelectedImage(filteredImages[newIndex])
+      return newIndex
+    })
+  }, [filteredImages])
 
   const downloadImage = async (imageSrc, imageAlt) => {
     try {
@@ -140,7 +145,6 @@ const MuseumGallery = ({ images = [], title = "Unser Clubhaus - Eine visuelle En
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
     } catch (error) {
-      console.error('Download failed:', error)
     } finally {
       setIsLoading(false)
     }
@@ -168,7 +172,7 @@ const MuseumGallery = ({ images = [], title = "Unser Clubhaus - Eine visuelle En
 
     document.addEventListener('keydown', handleKeyPress)
     return () => document.removeEventListener('keydown', handleKeyPress)
-  }, [isModalOpen, currentIndex, filteredImages.length])
+  }, [isModalOpen, navigateImage])
 
   // Close modal when clicking outside
   useEffect(() => {
@@ -228,8 +232,6 @@ const MuseumGallery = ({ images = [], title = "Unser Clubhaus - Eine visuelle En
             key={index}
             className="group relative overflow-hidden rounded-2xl bg-white dark:bg-gray-800 shadow-2xl hover:shadow-3xl museum-card cursor-pointer"
             onClick={() => openModal(image, index)}
-            onMouseEnter={() => setHoveredImage(index)}
-            onMouseLeave={() => setHoveredImage(null)}
           >
             {/* Large Image Container */}
             <div className="aspect-[4/3] relative overflow-hidden">

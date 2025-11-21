@@ -1,12 +1,14 @@
+// FILE OVERVIEW
+// - Purpose: Supabase client initialization and configuration; exports supabase client, table names, and user roles.
+// - Used by: Entire app for database access; imported by AuthContext, databaseApi, specialEventsApi, and many components.
+// - Notes: Production library file. Core dependency; uses secureConfig for safe key access.
+
 import { createClient } from '@supabase/supabase-js'
+import { getSupabaseUrl, getSupabaseAnonKey, getSiteUrl } from '../utils/secureConfig'
 
-// Supabase configuration
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL
-const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables. Please check your .env file.')
-}
+// SECURITY: Use secure getters to prevent key exposure
+const supabaseUrl = getSupabaseUrl()
+const supabaseAnonKey = getSupabaseAnonKey()
 
 // Create Supabase client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -14,7 +16,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
-    redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined
+    redirectTo: getSiteUrl()
   },
   db: {
     schema: 'public'
@@ -25,7 +27,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     }
   },
   realtime: {
-    enabled: false
+    enabled: true
   },
   storage: {
     // Add storage-specific configuration
@@ -38,7 +40,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 export const TABLES = {
   EVENTS: 'events',
   EVENT_REQUESTS: 'event_requests',
-  PROFILES: 'profiles'
+  PROFILES: 'profiles',
+  CLUB_STATUS: 'club_status'
 }
 
 // User roles - hierarchical permission system

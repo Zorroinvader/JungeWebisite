@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { getActiveSpecialEvents } from '../services/specialEvents'
+import { getActiveSpecialEvents } from '../services/specialEventsApi'
 
 const SpecialEventsPage = () => {
   const [events, setEvents] = useState([])
@@ -22,9 +22,9 @@ const SpecialEventsPage = () => {
   return (
     <div className="min-h-screen bg-[#F4F1E8] dark:bg-[#252422]">
       <div className="max-w-5xl mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-[#252422] dark:text-[#F4F1E8] mb-6">Special Events</h1>
+        <h1 className="text-3xl font-bold text-[#252422] dark:text-[#F4F1E8] mb-6">Besondere Veranstaltungen</h1>
         {events.length === 0 && (
-          <p className="text-[#252422] dark:text-[#F4F1E8]">Aktuell keine Special Events.</p>
+          <p className="text-[#252422] dark:text-[#F4F1E8]">Aktuell keine besonderen Veranstaltungen.</p>
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {events.map(ev => (

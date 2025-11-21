@@ -1,9 +1,14 @@
+// FILE OVERVIEW
+// - Purpose: Admin component for managing the 3-step event request workflow (initial → accepted → details submitted → final accepted).
+// - Used by: AdminPanelClean as the main request management interface; handles all stages of event request approval.
+// - Notes: Production component. Core admin tool; manages request stages, PDF downloads, and sends email notifications.
+
 import React, { useState, useEffect } from 'react';
-import { eventRequestsAPI } from '../../services/httpApi';
+import { eventRequestsAPI } from '../../services/databaseApi';
 import { CheckCircle, XCircle, Clock, Download, X } from 'lucide-react';
 import { useDarkMode } from '../../contexts/DarkModeContext';
 import { sendUserNotification } from '../../utils/settingsHelper';
-import { supabase } from '../../lib/supabase';
+import { secureLog, sanitizeError } from '../../utils/secureConfig';
 
 const ThreeStepRequestManagement = () => {
   const { isDarkMode } = useDarkMode();
@@ -13,42 +18,47 @@ const ThreeStepRequestManagement = () => {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [hasMoreRequests, setHasMoreRequests] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
 
   const loadRequests = async () => {
     try {
       setLoading(true);
       setError('');
       
-      console.log('Loading event requests...');
-      const session = await supabase.auth.getSession();
-      console.log('Current user session:', session);
-      console.log('Current user ID:', session.data.session?.user?.id);
-      console.log('Current user email:', session.data.session?.user?.email);
+      // Add timeout wrapper to prevent hanging
+      const loadPromise = eventRequestsAPI.getAdminPanelData(50, 0);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Lade-Timeout')), 4000)
+      );
       
-      // Load only the most recent 50 requests for faster loading
-      const data = await eventRequestsAPI.getAdminPanelData(50, 0);
-      console.log('Raw API data:', data);
+      const data = await Promise.race([loadPromise, timeoutPromise]);
       
-      // Show all requests, but prioritize 3-step workflow ones
-      const allRequests = data || [];
-      console.log('All requests:', allRequests);
+      // Handle different response formats
+      let allRequests = [];
+      
+      if (Array.isArray(data)) {
+        allRequests = data;
+      } else if (data && typeof data === 'object') {
+        // Might be { data: [...], error: null } format from Supabase
+        if (Array.isArray(data.data)) {
+          allRequests = data.data;
+        } else if (data.data === null || data.data === undefined) {
+          allRequests = [];
+        }
+      }
       
       // Sort by created_at, newest first
-      allRequests.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      allRequests.sort((a, b) => {
+        const dateA = a.created_at ? new Date(a.created_at) : new Date(0);
+        const dateB = b.created_at ? new Date(b.created_at) : new Date(0);
+        return dateB - dateA;
+      });
       
       setRequests(allRequests);
-      setHasMoreRequests(allRequests.length === 50); // If we got exactly 50, there might be more
       setLastUpdated(new Date());
     } catch (err) {
-      console.error('Error loading requests:', err);
-      console.error('Error details:', {
-        message: err.message,
-        stack: err.stack,
-        name: err.name
-      });
+      secureLog('error', '[ThreeStepRequestManagement] Error loading requests', { error: sanitizeError(err) });
       setError(`Fehler beim Laden der Anfragen: ${err.message}`);
+      setRequests([]);
     } finally {
       setLoading(false);
     }
@@ -57,10 +67,10 @@ const ThreeStepRequestManagement = () => {
   useEffect(() => {
     loadRequests();
     
-    // Auto-refresh every 60 seconds to catch updates (less frequent for better performance)
+    // Auto-refresh every 30 seconds to catch updates (especially when user submits details)
     const interval = setInterval(() => {
       loadRequests();
-    }, 60000);
+    }, 30000);
     
     // Safety timeout to prevent infinite loading
     const timeout = setTimeout(() => {
@@ -71,6 +81,7 @@ const ThreeStepRequestManagement = () => {
       clearInterval(interval);
       clearTimeout(timeout);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Helper functions - Using your color palette
@@ -196,10 +207,7 @@ const ThreeStepRequestManagement = () => {
     const handleLocalAcceptInitial = async () => {
       setLocalLoading(true);
       try {
-        console.log('Accepting request:', request.id, 'with notes:', localNotes);
         await eventRequestsAPI.acceptInitialRequest(request.id, localNotes);
-        console.log('Request accepted successfully');
-        
         // Send email to user informing them to fill detailed form
         try {
           await sendUserNotification(request.requester_email, {
@@ -212,15 +220,13 @@ const ThreeStepRequestManagement = () => {
             event_type: request.event_type
           }, 'initial_request_accepted');
         } catch (emailErr) {
-          console.warn('Failed to send user notification:', emailErr);
         }
         
         await loadRequests();
         setShowDetailModal(false);
         setSelectedRequest(null);
-        alert('✅ Initiale Anfrage akzeptiert! Der Benutzer wurde per E-Mail benachrichtigt und kann nun die Details ausfüllen.');
+        alert('✅ Initiale Anfrage akzeptiert!\n\n• Der Zeitraum ist jetzt im Kalender blockiert\n• Der Benutzer wurde per E-Mail benachrichtigt\n• Der Benutzer kann nun die Details einreichen');
       } catch (err) {
-        console.error('Error accepting initial request:', err);
         alert('Fehler beim Akzeptieren der Anfrage');
       } finally {
         setLocalLoading(false);
@@ -245,7 +251,6 @@ const ThreeStepRequestManagement = () => {
         setSelectedRequest(null);
         alert('❌ Anfrage abgelehnt. Der Benutzer wurde benachrichtigt.');
       } catch (err) {
-        console.error('Error rejecting request:', err);
         alert('Fehler beim Ablehnen der Anfrage');
       } finally {
         setLocalLoading(false);
@@ -253,7 +258,7 @@ const ThreeStepRequestManagement = () => {
     };
 
     const handleLocalFinalAccept = async () => {
-      if (!window.confirm('Hat der Benutzer bezahlt? Event wird endgültig freigegeben und im Kalender eingetragen.')) {
+      if (!window.confirm('Hat der Benutzer bezahlt? Die Veranstaltung wird endgültig freigegeben und im Kalender eingetragen.')) {
         return;
       }
       
@@ -275,15 +280,19 @@ const ThreeStepRequestManagement = () => {
             event_type: request.event_type
           }, 'final_approval');
         } catch (emailErr) {
-          console.warn('Failed to send user notification:', emailErr);
         }
         
         await loadRequests();
         setShowDetailModal(false);
         setSelectedRequest(null);
-        alert('✅ Event endgültig freigegeben! Das Event ist nun im Kalender sichtbar.\n\nDer Benutzer wurde per E-Mail benachrichtigt.');
+        
+        // Trigger calendar refresh by dispatching custom event
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('refreshCalendar'));
+        }
+        
+        alert('✅ Veranstaltung final freigegeben!\n\n• Die Veranstaltung ist nun im Kalender sichtbar\n• Der temporäre Block wurde entfernt\n• Der Benutzer wurde per E-Mail benachrichtigt');
       } catch (err) {
-        console.error('Error final accepting request:', err);
         alert(`Fehler bei der finalen Freigabe:\n\n${err.message || err.toString()}\n\nBitte überprüfen Sie die Browser-Konsole für Details.`);
       } finally {
         setLocalLoading(false);
@@ -291,35 +300,22 @@ const ThreeStepRequestManagement = () => {
     };
 
     const handleDownloadContract = async () => {
-      console.log('📥 Download attempt - Contract info:', {
-        has_storage_url: !!request.signed_contract_url,
-        has_database_data: !!request.uploaded_file_data,
-        file_name: request.uploaded_file_name,
-        file_size: request.uploaded_file_size,
-        data_length: request.uploaded_file_data ? request.uploaded_file_data.length : 0
-      });
-
       try {
         // METHOD 1: Try Storage Bucket URL
         if (request.signed_contract_url) {
-          console.log('Trying storage URL:', request.signed_contract_url);
           try {
             const response = await fetch(request.signed_contract_url);
             if (response.ok) {
-              console.log('✅ Storage download successful');
               window.open(request.signed_contract_url, '_blank');
               return;
             } else {
-              console.log('⚠️ Storage fetch failed:', response.status, response.statusText);
             }
           } catch (storageError) {
-            console.log('⚠️ Storage error:', storageError.message);
           }
         }
         
         // METHOD 2: Try Database Base64 Data
         if (request.uploaded_file_data) {
-          console.log('✅ Using database fallback - Base64 length:', request.uploaded_file_data.length);
           try {
             const byteCharacters = atob(request.uploaded_file_data);
             const byteNumbers = new Array(byteCharacters.length);
@@ -337,37 +333,45 @@ const ThreeStepRequestManagement = () => {
             link.click();
             document.body.removeChild(link);
             window.URL.revokeObjectURL(url);
-            console.log('✅ Database download successful!');
             return;
           } catch (base64Error) {
-            console.error('❌ Base64 decode error:', base64Error);
             throw new Error('Fehler beim Dekodieren der PDF-Daten: ' + base64Error.message);
           }
         }
         
         // If no data at all
-        console.error('❌ No contract data found!');
         alert(
           '❌ Kein Vertrag verfügbar!\n\n' +
           'Der Benutzer hat noch keinen Vertrag hochgeladen.\n' +
           'Bitte warten Sie, bis der Benutzer die Details eingereicht hat.'
         );
       } catch (error) {
-        console.error('❌ Download error:', error);
         alert('Fehler beim Herunterladen:\n\n' + error.message + '\n\nSiehe Browser-Konsole (F12) für Details.');
       }
     };
 
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-        <div className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-2xl shadow-xl max-w-3xl w-full my-8 max-h-[90vh] overflow-y-auto border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#4a4a4a]' : ''}`}>
-          <div className={`p-8 border-b border-[#A58C81] ${isDarkMode ? 'dark:border-[#EBE9E9]' : ''} sticky top-0 bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} z-10`}>
-            <div className="flex justify-between items-start">
-              <div>
-                <h2 className={`text-2xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
+      <div 
+        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-3 md:p-4 overflow-y-auto"
+        style={{ touchAction: 'pan-y', overscrollBehavior: 'contain' }}
+      >
+        {/* MOBILE RESPONSIVE: Detail modal with proper mobile sizing and touch-friendly interactions */}
+        <div 
+          className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-xl sm:rounded-2xl shadow-xl max-w-3xl w-full my-4 sm:my-8 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#4a4a4a]' : ''}`}
+          style={{ 
+            WebkitOverflowScrolling: 'touch',
+            touchAction: 'pan-y',
+            overscrollBehavior: 'contain'
+          }}
+        >
+          {/* MOBILE RESPONSIVE: Sticky header with responsive padding */}
+          <div className={`p-4 sm:p-6 md:p-8 border-b border-[#A58C81] ${isDarkMode ? 'dark:border-[#EBE9E9]' : ''} sticky top-0 bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} z-10`}>
+            <div className="flex justify-between items-start gap-2">
+              <div className="flex-1 min-w-0">
+                <h2 className={`text-lg sm:text-xl md:text-2xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} truncate`}>
                   {request.event_name || request.title}
                 </h2>
-                <p className={`text-sm text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mt-1`}>
+                <p className={`text-xs sm:text-sm text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mt-1`}>
                   {getStageLabel(request.request_stage)}
                 </p>
               </div>
@@ -376,25 +380,29 @@ const ThreeStepRequestManagement = () => {
                   setShowDetailModal(false);
                   setSelectedRequest(null);
                 }}
-                className={`p-2 hover:opacity-70 transition-opacity rounded-lg text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}
+                className={`min-w-[44px] min-h-[44px] p-2 hover:opacity-70 active:scale-95 transition-all rounded-lg text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} touch-manipulation flex items-center justify-center flex-shrink-0`}
+                aria-label="Schließen"
+                style={{ touchAction: 'manipulation' }}
               >
                 <X size={24} />
               </button>
             </div>
           </div>
 
-          <div className="p-8 space-y-6">
+          {/* MOBILE RESPONSIVE: Content with responsive padding */}
+          <div className="p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-6">
             {/* Request Information */}
             <div className={`bg-gray-50 ${isDarkMode ? 'dark:bg-gray-900/50' : ''} rounded-lg p-4 border border-gray-200 ${isDarkMode ? 'dark:border-gray-700' : ''}`}>
               <h4 className={`font-semibold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} mb-3 text-sm`}>Anfrageinformationen</h4>
-              <div className="grid grid-cols-2 gap-3 text-sm">
+              {/* MOBILE RESPONSIVE: Stack on mobile, 2 columns on desktop */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <div>
                   <p className={`text-xs text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>Antragsteller:</p>
-                  <p className={`font-medium text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>{request.requester_name}</p>
+                  <p className={`font-medium text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} break-words`}>{request.requester_name}</p>
                 </div>
                 <div>
                   <p className={`text-xs text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>E-Mail:</p>
-                  <p className={`font-medium text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>{request.requester_email}</p>
+                  <p className={`font-medium text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} break-all`}>{request.requester_email}</p>
                 </div>
                 {request.requester_phone && (
                   <div>
@@ -403,9 +411,9 @@ const ThreeStepRequestManagement = () => {
                   </div>
                 )}
                 <div>
-                  <p className={`text-xs text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>Event-Typ:</p>
+                  <p className={`text-xs text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>Veranstaltungs-Typ:</p>
                   <p className={`font-medium text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
-                    {request.is_private ? 'Privates Event' : 'Öffentliches Event'}
+                    {request.is_private ? 'Private Veranstaltung' : 'Öffentliche Veranstaltung'}
                   </p>
                 </div>
                 <div className="col-span-2">
@@ -431,11 +439,11 @@ const ThreeStepRequestManagement = () => {
                 <h4 className={`font-semibold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} mb-2 text-sm`}>Detaillierte Zeiten:</h4>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
-                    <p className={`text-xs text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>Event-Start:</p>
+                    <p className={`text-xs text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>Veranstaltungs-Start:</p>
                     <p className={`font-medium text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>{formatDate(request.exact_start_datetime)}</p>
                   </div>
                   <div>
-                    <p className={`text-xs text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>Event-Ende:</p>
+                    <p className={`text-xs text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>Veranstaltungs-Ende:</p>
                     <p className={`font-medium text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>{formatDate(request.exact_end_datetime)}</p>
                   </div>
                   <div>
@@ -537,8 +545,9 @@ const ThreeStepRequestManagement = () => {
                         onClick={handleLocalAcceptInitial}
                         disabled={localLoading}
                         className={`px-6 py-3 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} hover:bg-[#8a6a5a] ${isDarkMode ? 'dark:hover:bg-[#8a8a8a]' : ''}`}
+                        title="Initiale Akzeptanz: Zeitraum wird blockiert, Benutzer kann Details einreichen"
                       >
-                        {localLoading ? 'Wird akzeptiert...' : '✅ Akzeptieren'}
+                        {localLoading ? 'Wird akzeptiert...' : '✅ Initial akzeptieren'}
                       </button>
                     </>
                   )}
@@ -573,8 +582,9 @@ const ThreeStepRequestManagement = () => {
                         onClick={handleLocalFinalAccept}
                         disabled={localLoading}
                         className={`px-6 py-3 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} hover:bg-[#8a6a5a] ${isDarkMode ? 'dark:hover:bg-[#8a8a8a]' : ''}`}
+                        title="Finale Freigabe: Veranstaltung wird im Kalender erstellt und Benutzer wird benachrichtigt"
                       >
-                        {localLoading ? 'Wird freigegeben...' : '🎉 Freigeben'}
+                        {localLoading ? 'Wird freigegeben...' : '🎉 Final freigeben'}
                       </button>
                     </>
                   )}
@@ -668,7 +678,7 @@ const ThreeStepRequestManagement = () => {
             Keine Anfragen vorhanden
           </h3>
           <p className={`text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>
-            Sobald Benutzer Event-Anfragen stellen, werden sie hier angezeigt.
+            Sobald Benutzer Veranstaltungs-Anfragen stellen, werden sie hier angezeigt.
           </p>
         </div>
       ) : (

@@ -11,36 +11,74 @@ declare global {
   }
 }
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+// CORS configuration with origin whitelist
+const getAllowedOrigins = () => {
+  const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
+  if (envOrigins) {
+    return envOrigins.split(',').map(o => o.trim())
+  }
+  return [
+    Deno.env.get('ALLOWED_ORIGIN') || 'https://your-production-domain.com',
+    'http://localhost:3000', // Development
+  ]
+}
+
+const getCorsHeaders = (req: Request) => {
+  const allowedOrigins = getAllowedOrigins()
+  const origin = req.headers.get('origin')
+  const corsOrigin = origin && allowedOrigins.includes(origin) 
+    ? origin 
+    : allowedOrigins[0]
+  
+  return {
+    'Access-Control-Allow-Origin': corsOrigin,
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Credentials': 'true',
+  }
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req)
+  
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    // Get Resend API key
+    // Get Resend API key - SECURITY: Validate required environment variables
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
     
     if (!RESEND_API_KEY) {
-      console.error('❌ RESEND_API_KEY not found in environment')
-      throw new Error('RESEND_API_KEY not configured')
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'RESEND_API_KEY not configured. Please set this environment variable in Supabase Dashboard.',
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      )
     }
-
-    console.log('✅ API Key found, length:', RESEND_API_KEY.length)
+    
+    // Validate key format (basic check - Resend keys typically start with 're_')
+    if (!RESEND_API_KEY.startsWith('re_') && RESEND_API_KEY.length < 20) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Invalid RESEND_API_KEY format.',
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      )
+    }
 
     // Parse request body
     const { adminEmails, subject, message, htmlContent, recipients } = await req.json()
-
-    console.log('📧 Request received:')
-    console.log('  - Admin emails:', adminEmails)
-    console.log('  - Recipients:', recipients)
-    console.log('  - Subject:', subject)
-    console.log('  - Has HTML:', !!htmlContent)
 
     // Determine recipients - prefer recipients parameter, fallback to adminEmails
     const emailRecipients = recipients || adminEmails
@@ -51,10 +89,8 @@ Deno.serve(async (req) => {
     }
 
     // Send email using Resend API
-    console.log('📤 Sending to Resend API...')
-    
     // Sender (must be verified with Resend)
-    const fromEmail = Deno.env.get('RESEND_FROM_EMAIL') || 'no-reply@jg-wedeswedel.de'
+    const fromEmail = Deno.env.get('RESEND_FROM_EMAIL') || 'jungegesellschaft@wedelheine.de'
     const fromName = Deno.env.get('RESEND_FROM_NAME') || 'Jungengesellschaft'
     
     // Always send to provided recipients; rely on Resend domain verification instead of filtering
@@ -68,9 +104,6 @@ Deno.serve(async (req) => {
       text: message,
     }
 
-    console.log('📦 Email payload:', JSON.stringify(emailPayload, null, 2))
-    console.log('📧 From address:', emailPayload.from)
-
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -80,18 +113,13 @@ Deno.serve(async (req) => {
       body: JSON.stringify(emailPayload),
     })
 
-    console.log('📬 Resend API response status:', response.status)
-
     const responseText = await response.text()
-    console.log('📬 Resend API response:', responseText)
 
     if (!response.ok) {
-      console.error('❌ Resend API error:', responseText)
       throw new Error(`Resend API error (${response.status}): ${responseText}`)
     }
 
     const result = JSON.parse(responseText)
-    console.log('✅ Email sent successfully! ID:', result.id)
 
     return new Response(
       JSON.stringify({ 
@@ -106,14 +134,13 @@ Deno.serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('❌ Error in function:', error)
-    console.error('❌ Error stack:', error.stack)
+    const isProduction = Deno.env.get('ENVIRONMENT') === 'production'
     
     return new Response(
       JSON.stringify({ 
         success: false, 
         error: error.message,
-        details: error.stack 
+        ...(isProduction ? {} : { details: error.stack })
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

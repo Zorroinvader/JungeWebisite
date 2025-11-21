@@ -1,5 +1,11 @@
+// FILE OVERVIEW
+// - Purpose: Admin component for managing users: viewing profiles, updating roles, creating users, and viewing user activity.
+// - Used by: AdminPanelClean in the users tab; provides user list, role management, and user creation via RegisterForm.
+// - Notes: Production component. Admin-only; uses profilesAPI for user operations; includes user creation and role updates.
+
 import React, { useState, useEffect } from 'react'
-import { profilesAPI } from '../../services/httpApi'
+import { profilesAPI } from '../../services/databaseApi'
+import { secureLog, sanitizeError } from '../../utils/secureConfig'
 import { User, Shield, Mail, Calendar, AlertCircle, X, Plus, Eye, EyeOff, CheckCircle, Trash2 } from 'lucide-react'
 import moment from 'moment'
 import RegisterForm from '../Auth/RegisterForm'
@@ -21,33 +27,25 @@ const UserManagement = () => {
       setLoading(true)
       setError('')
       
-      console.log('👥 User Management: Loading users...')
-      let data = []
+      // Add timeout wrapper to prevent hanging
+      const loadPromise = profilesAPI.getAll()
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Lade-Timeout')), 4000)
+      )
       
+      let data = []
       try {
-        data = await profilesAPI.getAll()
-        console.log('👥 User Management: Primary API success:', data?.length || 0, 'users')
+        data = await Promise.race([loadPromise, timeoutPromise])
+        data = Array.isArray(data) ? data : []
       } catch (error) {
-        console.error('👥 User Management: Primary API failed, trying fallback:', error)
-        try {
-          data = await profilesAPI.getAllDirect()
-          console.log('👥 User Management: Fallback API success:', data?.length || 0, 'users')
-        } catch (fallbackError) {
-          console.error('👥 User Management: Direct API failed, trying ultra-simple:', fallbackError)
-          try {
-            data = await profilesAPI.getAllSimple()
-            console.log('👥 User Management: Ultra-simple API success:', data?.length || 0, 'users')
-          } catch (simpleError) {
-            console.error('👥 User Management: All API methods failed:', simpleError)
-            data = []
-          }
-        }
+        secureLog('error', 'Failed to load profiles', sanitizeError(error))
+        data = []
       }
       
       setUsers(data || [])
     } catch (err) {
-      console.error('👥 User Management: Error loading users:', err)
       setError('Fehler beim Laden der Benutzer')
+      setUsers([])
     } finally {
       setLoading(false)
     }
@@ -95,7 +93,6 @@ const UserManagement = () => {
       setShowDeleteAllConfirm(false)
       
     } catch (err) {
-      console.error('Error deleting all users:', err)
       setError(`Fehler beim Löschen: ${err.message}`)
     } finally {
       setIsDeletingAll(false)
@@ -131,7 +128,6 @@ const UserManagement = () => {
         try {
           await loadUsers()
         } catch (error) {
-          console.error('Error loading users:', error)
           if (mounted) {
             setLoading(false)
             setError('Fehler beim Laden der Benutzer')
@@ -337,9 +333,20 @@ const UserManagement = () => {
       )}
 
       {/* Register Form Modal */}
+      {/* MOBILE RESPONSIVE: Register Form Modal with proper mobile sizing */}
       {showRegisterForm && (
-        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-          <div className="relative w-full max-w-lg bg-white dark:bg-[#252422] rounded-2xl shadow-2xl border border-gray-200 dark:border-[#EBE9E9]/20">
+        <div 
+          className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-2 sm:p-3 md:p-4"
+          style={{ touchAction: 'pan-y', overscrollBehavior: 'contain' }}
+        >
+          <div 
+            className="relative w-full max-w-lg bg-white dark:bg-[#252422] rounded-xl sm:rounded-2xl shadow-2xl border border-gray-200 dark:border-[#EBE9E9]/20 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto"
+            style={{ 
+              WebkitOverflowScrolling: 'touch',
+              touchAction: 'pan-y',
+              overscrollBehavior: 'contain'
+            }}
+          >
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-[#EBE9E9]/20">
               <div>
@@ -437,15 +444,25 @@ const RoleChangeModal = ({ user, onClose, onUpdateRole }) => {
     try {
       await onUpdateRole(user.id, selectedRole)
     } catch (err) {
-      console.error('Error updating role:', err)
     } finally {
       setLoading(false)
     }
   }
 
+  // MOBILE RESPONSIVE: Role change modal with proper mobile sizing
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-black/70 flex items-center justify-center p-4 z-50">
-      <div className="bg-white dark:bg-[#2a2a2a] rounded-lg max-w-md w-full border-2 border-[#A58C81] dark:border-[#4a4a4a]">
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 dark:bg-black/70 flex items-center justify-center p-2 sm:p-3 md:p-4 z-50"
+      style={{ touchAction: 'pan-y', overscrollBehavior: 'contain' }}
+    >
+      <div 
+        className="bg-white dark:bg-[#2a2a2a] rounded-xl sm:rounded-lg max-w-md w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto border-2 border-[#A58C81] dark:border-[#4a4a4a]"
+        style={{ 
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y',
+          overscrollBehavior: 'contain'
+        }}
+      >
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold text-[#252422] dark:text-[#F4F1E8]">
@@ -495,18 +512,21 @@ const RoleChangeModal = ({ user, onClose, onUpdateRole }) => {
               </div>
             </div>
 
-            <div className="flex justify-end space-x-3 pt-4 border-t border-[#A58C81] dark:border-[#EBE9E9]">
+            {/* MOBILE RESPONSIVE: Buttons stack on mobile */}
+            <div className="flex flex-col sm:flex-row justify-end gap-3 sm:space-x-3 pt-4 border-t border-[#A58C81] dark:border-[#EBE9E9]">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-[#252422] dark:text-[#e0e0e0] bg-white dark:bg-[#1a1a1a] border-2 border-[#A58C81] dark:border-[#6a6a6a] rounded-lg hover:bg-gray-50 dark:hover:bg-[#252422] transition-colors"
+                className="w-full sm:w-auto px-4 py-2 min-h-[44px] text-base font-medium text-[#252422] dark:text-[#e0e0e0] bg-white dark:bg-[#1a1a1a] border-2 border-[#A58C81] dark:border-[#6a6a6a] rounded-lg hover:bg-gray-50 dark:hover:bg-[#252422] active:scale-95 transition-all touch-manipulation"
+                style={{ touchAction: 'manipulation' }}
               >
                 Abbrechen
               </button>
               <button
                 type="submit"
                 disabled={loading || selectedRole === user.role}
-                className="px-4 py-2 text-sm font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto px-4 py-2 min-h-[44px] text-base font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+                style={{ touchAction: 'manipulation' }}
               >
                 {loading ? 'Wird aktualisiert...' : 'Rolle aktualisieren'}
               </button>
@@ -576,18 +596,11 @@ const SuperAdminUserForm = ({ onClose, onSuccess }) => {
       // Use Supabase auth signUp (same as normal registration)
       const { supabase } = await import('../../lib/supabase')
       
-      console.log('🔄 Creating user via Supabase Auth:', {
-        email: formData.email,
-        role: formData.role
-      })
-      
       // Create user with signUp and immediately confirm email
-      console.log('🔄 Creating user via signUp:', { email: formData.email, role: formData.role })
       
-      // Use site origin as redirect URL to match Supabase allow list
-      const redirectTo = typeof window !== 'undefined' 
-        ? window.location.origin 
-        : undefined
+      // Use production site URL for email redirect to match Supabase allow list
+      const { getSiteUrl } = await import('../../utils/secureConfig')
+      const redirectTo = getSiteUrl()
 
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
@@ -602,10 +615,8 @@ const SuperAdminUserForm = ({ onClose, onSuccess }) => {
         }
       })
 
-      console.log('📥 SignUp Response:', { authData, authError })
 
       if (authError) {
-        console.error('❌ SignUp Error:', authError)
         throw new Error(authError.message || 'Fehler beim Erstellen des Benutzers')
       }
       if (!authData.user) throw new Error('Benutzer konnte nicht erstellt werden')
@@ -613,7 +624,6 @@ const SuperAdminUserForm = ({ onClose, onSuccess }) => {
       const user = authData.user
       
       // Set up complete user (confirm email + create profile) using database function
-      console.log('🔄 Setting up complete user (email confirmation + profile creation)...')
       
       try {
         const { error } = await supabase.rpc('setup_complete_user', {
@@ -625,21 +635,16 @@ const SuperAdminUserForm = ({ onClose, onSuccess }) => {
         })
         
         if (error) {
-          console.warn('⚠️ Complete user setup failed:', error)
           throw error
         } else {
-          console.log('✅ Complete user setup successful - email confirmed and profile created')
         }
         
       } catch (setupError) {
-        console.warn('⚠️ Complete user setup failed, trying fallback methods:', setupError.message)
         
         // Fallback 1: Try to confirm email
         try {
           await supabase.rpc('confirm_user_email', { user_id: user.id })
-          console.log('✅ Email confirmed via fallback')
         } catch (emailError) {
-          console.warn('⚠️ Email confirmation fallback failed:', emailError.message)
         }
         
         // Fallback 2: Try to create profile
@@ -651,19 +656,15 @@ const SuperAdminUserForm = ({ onClose, onSuccess }) => {
             user_role: formData.role,
             username: formData.username
           })
-          console.log('✅ Profile created via fallback')
         } catch (profileError) {
-          console.warn('⚠️ Profile creation fallback failed:', profileError.message)
         }
       }
 
       // Success!
-      console.log('✅ User created successfully:', user)
       setSuccess(true)
       setError('') // Clear any previous errors
       
       // Trigger parent component to refresh user list
-      console.log('🔄 Triggering user list refresh...')
       if (onSuccess) {
         onSuccess() // This will trigger the parent to refresh
       }
@@ -674,7 +675,6 @@ const SuperAdminUserForm = ({ onClose, onSuccess }) => {
       }, 3000)
 
     } catch (err) {
-      console.error('Error creating user:', err)
       setError(err.message || 'Fehler beim Erstellen des Benutzers')
       setSuccess(false) // Ensure success is false on error
     } finally {
@@ -683,8 +683,15 @@ const SuperAdminUserForm = ({ onClose, onSuccess }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-      <div className="relative w-full max-w-lg bg-white dark:bg-[#252422] rounded-2xl shadow-2xl border border-gray-200 dark:border-[#EBE9E9]/20">
+    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-2 sm:p-3 md:p-4" style={{ touchAction: 'pan-y', overscrollBehavior: 'contain' }}>
+      <div 
+        className="relative w-full max-w-lg bg-white dark:bg-[#252422] rounded-xl sm:rounded-2xl shadow-2xl border border-gray-200 dark:border-[#EBE9E9]/20 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto"
+        style={{ 
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y',
+          overscrollBehavior: 'contain'
+        }}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-[#EBE9E9]/20">
           <div>

@@ -1,15 +1,19 @@
+// FILE OVERVIEW
+// - Purpose: Main admin dashboard component that provides tabs for event management, request management, user management, settings, and special events.
+// - Used by: Route '/admin' in App.js (protected, admin-only); central hub for all admin operations.
+// - Notes: Production component. Admin-only access; includes ThreeStepRequestManagement, EventRequestManagement, UserManagement, AdminSettings, SpecialEventModeration.
+
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDarkMode } from '../../contexts/DarkModeContext'
-import { Calendar, Users, FileText, Settings, AlertCircle, Check, X, Clock, Eye, Download, ArrowLeft, Workflow, Plus, Edit, RefreshCw } from 'lucide-react'
-import { eventRequestsAPI, eventsAPI } from '../../services/httpApi'
-import eventBus from '../../utils/eventBus'
+import { Calendar, Users, FileText, Settings, AlertCircle, Check, X, Eye, Download, ArrowLeft, Workflow, Plus, Edit, RefreshCw } from 'lucide-react'
+import { eventsAPI } from '../../services/databaseApi'
+import { secureLog, sanitizeError } from '../../utils/secureConfig'
 import UserManagement from './UserManagement'
 import ThreeStepRequestManagement from './ThreeStepRequestManagement'
 import AdminEventCreationForm from './AdminEventCreationForm'
 import AdminEventEditForm from './AdminEventEditForm'
-// import SimpleMonthCalendar from '../Calendar/SimpleMonthCalendar' // Removed to speed up admin panel
 import { fetchAndParseICS, convertToDBEvent } from '../../utils/icsParser'
 
 const AdminPanelClean = () => {
@@ -19,8 +23,8 @@ const AdminPanelClean = () => {
 
   const tabs = [
     { id: 'three-step-requests', name: '3-Schritt Anfragen', icon: Workflow },
-    { id: 'events', name: 'Events verwalten', icon: FileText },
-    { id: 'special-events', name: 'Special Events', icon: Eye },
+    { id: 'events', name: 'Veranstaltungen verwalten', icon: FileText },
+    { id: 'special-events', name: 'Besondere Veranstaltungen', icon: Eye },
     { id: 'users', name: 'Benutzer verwalten', icon: Users },
     { id: 'settings', name: 'Einstellungen', icon: Settings }
   ]
@@ -65,12 +69,12 @@ const AdminPanelClean = () => {
                 Zugriff verweigert
               </h2>
               <p className="text-base mb-6" style={{ color: '#A58C81' }}>
-                Sie haben keine Berechtigung, auf den Admin-Bereich zuzugreifen.
+                Sie haben keine Berechtigung, auf den Verwaltungsbereich zuzugreifen.
               </p>
               <div className="text-sm mb-6" style={{ color: '#666' }}>
-                <p>User Email: {user?.email || 'Not logged in'}</p>
-                <p>Profile Role: {profile?.role || 'No profile'}</p>
-                <p>Is Admin: {isAdmin() ? 'Yes' : 'No'}</p>
+                <p>E-Mail: {user?.email || 'Nicht angemeldet'}</p>
+                <p>Rolle: {profile?.role || 'Kein Profil'}</p>
+                <p>Administrator: {isAdmin() ? 'Ja' : 'Nein'}</p>
               </div>
               <button
                 onClick={() => navigate('/')}
@@ -110,9 +114,9 @@ const AdminPanelClean = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold mb-4 text-[#252422] dark:text-[#F4F1E8]">Admin Panel</h1>
+            <h1 className="text-4xl font-bold mb-4 text-[#252422] dark:text-[#F4F1E8]">Verwaltung</h1>
             <p className="text-lg text-[#A58C81] dark:text-[#EBE9E9]">
-              Verwalten Sie Events, Benutzer und Einstellungen
+              Verwalten Sie Veranstaltungen, Benutzer und Einstellungen
             </p>
           </div>
         </div>
@@ -151,57 +155,6 @@ const AdminPanelClean = () => {
   )
 }
 
-// Calendar tab component - REMOVED to speed up admin panel loading
-// const CalendarTab = () => {
-//   const [currentDate, setCurrentDate] = useState(new Date())
-//   const [onEventUpdated, setOnEventUpdated] = useState(0)
-//   const [shouldLoad, setShouldLoad] = useState(false)
-
-//   // Only load calendar when component mounts (tab is active)
-//   useEffect(() => {
-//     setShouldLoad(true)
-//     return () => setShouldLoad(false)
-//   }, [])
-
-//   const handleNavigate = (date) => {
-//     setCurrentDate(date)
-//   }
-
-//   const handleDateClick = (date) => {
-//     // Handle date click if needed
-//   }
-
-//   const handleEventUpdated = () => {
-//     // Trigger calendar refresh
-//     setOnEventUpdated(prev => prev + 1)
-//   }
-
-//   return (
-//     <div>
-//       <div className="mb-6">
-//         <h2 className="text-xl font-semibold text-gray-900 dark:text-[#F4F1E8] mb-2">
-//           Kalender-Ansicht
-//         </h2>
-//         <p className="text-sm text-gray-600 dark:text-[#EBE9E9]">
-//           Übersicht aller Events im Kalenderformat
-//         </p>
-//       </div>
-      
-//       <div className="bg-white dark:bg-[#2a2a2a] rounded-lg border-2 border-[#A58C81] dark:border-[#4a4a4a] p-4">
-//         {shouldLoad && (
-//           <SimpleMonthCalendar
-//             currentDate={currentDate}
-//             onNavigate={handleNavigate}
-//             onDateClick={handleDateClick}
-//             onEventUpdated={handleEventUpdated}
-//             key={`admin-calendar-${onEventUpdated}`}
-//           />
-//         )}
-//       </div>
-//     </div>
-//   )
-// }
-
 // Events tab component
 const EventsTab = () => {
   const [events, setEvents] = useState([])
@@ -217,7 +170,7 @@ const EventsTab = () => {
     // Safety timeout to prevent infinite loading
     const timeout = setTimeout(() => {
       setLoading(false)
-    }, 5000) // 5 second timeout
+    }, 3000) // 3 second timeout
     
     return () => clearTimeout(timeout)
   }, [])
@@ -227,28 +180,19 @@ const EventsTab = () => {
       setLoading(true)
       setError(null)
       
-      console.log('📋 Admin Events: Loading events...')
-      // Get all events directly from events table
+      // Add timeout wrapper to prevent hanging
+      const loadPromise = eventsAPI.getAll()
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Lade-Timeout')), 4000)
+      )
+      
       let data = []
       try {
-        data = await eventsAPI.getAll()
-        console.log('📋 Admin Events: API response:', data)
-        console.log('📋 Admin Events: Total events loaded:', data?.length || 0)
+        data = await Promise.race([loadPromise, timeoutPromise])
+        data = Array.isArray(data) ? data : []
       } catch (error) {
-        console.error('📋 Admin Events: Primary API failed, trying fallback:', error)
-        try {
-          data = await eventsAPI.getAllDirect()
-          console.log('📋 Admin Events: Fallback API success:', data?.length || 0, 'events')
-        } catch (fallbackError) {
-          console.error('📋 Admin Events: Direct API failed, trying ultra-simple:', fallbackError)
-          try {
-            data = await eventsAPI.getAllSimple()
-            console.log('📋 Admin Events: Ultra-simple API success:', data?.length || 0, 'events')
-          } catch (simpleError) {
-            console.error('📋 Admin Events: All API methods failed:', simpleError)
-            data = []
-          }
-        }
+        secureLog('error', 'Failed to load events', sanitizeError(error))
+        data = []
       }
       
       // Filter out past events - only show future events
@@ -256,15 +200,13 @@ const EventsTab = () => {
       const futureEvents = (data || []).filter(event => {
         const eventDate = new Date(event.start_date || event.end_date)
         const isFuture = eventDate >= now
-        console.log(`📋 Admin Events: Event "${event.title}" - Date: ${event.start_date}, Is Future: ${isFuture}`)
         return isFuture
       })
       
-      console.log('📋 Admin Events: Future events count:', futureEvents.length)
       setEvents(futureEvents)
     } catch (err) {
-      console.error('📋 Admin Events: Error loading events:', err)
       setError(err.message)
+      setEvents([])
     } finally {
       setLoading(false)
     }
@@ -290,7 +232,7 @@ const EventsTab = () => {
     return (
       <div className="flex justify-center items-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-        <span className="ml-2 text-gray-600">Lade Events...</span>
+        <span className="ml-2 text-gray-600">Veranstaltungen werden geladen...</span>
       </div>
     )
   }
@@ -314,14 +256,14 @@ const EventsTab = () => {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-[#F4F1E8]">Events verwalten ({events.length})</h2>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-[#F4F1E8]">Veranstaltungen verwalten ({events.length})</h2>
         <div className="flex gap-3">
           <button
             onClick={() => setShowCreateForm(true)}
             className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg transition-colors shadow-md"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Event erstellen
+            Veranstaltung erstellen
           </button>
           <button
             onClick={loadEvents}
@@ -335,16 +277,16 @@ const EventsTab = () => {
       {events.length === 0 ? (
         <div className="text-center py-12 bg-gray-50 dark:bg-gray-900/20 rounded-lg border-2 border-[#A58C81] dark:border-[#4a4a4a]">
           <Calendar className="mx-auto h-12 w-12 text-[#A58C81] dark:text-[#EBE9E9]" />
-          <h3 className="mt-2 text-sm font-medium text-[#252422] dark:text-[#F4F1E8]">Keine Events vorhanden</h3>
+          <h3 className="mt-2 text-sm font-medium text-[#252422] dark:text-[#F4F1E8]">Keine Veranstaltungen vorhanden</h3>
           <p className="mt-1 text-sm text-[#A58C81] dark:text-[#EBE9E9]">
-            Erstellen Sie ein neues Event oder warten Sie auf genehmigte Anfragen.
+            Erstellen Sie eine neue Veranstaltung oder warten Sie auf genehmigte Anfragen.
           </p>
           <button
             onClick={() => setShowCreateForm(true)}
             className="mt-4 inline-flex items-center px-6 py-3 text-sm font-medium text-white bg-[#6054d9] hover:bg-[#4f44c7] rounded-lg transition-colors shadow-md"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Erstes Event erstellen
+            Erste Veranstaltung erstellen
           </button>
         </div>
       ) : (
@@ -440,7 +382,6 @@ const UsersTab = () => {
 }
 
 const SettingsTab = () => {
-  const { isDarkMode } = useDarkMode()
   const [notificationsEnabled, setNotificationsEnabled] = useState(true)
   const [autoApprovePublic, setAutoApprovePublic] = useState(false)
   const [showPrivateEvents, setShowPrivateEvents] = useState(true)
@@ -469,7 +410,6 @@ const SettingsTab = () => {
         setShowBlockedDates(settings.showBlockedDates ?? true)
         setDefaultToWeekView(settings.defaultToWeekView ?? false)
       } catch (error) {
-        console.error('Error loading settings:', error)
       }
     }
   }, [])
@@ -478,12 +418,11 @@ const SettingsTab = () => {
   useEffect(() => {
     async function loadEmails() {
       try {
-        const { getAdminNotificationEmails } = await import('../../services/adminEmails')
+        const { getAdminNotificationEmails } = await import('../../services/emailApi')
         const emails = await getAdminNotificationEmails()
         setAdminEmailsFull(emails)
         setAdminEmails(emails.map(e => e.email))
       } catch (error) {
-        console.error('Error loading admin emails:', error)
       } finally {
         setLoadingEmails(false)
       }
@@ -570,65 +509,34 @@ const SettingsTab = () => {
 
   const handleImportOldCalendar = async () => {
     // Use Supabase Edge Function as proxy to bypass CORS
-    const ICS_FEED_URL = `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/fetch-ics`
+    // SECURITY: Use secure getters to prevent key exposure
+    const { getSupabaseUrl, getSupabaseAnonKey } = await import('../../utils/secureConfig')
+    const supabaseUrl = getSupabaseUrl()
+    const ICS_FEED_URL = `${supabaseUrl}/functions/v1/fetch-ics`
     
-    console.log('═══════════════════════════════════════════════════════════')
-    console.log('🚀 CALENDAR IMPORT STARTED')
-    console.log('═══════════════════════════════════════════════════════════')
-    console.log('⏰ Start Time:', new Date().toLocaleString())
-    console.log('🔗 ICS Feed URL:', ICS_FEED_URL)
-    console.log('')
     
     if (!window.confirm('Möchten Sie Events aus dem alten Kalender importieren?\n\nDies kann einige Minuten dauern.')) {
-      console.log('❌ Import cancelled by user')
       return
     }
     
     try {
       // Show loading indicator
-      console.log('───────────────────────────────────────────────────────────')
-      console.log('📡 PHASE 1: FETCHING ICS FEED')
-      console.log('───────────────────────────────────────────────────────────')
       
       alert('Import wird gestartet...\n\nBitte warten Sie, während die Events importiert werden.\n\nÖffnen Sie die Browser-Konsole (F12) für Live-Logs!')
       
       // Fetch and parse ICS feed
-      console.log('📥 Fetching ICS feed...')
-      const startFetch = Date.now()
-      const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY
+      const supabaseKey = getSupabaseAnonKey()
       const parsedEvents = await fetchAndParseICS(ICS_FEED_URL, supabaseKey)
-      const fetchTime = Date.now() - startFetch
       
-      console.log(`✅ Fetch completed in ${fetchTime}ms`)
-      console.log(`📊 Total events parsed: ${parsedEvents.length}`)
-      console.log('')
       
       // Show sample of first few events
-      console.log('───────────────────────────────────────────────────────────')
-      console.log('📋 SAMPLE OF PARSED EVENTS (First 3):')
-      console.log('───────────────────────────────────────────────────────────')
       parsedEvents.slice(0, 3).forEach((evt, idx) => {
-        console.log(`${idx + 1}. ${evt.SUMMARY}`)
-        console.log(`   📅 Date: ${evt.startDate?.toLocaleDateString()}`)
-        console.log(`   🏷️ Category: ${evt.CATEGORIES}`)
-        console.log(`   🔒 Private: ${evt.isPrivate}`)
-        console.log(`   📍 Location: ${evt.LOCATION || 'N/A'}`)
-        console.log('')
       })
       
       // Get existing events once
-      console.log('───────────────────────────────────────────────────────────')
-      console.log('📡 PHASE 2: CHECKING FOR DUPLICATES')
-      console.log('───────────────────────────────────────────────────────────')
-      console.log('🔍 Fetching existing events from database...')
       const existingEvents = await eventsAPI.getAll()
-      console.log(`📊 Found ${existingEvents.length} existing events in database`)
-      console.log('')
       
       // Convert and import events
-      console.log('───────────────────────────────────────────────────────────')
-      console.log('📡 PHASE 3: IMPORTING EVENTS')
-      console.log('───────────────────────────────────────────────────────────')
       
       let successCount = 0
       let errorCount = 0
@@ -638,7 +546,6 @@ const SettingsTab = () => {
       
       for (let i = 0; i < parsedEvents.length; i++) {
         const icsEvent = parsedEvents[i]
-        const progress = `[${i + 1}/${parsedEvents.length}]`
         
         try {
           const dbEvent = convertToDBEvent(icsEvent)
@@ -648,85 +555,42 @@ const SettingsTab = () => {
           
           if (exists) {
             skipCount++
-            console.log(`${progress} ⏭️  SKIP (duplicate): "${dbEvent.title}"`)
             continue
           }
           
           // Create event in database
-          console.log(`${progress} 📝 Creating: "${dbEvent.title}"`)
-          console.log(`         📅 ${dbEvent.start_date} - ${dbEvent.end_date}`)
-          console.log(`         🎨 Type: ${dbEvent.event_type}, Private: ${dbEvent.is_private}`)
           
           await eventsAPI.create(dbEvent)
           successCount++
-          console.log(`${progress} ✅ SUCCESS: "${dbEvent.title}"`)
-          console.log('')
           
         } catch (error) {
           errorCount++
           errors.push({ event: icsEvent.SUMMARY, error: error.message })
-          console.error(`${progress} ❌ ERROR: "${icsEvent.SUMMARY}"`)
-          console.error(`         ⚠️  ${error.message}`)
-          console.error(error)
-          console.log('')
         }
       }
       
-      const importTime = Date.now() - startImport
-      
       // Show results
-      console.log('')
-      console.log('═══════════════════════════════════════════════════════════')
-      console.log('🎉 IMPORT COMPLETED')
-      console.log('═══════════════════════════════════════════════════════════')
-      console.log('📊 STATISTICS:')
-      console.log(`   ✅ Successfully imported: ${successCount}`)
-      console.log(`   ❌ Errors: ${errorCount}`)
-      console.log(`   ⏭️  Skipped (duplicates): ${skipCount}`)
-      console.log(`   📊 Total processed: ${parsedEvents.length}`)
-      console.log('')
-      console.log('⏱️  TIMING:')
-      console.log(`   📥 Fetch time: ${fetchTime}ms`)
-      console.log(`   💾 Import time: ${importTime}ms`)
-      console.log(`   🕐 Total time: ${fetchTime + importTime}ms`)
-      console.log('')
-      console.log('⏰ End Time:', new Date().toLocaleString())
       
       if (errors.length > 0) {
-        console.log('')
-        console.log('───────────────────────────────────────────────────────────')
-        console.log('⚠️  ERRORS DETAILS:')
-        console.log('───────────────────────────────────────────────────────────')
         errors.forEach((err, idx) => {
-          console.error(`${idx + 1}. Event: "${err.event}"`)
-          console.error(`   Error: ${err.error}`)
         })
       }
       
-      console.log('═══════════════════════════════════════════════════════════')
       
       const message = `Import abgeschlossen!\n\n✅ Erfolgreich importiert: ${successCount}\n❌ Fehler: ${errorCount}\n⏭️ Übersprungen (Duplikate): ${skipCount}\n\nDetails in der Browser-Konsole (F12)\n\nSeite wird neu geladen...`
       alert(message)
       
       // Reload events
-      console.log('🔄 Reloading page...')
       window.location.reload()
       
     } catch (error) {
-      console.error('')
-      console.error('═══════════════════════════════════════════════════════════')
-      console.error('💥 IMPORT FAILED')
-      console.error('═══════════════════════════════════════════════════════════')
-      console.error('❌ Error:', error.message)
-      console.error('📍 Stack:', error.stack)
-      console.error('═══════════════════════════════════════════════════════════')
       
       alert(`Import fehlgeschlagen!\n\nFehler: ${error.message}\n\nBitte überprüfen Sie die Browser-Konsole (F12) für Details.`)
     }
   }
 
   const handleExportData = () => {
-    alert('Export-Funktion:\n\nAlle Events und Anfragen werden als CSV/JSON exportiert.\n(In Entwicklung)')
+    alert('Export-Funktion:\n\nAlle Veranstaltungen und Anfragen werden als CSV/JSON exportiert.\n(In Entwicklung)')
   }
 
   const handleClearCache = () => {
@@ -746,62 +610,48 @@ const SettingsTab = () => {
   const handleDeleteAllEvents = async () => {
     // Triple confirmation for safety
     const confirmStep1 = window.confirm(
-      '⚠️ WARNUNG: Alle Events löschen\n\n' +
-      'Dies wird ALLE Events aus der Datenbank löschen!\n\n' +
+      '⚠️ WARNUNG: Alle Veranstaltungen löschen\n\n' +
+      'Dies wird ALLE Veranstaltungen aus der Datenbank löschen!\n\n' +
       'Diese Aktion kann NICHT rückgängig gemacht werden!\n\n' +
       'Möchten Sie fortfahren?'
     )
     
     if (!confirmStep1) {
-      console.log('❌ Delete cancelled at step 1')
       return
     }
 
     const confirmStep2 = window.prompt(
       '⚠️ ZWEITE BESTÄTIGUNG\n\n' +
-      'Um fortzufahren, geben Sie "ALLE EVENTS LÖSCHEN" ein:\n\n' +
+      'Um fortzufahren, geben Sie "ALLE VERANSTALTUNGEN LÖSCHEN" ein:\n\n' +
       '(Groß-/Kleinschreibung wird beachtet)'
     )
     
-    if (confirmStep2 !== 'ALLE EVENTS LÖSCHEN') {
+    if (confirmStep2 !== 'ALLE VERANSTALTUNGEN LÖSCHEN') {
       alert('❌ Abgebrochen: Falsche Eingabe')
-      console.log('❌ Delete cancelled at step 2')
       return
     }
 
     const confirmStep3 = window.confirm(
       '🔴 LETZTE WARNUNG\n\n' +
       'Dies ist Ihre letzte Chance!\n\n' +
-      'Alle Events werden unwiderruflich gelöscht.\n\n' +
+      'Alle Veranstaltungen werden unwiderruflich gelöscht.\n\n' +
       'Sind Sie ABSOLUT SICHER?'
     )
     
     if (!confirmStep3) {
-      console.log('❌ Delete cancelled at step 3')
       return
     }
 
     try {
-      console.log('═══════════════════════════════════════════════════════════')
-      console.log('🗑️ DELETE ALL EVENTS STARTED')
-      console.log('═══════════════════════════════════════════════════════════')
-      console.log('⏰ Start Time:', new Date().toLocaleString())
-      console.log('')
 
       // Fetch all events
-      console.log('📥 Fetching all events...')
       const allEvents = await eventsAPI.getAll()
-      console.log(`📊 Found ${allEvents.length} events to delete`)
       
       if (allEvents.length === 0) {
-        alert('ℹ️ Keine Events zum Löschen gefunden.')
+        alert('ℹ️ Keine Veranstaltungen zum Löschen gefunden.')
         return
       }
 
-      console.log('')
-      console.log('───────────────────────────────────────────────────────────')
-      console.log('🗑️ DELETING EVENTS')
-      console.log('───────────────────────────────────────────────────────────')
 
       let successCount = 0
       let errorCount = 0
@@ -809,44 +659,22 @@ const SettingsTab = () => {
 
       for (let i = 0; i < allEvents.length; i++) {
         const event = allEvents[i]
-        const progress = `[${i + 1}/${allEvents.length}]`
 
         try {
-          console.log(`${progress} 🗑️ Deleting: "${event.title}"`)
           await eventsAPI.delete(event.id)
           successCount++
-          console.log(`${progress} ✅ Deleted: "${event.title}"`)
         } catch (error) {
           errorCount++
           errors.push({ event: event.title, error: error.message })
-          console.error(`${progress} ❌ Error deleting: "${event.title}"`)
-          console.error(`         ⚠️  ${error.message}`)
         }
       }
 
-      console.log('')
-      console.log('═══════════════════════════════════════════════════════════')
-      console.log('🎯 DELETE COMPLETED')
-      console.log('═══════════════════════════════════════════════════════════')
-      console.log('📊 STATISTICS:')
-      console.log(`   ✅ Successfully deleted: ${successCount}`)
-      console.log(`   ❌ Errors: ${errorCount}`)
-      console.log(`   📊 Total processed: ${allEvents.length}`)
-      console.log('')
-      console.log('⏰ End Time:', new Date().toLocaleString())
 
       if (errors.length > 0) {
-        console.log('')
-        console.log('───────────────────────────────────────────────────────────')
-        console.log('⚠️ ERRORS DETAILS:')
-        console.log('───────────────────────────────────────────────────────────')
         errors.forEach((err, idx) => {
-          console.error(`${idx + 1}. Event: "${err.event}"`)
-          console.error(`   Error: ${err.error}`)
         })
       }
 
-      console.log('═══════════════════════════════════════════════════════════')
 
       alert(
         `✅ Löschvorgang abgeschlossen!\n\n` +
@@ -859,22 +687,12 @@ const SettingsTab = () => {
       window.location.reload()
 
     } catch (error) {
-      console.error('')
-      console.error('═══════════════════════════════════════════════════════════')
-      console.error('💥 DELETE FAILED')
-      console.error('═══════════════════════════════════════════════════════════')
-      console.error('❌ Error:', error.message)
-      console.error('📍 Stack:', error.stack)
-      console.error('═══════════════════════════════════════════════════════════')
 
       alert(`❌ Fehler beim Löschen!\n\n${error.message}\n\nDetails in der Konsole (F12).`)
     }
   }
 
   const handleSaveSettings = async () => {
-    console.log('🔄 Save button clicked!')
-    console.log('Pending emails:', pendingEmails)
-    console.log('Emails to remove:', emailsToRemove)
     
     setSaving(true)
     setSaveSuccess(false)
@@ -891,33 +709,28 @@ const SettingsTab = () => {
         lastUpdated: new Date().toISOString()
       }
       localStorage.setItem('adminSettings', JSON.stringify(settings))
-      console.log('✅ Settings saved to localStorage')
 
       // Only save emails if there are changes
       if (pendingEmails.length > 0 || emailsToRemove.length > 0) {
-        console.log('📧 Saving email changes to database...')
         
         // Save admin emails to database
-        const { addAdminNotificationEmail, removeAdminNotificationEmail } = await import('../../services/adminEmails')
+        const { addAdminNotificationEmail, removeAdminNotificationEmail } = await import('../../services/emailApi')
         
         // Add pending emails
         for (const email of pendingEmails) {
-          console.log('➕ Adding email:', email)
           await addAdminNotificationEmail(email)
         }
         
         // Remove marked emails
         for (const emailId of emailsToRemove) {
-          console.log('➖ Removing email ID:', emailId)
           await removeAdminNotificationEmail(emailId)
         }
         
         // Reload emails from database
-        const { getAdminNotificationEmails } = await import('../../services/adminEmails')
+        const { getAdminNotificationEmails } = await import('../../services/emailApi')
         const updatedEmails = await getAdminNotificationEmails()
         setAdminEmailsFull(updatedEmails)
         setAdminEmails(updatedEmails.map(e => e.email))
-        console.log('✅ Emails reloaded from database')
       }
       
       // Clear pending lists
@@ -925,11 +738,9 @@ const SettingsTab = () => {
       setEmailsToRemove([])
       
       setSaveSuccess(true)
-      console.log('✅ Settings saved successfully!')
       setTimeout(() => setSaveSuccess(false), 3000)
       
     } catch (error) {
-      console.error('❌ Error saving settings:', error)
       setSaveError('Fehler beim Speichern der Einstellungen: ' + (error.message || 'Unbekannter Fehler'))
     } finally {
       setSaving(false)
@@ -983,7 +794,7 @@ const SettingsTab = () => {
             Benachrichtigungen
           </h3>
           <p className={`text-xs text-[#A58C81] dark:text-[#EBE9E9] mb-4`}>
-            E-Mail-Benachrichtigungen für neue Event-Anfragen und Statusänderungen
+            E-Mail-Benachrichtigungen für neue Veranstaltungs-Anfragen und Statusänderungen
           </p>
 
           <div className="space-y-3 mt-4">
@@ -1017,7 +828,7 @@ const SettingsTab = () => {
               Admin E-Mail-Adressen für Benachrichtigungen
             </h4>
               <p className={`text-xs text-[#A58C81] dark:text-[#EBE9E9] mb-3`}>
-              Diese E-Mail-Adressen erhalten Benachrichtigungen bei neuen Event-Anfragen. 
+              Diese E-Mail-Adressen erhalten Benachrichtigungen bei neuen Veranstaltungs-Anfragen. 
               Sie können mehrere E-Mails gleichzeitig hinzufügen (durch Komma getrennt).
             </p>
 
@@ -1144,7 +955,7 @@ const SettingsTab = () => {
                 className="w-4 h-4 text-[#6054d9] border-[#A58C81] rounded focus:ring-[#6054d9]"
               />
               <span className={`text-sm text-[#252422] dark:text-[#F4F1E8]`}>
-                Private Events im öffentlichen Kalender anzeigen
+                Private Veranstaltungen im öffentlichen Kalender anzeigen
               </span>
             </label>
             <label className="flex items-center space-x-3 cursor-pointer">
@@ -1189,7 +1000,7 @@ const SettingsTab = () => {
               className="inline-flex items-center px-4 py-2 text-sm font-medium text-[#252422] dark:text-[#F4F1E8] bg-white dark:bg-[#1a1a1a] border-2 border-[#A58C81] dark:border-[#6a6a6a] rounded-lg hover:bg-gray-50 dark:hover:bg-[#252422] transition-colors"
             >
               <Download className="h-4 w-4 mr-2" />
-              Alle Events exportieren (CSV)
+              Alle Veranstaltungen exportieren (CSV)
             </button>
             <button
               onClick={handleExportData}
@@ -1258,13 +1069,13 @@ const SettingsTab = () => {
               className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-red-600 dark:bg-red-700 border-2 border-red-700 dark:border-red-900 rounded-lg hover:bg-red-700 dark:hover:bg-red-800 transition-colors shadow-md"
             >
               <X className="h-4 w-4 mr-2" />
-              Alle Events löschen
+              Alle Veranstaltungen löschen
             </button>
           </div>
           
           <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/10 border-l-4 border-red-500 rounded">
             <p className="text-xs text-red-700 dark:text-red-400">
-              <strong>⚠️ Warnung:</strong> Der Button "Alle Events löschen" erfordert eine 3-fache Bestätigung und löscht unwiderruflich alle Events aus der Datenbank. Verwenden Sie diese Funktion nur zum Testen oder bei einem kompletten Neustart!
+              <strong>⚠️ Warnung:</strong> Der Button "Alle Veranstaltungen löschen" erfordert eine 3-fache Bestätigung und löscht unwiderruflich alle Veranstaltungen aus der Datenbank. Verwenden Sie diese Funktion nur zum Testen oder bei einem kompletten Neustart!
             </p>
           </div>
         </div>

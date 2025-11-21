@@ -1,0 +1,56 @@
+# =============================================================================
+# Jungengesellschaft Website - Environment Variables Example
+# =============================================================================
+# Rename this file to .env.example and fill in your actual values
+# NEVER commit .env to version control
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Supabase Configuration (REQUIRED)
+# -----------------------------------------------------------------------------
+# Get these from: https://app.supabase.com/project/YOUR_PROJECT/settings/api
+REACT_APP_SUPABASE_URL=https://your-project-ref.supabase.co
+REACT_APP_SUPABASE_ANON_KEY=your-anon-key-here
+
+# -----------------------------------------------------------------------------
+# Supabase Edge Functions Environment Variables
+# Set these in Supabase Dashboard > Project Settings > Edge Functions
+# -----------------------------------------------------------------------------
+# Service Role Key (for Edge Functions to access database with elevated privileges)
+# SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# FritzBox Service (EC2 Instance)
+# FRITZ_SERVICE_URL=https://your-ec2-instance-ip:8000
+# FRITZ_SERVICE_API_KEY=your-api-key-here
+
+# Resend Email Service
+# RESEND_API_KEY=re_your-resend-api-key
+# RESEND_FROM_EMAIL=noreply@yourdomain.com
+# RESEND_FROM_NAME=Jungengesellschaft
+
+# CORS Configuration for Edge Functions
+# ALLOWED_ORIGIN=https://your-production-domain.com
+# ALLOWED_ORIGINS=https://your-domain.com,https://www.your-domain.com
+
+# -----------------------------------------------------------------------------
+# Testing Environment Variables (OPTIONAL)
+# -----------------------------------------------------------------------------
+# Only needed for running E2E and integration tests
+# TEST_BASE_URL=http://localhost:3000
+# TEST_USER_EMAIL=test@example.com
+# TEST_USER_PASSWORD=testpassword123
+# TEST_ADMIN_EMAIL=admin@example.com
+# TEST_ADMIN_PASSWORD=adminpassword123
+
+# -----------------------------------------------------------------------------
+# Production Environment Variables
+# -----------------------------------------------------------------------------
+# NODE_ENV=production
+# REACT_APP_BASE_URL=https://your-production-domain.com
+# ENVIRONMENT=production
+
+# -----------------------------------------------------------------------------
+# Optional: Error Tracking (Sentry, etc.)
+# -----------------------------------------------------------------------------
+# REACT_APP_SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
+

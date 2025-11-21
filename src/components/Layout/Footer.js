@@ -1,3 +1,8 @@
+// FILE OVERVIEW
+// - Purpose: Site footer with contact info, links to About/FAQ/Contact pages, and copyright information.
+// - Used by: Layout component on all public pages; provides consistent footer navigation and contact details.
+// - Notes: Production component. Simple static footer with navigation links and contact email.
+
 import React from 'react'
 import { Link } from 'react-router-dom'
 
@@ -30,7 +35,7 @@ const Footer = () => {
               <Link to="/contact" className="text-[#EBE9E9] hover:text-[#F4F1E8] transition-colors">Kontakt</Link>
               <a href="/assets/satzung.pdf" className="text-[#EBE9E9] hover:text-[#F4F1E8] transition-colors">Satzung</a>
               <a href="/assets/Junge_Geseltschaft_Hausordnung.pdf" className="text-[#EBE9E9] hover:text-[#F4F1E8] transition-colors">Hausordnung</a>
-              <Link to="/" className="text-[#EBE9E9] hover:text-[#F4F1E8] transition-colors">Event-Kalender</Link>
+              <Link to="/" className="text-[#EBE9E9] hover:text-[#F4F1E8] transition-colors">Veranstaltungs-Kalender</Link>
             </div>
 
             {/* Legal Links */}

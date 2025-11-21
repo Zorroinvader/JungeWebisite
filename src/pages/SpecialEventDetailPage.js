@@ -1,5 +1,10 @@
+// FILE OVERVIEW
+// - Purpose: Detail page for a special event (e.g., costume contest) showing approved entries, voting results, and upload form.
+// - Used by: Route '/special-events/:slug' in App.js, linked from SpecialEventsPage and banners.
+// - Notes: Production page. Handles image uploads, voting, and displays public results sorted by vote count.
+
 import React, { useEffect, useMemo, useState, useRef } from 'react'
-import { Upload, ImagePlus, Trash2, RefreshCw } from 'lucide-react'
+import { Trash2, RefreshCw } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
@@ -13,33 +18,27 @@ import {
   deleteUserUpload,
   getUserVoteForEntry,
   getVoteStatsForEvent
-} from '../services/specialEvents'
+} from '../services/specialEventsApi'
 
 const SpecialEventDetailPage = () => {
-  const { user, isAdmin } = useAuth()
+  const { isAdmin } = useAuth()
   const { slug } = useParams()
   const [event, setEvent] = useState(null)
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [uploading, setUploading] = useState(false)
   const [file, setFile] = useState(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [contact, setContact] = useState('')
   const [voting, setVoting] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [alreadyUploaded, setAlreadyUploaded] = useState(false)
   const [userEntry, setUserEntry] = useState(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteSuccess, setDeleteSuccess] = useState(false)
-  const [currentVoteEntryId, setCurrentVoteEntryId] = useState('')
   const [notification, setNotification] = useState(null) // { type: 'success'|'error'|'info'|'warning', text: string }
-  const [showMoveLikeConfirm, setShowMoveLikeConfirm] = useState(false)
-  const [pendingLikeEntryId, setPendingLikeEntryId] = useState('')
-  const [previewUrl, setPreviewUrl] = useState('')
   const [userLikes, setUserLikes] = useState({}) // {entryId: true/false}
-  const fileInputCameraRef = useRef(null)
-  const fileInputGalleryRef = useRef(null)
   const [refreshingEntries, setRefreshingEntries] = useState(false)
   const [showVotePrompt, setShowVotePrompt] = useState(false)
   const [voteStats, setVoteStats] = useState([])
@@ -51,14 +50,12 @@ const SpecialEventDetailPage = () => {
     let isMounted = true
     async function load() {
       try {
-        console.log('[SE:Detail] slug=', slug)
         // Seed from cache synchronously for instant paint
         try {
           const raw = sessionStorage.getItem('special_event_detail_' + slug)
           if (raw) {
             const parsed = JSON.parse(raw)
             if (parsed?.data && parsed.expiresAt && Date.now() < parsed.expiresAt) {
-              console.log('[SE:Detail] detail cache hit for slug', slug)
               setEvent(parsed.data)
             }
           }
@@ -67,19 +64,17 @@ const SpecialEventDetailPage = () => {
         let ev = null
         try {
           // Try REST first (simplest path, anon-friendly)
-          const { getSpecialEventBySlugREST } = await import('../services/specialEvents')
+          const { getSpecialEventBySlugREST } = await import('../services/specialEventsApi')
           ev = await getSpecialEventBySlugREST(slug)
           if (!ev) {
             ev = await getSpecialEventBySlug(slug)
           }
         } catch (e) {
-          console.warn('[SE:Detail] slug fetch failed:', e?.message)
         }
         if (!ev) {
           // Fallback: load the first available event regardless of status
-          const { getFirstSpecialEventAny } = await import('../services/specialEvents')
+          const { getFirstSpecialEventAny } = await import('../services/specialEventsApi')
           ev = await getFirstSpecialEventAny()
-          console.log('[SE:Detail] Fallback first event slug=', ev?.slug)
         }
         if (!ev) {
           // Last-resort: use cached active events (banner cache)
@@ -91,14 +86,12 @@ const SpecialEventDetailPage = () => {
               if (list.length) {
                 const bySlug = list.find(x => x.slug === slug)
                 ev = bySlug || list[0]
-                console.log('[SE:Detail] Last-resort picked slug=', ev?.slug)
               }
             }
           } catch {}
         }
         if (!isMounted) return
         setEvent(ev)
-        console.log('[SE:Detail] Selected event id=', ev?.id, 'slug=', ev?.slug)
         const uploadedFlag = localStorage.getItem(`se_uploaded_${ev.id}`)
         setAlreadyUploaded(!!uploadedFlag)
         if (uploadedFlag) {
@@ -142,11 +135,10 @@ const SpecialEventDetailPage = () => {
             if (isMounted) setVoteStats(Array.isArray(stats) ? stats : [])
           } catch {}
         }
-        setCurrentVoteEntryId('') // No longer needed for event-wide voting
+        // Vote entry ID tracking removed - using event-wide voting
       } catch (e) {
         if (!isMounted) return
         setError(e.message || String(e))
-        console.error('[SE:Detail] Fatal load error:', e)
       } finally {
         if (isMounted) setLoading(false)
       }
@@ -200,7 +192,7 @@ const SpecialEventDetailPage = () => {
     e.preventDefault()
     if (!event || !file) return
     if (alreadyUploaded) {
-      setNotification({ type: 'warning', text: 'Du hast bereits ein Foto für dieses Event hochgeladen. Pro Person ist nur ein Upload erlaubt.' })
+      setNotification({ type: 'warning', text: 'Du hast bereits ein Foto für diese Veranstaltung hochgeladen. Pro Person ist nur ein Upload erlaubt.' })
       return
     }
     setUploading(true)
@@ -218,7 +210,7 @@ const SpecialEventDetailPage = () => {
     } catch (err) {
       const msg = (err?.message || String(err)).toLowerCase()
       if (msg.includes('duplicate') || msg.includes('unique')) {
-        setNotification({ type: 'warning', text: 'Für dieses Event wurde bereits ein Foto von dir hochgeladen. Pro Person ist nur ein Upload erlaubt.' })
+        setNotification({ type: 'warning', text: 'Für diese Veranstaltung wurde bereits ein Foto von dir hochgeladen. Pro Person ist nur ein Upload erlaubt.' })
       } else {
         setNotification({ type: 'error', text: err.message || String(err) })
       }
@@ -306,11 +298,21 @@ const SpecialEventDetailPage = () => {
     )
   }
   if (error) return <div className="p-6 text-red-600">{error}</div>
-  if (!event) return <div className="p-6">Event nicht gefunden</div>
+  if (!event) return <div className="p-6">Veranstaltung nicht gefunden</div>
 
   return (
-    <div className="min-h-screen bg-[#F4F1E8] dark:bg-[#252422]">
-      <div className="max-w-6xl mx-auto px-4 py-8">
+    <div 
+      className="min-h-screen bg-[#F4F1E8] dark:bg-[#252422]" 
+      style={{ 
+        touchAction: 'pan-y', 
+        WebkitOverflowScrolling: 'touch',
+        overscrollBehavior: 'contain'
+      }}
+    >
+      <div 
+        className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8 pb-16 sm:pb-8" 
+        style={{ touchAction: 'pan-y' }}
+      >
         {notification && (
           <div className={`mb-4 p-3 rounded-lg border ${
             notification.type === 'success' ? 'bg-green-100 dark:bg-green-900/20 border-green-300 dark:border-green-700 text-green-800 dark:text-green-200'
@@ -324,9 +326,9 @@ const SpecialEventDetailPage = () => {
             </div>
           </div>
         )}
-        <h1 className="text-3xl font-bold text-[#252422] dark:text-[#F4F1E8] mb-2">{event.title}</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-[#252422] dark:text-[#F4F1E8] mb-2">{event.title}</h1>
         {event.description && (
-          <p className="text-[#A58C81] dark:text-[#EBE9E9] mb-6">{event.description}</p>
+          <p className="text-sm sm:text-base text-[#A58C81] dark:text-[#EBE9E9] mb-4 sm:mb-6">{event.description}</p>
         )}
 
         {/* Gallery hidden - showing results instead */}
@@ -339,7 +341,7 @@ const SpecialEventDetailPage = () => {
                   if (!event) return
                   setRefreshingEntries(true)
                   try {
-                    const { listApprovedEntriesREST } = await import('../services/specialEvents')
+                    const { listApprovedEntriesREST } = await import('../services/specialEventsApi')
                     const fresh = await listApprovedEntriesREST(event.id)
                     setEntries(fresh)
                   } finally {
@@ -384,9 +386,17 @@ const SpecialEventDetailPage = () => {
 
         {/* Öffentliche Ergebnisse */}
         {voteStats && voteStats.length > 0 && (
-          <div id="special-event-results" className="mt-8 scroll-mt-24">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-2xl font-semibold text-[#252422] dark:text-[#F4F1E8]">Ergebnisse</h2>
+          <div 
+            id="special-event-results" 
+            className="mt-6 sm:mt-8 scroll-mt-24 pb-8"
+            style={{ 
+              touchAction: 'pan-y',
+              WebkitOverflowScrolling: 'touch',
+              overscrollBehavior: 'contain'
+            }}
+          >
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4 sm:mb-3">
+              <h2 className="text-xl sm:text-2xl font-semibold text-[#252422] dark:text-[#F4F1E8]">Ergebnisse</h2>
               <button
                 onClick={async () => {
                   if (!event) return
@@ -398,28 +408,51 @@ const SpecialEventDetailPage = () => {
                     setRefreshingResults(false)
                   }
                 }}
-                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md border-2 border-[#A58C81] text-[#252422] dark:text-[#F4F1E8] hover:bg-gray-50 dark:hover:bg-[#1a1a1a]"
+                className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md border-2 border-[#A58C81] text-[#252422] dark:text-[#F4F1E8] hover:bg-gray-50 dark:hover:bg-[#1a1a1a] touch-manipulation min-h-[44px]"
+                style={{ touchAction: 'manipulation' }}
               >
                 <span className={refreshingResults ? 'animate-pulse' : ''}>Aktualisieren</span>
               </button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            <div 
+              className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 md:gap-6 pb-4"
+              style={{ 
+                touchAction: 'pan-y', 
+                WebkitOverflowScrolling: 'touch'
+              }}
+            >
               {voteStats.map((entry, index) => (
-                <div key={entry.entry_id} className="border-2 border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-[#2a2a2a]">
+                <div 
+                  key={entry.entry_id} 
+                  className="border-2 border-gray-200 dark:border-gray-700 rounded-lg sm:rounded-xl overflow-hidden bg-white dark:bg-[#2a2a2a]"
+                >
                   <div className="relative">
-                    <div className="w-full h-48 bg-gray-50 dark:bg-[#1a1a1a] flex items-center justify-center">
-                      <img src={getPublicImageUrl(entry.image_path)} alt={entry.title || 'Beitrag'} className="max-w-full max-h-full object-contain" />
+                    <div className="w-full h-32 sm:h-40 md:h-48 bg-gray-50 dark:bg-[#1a1a1a] flex items-center justify-center">
+                      <img 
+                        src={getPublicImageUrl(entry.image_path)} 
+                        alt={entry.title || 'Beitrag'} 
+                        className="max-w-full max-h-full object-contain"
+                        style={{ touchAction: 'none', userSelect: 'none' }}
+                        draggable="false"
+                        loading="lazy"
+                      />
                     </div>
-                    <div className="absolute top-2 left-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-3 py-1 rounded-full text-xs font-semibold shadow">
+                    <div className="absolute top-2 left-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs font-semibold shadow">
                       #{entry.rank}{index === 0 ? ' • Leader' : ''}
                     </div>
                   </div>
-                  <div className="p-4">
-                    {entry.title && <div className="font-semibold text-[#252422] dark:text-[#F4F1E8] mb-1">{entry.title}</div>}
-                    {entry.description && (
-                      <div className="text-sm text-[#A58C81] dark:text-[#EBE9E9] mb-2 line-clamp-2">{entry.description}</div>
+                  <div className="p-3 sm:p-4">
+                    {entry.title && (
+                      <div className="font-semibold text-sm sm:text-base text-[#252422] dark:text-[#F4F1E8] mb-1 line-clamp-1">
+                        {entry.title}
+                      </div>
                     )}
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-sm font-semibold">
+                    {entry.description && (
+                      <div className="text-xs sm:text-sm text-[#A58C81] dark:text-[#EBE9E9] mb-2 line-clamp-2">
+                        {entry.description}
+                      </div>
+                    )}
+                    <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs sm:text-sm font-semibold">
                       <span>{entry.vote_count}</span>
                       <span>{entry.vote_count === 1 ? 'Stimme' : 'Stimmen'}</span>
                     </div>
@@ -442,7 +475,7 @@ const SpecialEventDetailPage = () => {
                   if (!event) return
                   setRefreshingEntries(true)
                   try {
-                    const { listApprovedEntriesREST } = await import('../services/specialEvents')
+                    const { listApprovedEntriesREST } = await import('../services/specialEventsApi')
                     const fresh = await listApprovedEntriesREST(event.id)
                     setEntries(fresh)
                   } finally {

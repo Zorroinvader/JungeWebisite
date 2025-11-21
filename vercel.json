@@ -34,10 +34,39 @@
       "dest": "/index.html"
     }
   ],
-  "env": {
-    "REACT_APP_SUPABASE_URL": "https://wthsritnjosieqxpprsl.supabase.co",
-    "REACT_APP_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0aHNyaXRuam9zaWVxeHBwcnNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5NDEwNjAsImV4cCI6MjA3NTUxNzA2MH0.kIdmad-ohH_r2Ss6OsoqMbZw10cgNiF0FDj1zbgszlE",
-    "CI": "false",
-    "DISABLE_ESLINT_PLUGIN": "true"
-  }
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live https://va.vercel-scripts.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://api.resend.com https://vercel.live wss://*.supabase.co; frame-ancestors 'none';"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=31536000; includeSubDomains; preload"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+        }
+      ]
+    }
+  ]
 }

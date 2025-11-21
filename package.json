@@ -16,13 +16,46 @@
     "react-big-calendar": "^1.8.2",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.8.1",
-    "react-scripts": "5.0.1",
+    "react-scripts": "^5.0.1",
+    "supabase": "^2.58.5",
     "tailwindcss": "^3.3.6"
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "DISABLE_ESLINT_PLUGIN=true react-scripts build",
-    "test": "react-scripts test",
+    "build": "cross-env DISABLE_ESLINT_PLUGIN=true GENERATE_SOURCEMAP=false react-scripts build",
+    "test": "node scripts/run-all-tests.js",
+    "test:all": "node scripts/run-grouped-tests.js all",
+    "test:user": "node scripts/run-grouped-tests.js user",
+    "test:event": "node scripts/run-grouped-tests.js event",
+    "test:email": "node scripts/run-grouped-tests.js email",
+    "test:unit": "cross-env CI=true react-scripts test --testPathPattern=\"__tests__/unit\" --no-coverage --passWithNoTests --maxWorkers=50%",
+    "test:unit:user": "cross-env CI=true react-scripts test --testPathPattern=\"__tests__/unit/user\" --no-coverage --passWithNoTests --maxWorkers=50%",
+    "test:unit:event": "cross-env CI=true react-scripts test --testPathPattern=\"__tests__/unit/event\" --no-coverage --passWithNoTests --maxWorkers=50%",
+    "test:unit:email": "cross-env CI=true react-scripts test --testPathPattern=\"__tests__/unit/email\" --no-coverage --passWithNoTests --maxWorkers=50%",
+    "test:api": "cross-env CI=true react-scripts test --testPathPattern=\"__tests__/api\" --no-coverage --passWithNoTests --maxWorkers=50%",
+    "test:api:user": "cross-env CI=true react-scripts test --testPathPattern=\"__tests__/api/user\" --no-coverage --passWithNoTests --maxWorkers=50%",
+    "test:api:event": "cross-env CI=true react-scripts test --testPathPattern=\"__tests__/api/event\" --no-coverage --passWithNoTests --maxWorkers=50%",
+    "test:api:email": "cross-env CI=true react-scripts test --testPathPattern=\"__tests__/api/email\" --no-coverage --passWithNoTests --maxWorkers=50%",
+    "test:security": "cross-env CI=true react-scripts test --testPathPattern=\"(tests/security|__tests__/security)\" --no-coverage --passWithNoTests --maxWorkers=50%",
+    "test:rls": "cross-env CI=true react-scripts test --testPathPattern=\"tests/security/rls\" --no-coverage --passWithNoTests --maxWorkers=50%",
+    "test:edgecases": "cross-env CI=true react-scripts test --testPathPattern=\"tests/unit/edgeCases\" --no-coverage --passWithNoTests --maxWorkers=50%",
+    "test:errorhandling": "cross-env CI=true react-scripts test --testPathPattern=\"tests/api/errorHandling\" --no-coverage --passWithNoTests --maxWorkers=50%",
+    "test:e2e": "playwright test",
+    "test:e2e:user": "playwright test --grep \"(User|Auth|Profile|Admin)\"",
+    "test:e2e:event": "playwright test --grep \"(Event|Request|Calendar)\"",
+    "test:e2e:email": "playwright test --grep \"(Email|Workflow|Notification)\"",
+    "test:e2e:concurrency": "playwright test tests/e2e/concurrency.spec.ts",
+    "test:e2e:a11y": "playwright test tests/e2e/a11y.spec.ts",
+    "test:e2e:functionality": "playwright test tests/e2e/functionality-verification.spec.ts",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "test:visual": "playwright test --config=playwright.visual.config.ts",
+    "test:visual:expanded": "playwright test tests/visual/expandedSnapshots.spec.ts --config=playwright.visual.config.ts",
+    "test:visual:update": "playwright test --config=playwright.visual.config.ts --update-snapshots",
+    "test:failed": "node scripts/rerun-failed-tests.js",
+    "test:debug": "node scripts/rerun-failed-tests.js --debug",
+    "verify:functionality": "node scripts/verify-functionality.js",
+    "verify": "node scripts/verify-functionality.js",
     "eject": "react-scripts eject",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d build"
@@ -31,6 +64,36 @@
     "extends": [
       "react-app",
       "react-app/jest"
+    ],
+    "rules": {
+      "no-console": [
+        "warn",
+        {
+          "allow": [
+            "warn",
+            "error"
+          ]
+        }
+      ],
+      "no-restricted-syntax": [
+        "warn",
+        {
+          "selector": "CallExpression[callee.object.name='console'][callee.property.name=/^(log|info|debug)$/]",
+          "message": "Use secureLog() from secureConfig instead of console.log/info/debug to prevent exposing sensitive data"
+        }
+      ]
+    }
+  },
+  "jest": {
+    "testMatch": [
+      "**/__tests__/**/*.[jt]s?(x)",
+      "**/?(*.)+(spec|test).[jt]s?(x)"
+    ],
+    "watchPathIgnorePatterns": [
+      "/node_modules/",
+      "/build/",
+      "/playwright-report/",
+      "/test-results/"
     ]
   },
   "browserslist": {
@@ -46,7 +109,9 @@
     ]
   },
   "devDependencies": {
-    "@craco/craco": "^7.1.0",
+    "@axe-core/playwright": "^4.8.2",
+    "@craco/craco": "^5.9.0",
+    "@playwright/test": "^1.40.0",
     "@types/react": "^18.2.45",
     "@types/react-big-calendar": "^1.8.4",
     "@types/react-dom": "^18.2.18",
@@ -54,8 +119,18 @@
     "cross-env": "^7.0.3",
     "gh-pages": "^6.0.0",
     "javascript-obfuscator": "^4.1.1",
+    "npm-run-all": "^4.1.5",
     "terser-webpack-plugin": "^5.3.14",
     "typescript": "^4.9.5",
     "webpack-obfuscator": "^3.5.1"
+  },
+  "overrides": {
+    "js-yaml": ">=4.1.1",
+    "nth-check": ">=2.0.1",
+    "css-select": ">=4.3.0",
+    "webpack-dev-server": "^4.15.1",
+    "resolve-url-loader": {
+      "postcss": "^8.4.32"
+    }
   }
 }

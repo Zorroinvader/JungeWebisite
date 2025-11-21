@@ -1,8 +1,15 @@
+// FILE OVERVIEW
+// - Purpose: Modal form for submitting detailed event information (step 2 of 3-step workflow) after initial request is accepted; includes PDF upload.
+// - Used by: EventRequestTrackingPage when user clicks "Details ausfüllen" for an accepted request; also used in admin flows.
+// - Notes: Production component. Submits via eventRequestsAPI.submitDetailedRequest; handles file uploads for signed contracts.
+
 import React, { useState, useEffect } from 'react';
 import { X, Upload, CheckCircle } from 'lucide-react';
-import { eventRequestsAPI, storageAPI } from '../../services/httpApi';
+import { eventRequestsAPI, storageAPI } from '../../services/databaseApi';
 import { useDarkMode } from '../../contexts/DarkModeContext';
-import { sendAdminNotification, areNotificationsEnabled } from '../../utils/settingsHelper';
+import { secureLog, sanitizeError } from '../../utils/secureConfig';
+// Email notification is sent by submitDetailedRequest in databaseApi
+// No need to import sendAdminNotification here
 
 const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
   const { isDarkMode } = useDarkMode();
@@ -26,6 +33,25 @@ const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
   const [fileError, setFileError] = useState('');
   const [success, setSuccess] = useState(false);
 
+  // Check if details are already submitted and prevent form from opening
+  useEffect(() => {
+    if (isOpen && request) {
+      // If details are already submitted or stage is not initial_accepted, close the form and show message
+      const isAlreadySubmitted = request.request_stage === 'details_submitted' || 
+                                  request.request_stage === 'final_accepted' ||
+                                  request.details_submitted_at ||
+                                  (request.request_stage !== 'initial_accepted');
+      
+      if (isAlreadySubmitted) {
+        setError('Die Details wurden bereits eingereicht. Sie können das Formular nicht erneut ausfüllen.');
+        // Close after a short delay
+        setTimeout(() => {
+          onClose();
+        }, 2000);
+      }
+    }
+  }, [isOpen, request, onClose]);
+
   // Pre-fill dates from requested_days if available
   useEffect(() => {
     if (request && request.requested_days) {
@@ -41,7 +67,6 @@ const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
           }));
         }
       } catch (e) {
-        console.error('Error parsing requested_days:', e);
       }
     } else if (request && request.start_date) {
       const startDate = request.start_date.split('T')[0];
@@ -89,6 +114,16 @@ const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
     setUploadProgress(0);
 
     try {
+      // Prevent submission if details are already submitted
+      const isAlreadySubmitted = request.request_stage === 'details_submitted' || 
+                                  request.request_stage === 'final_accepted' ||
+                                  request.details_submitted_at ||
+                                  (request.request_stage !== 'initial_accepted');
+      
+      if (isAlreadySubmitted) {
+        throw new Error('Die Details wurden bereits eingereicht. Sie können das Formular nicht erneut ausfüllen.');
+      }
+
       // Validate required fields
       if (!formData.event_start_date || !formData.event_start_time) {
         throw new Error('Bitte geben Sie Startdatum und -uhrzeit an');
@@ -127,11 +162,11 @@ const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
       }
 
       if (keyPickupDate >= startDate) {
-        throw new Error('Die Schlüsselannahme sollte vor dem Event-Start stattfinden');
+        throw new Error('Die Schlüsselannahme sollte vor dem Veranstaltungs-Start stattfinden');
       }
 
       if (keyReturnDate <= endDate) {
-        throw new Error('Die Schlüsselrückgabe sollte nach dem Event-Ende stattfinden');
+        throw new Error('Die Schlüsselrückgabe sollte nach dem Veranstaltungs-Ende stattfinden');
       }
 
       // Convert PDF to base64 FIRST (as backup - always store in DB)
@@ -148,10 +183,8 @@ const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
         const uploadResult = await storageAPI.uploadSignedContract(contractFile, request.id);
         if (uploadResult.success) {
           contractUrl = uploadResult.url;
-          console.log('✅ Storage upload successful:', contractUrl);
         }
       } catch (storageError) {
-        console.log('⚠️ Storage upload failed, will use database fallback:', storageError.message);
       }
 
       setUploadProgress(70);
@@ -171,39 +204,30 @@ const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
         uploaded_file_type: contractFile.type,
         uploaded_file_data: contractBase64
       };
-
-      console.log('📤 Submitting detailed request');
-
-      await eventRequestsAPI.submitDetailedRequest(request.id, detailedData);
-
-      // Send notification to admins that user has submitted detailed information
-      if (areNotificationsEnabled()) {
-        try {
-          await sendAdminNotification({
-            title: request.title || request.event_name,
-            requester_name: request.requester_name,
-            requester_email: request.requester_email,
-            start_datetime: exactStartDatetime,
-            end_datetime: exactEndDatetime,
-            event_type: request.event_type
-          }, 'detailed_info_submitted');
-        } catch (notifError) {
-          console.warn('Failed to send notification:', notifError);
-          // Don't fail the whole request if notification fails
-        }
+      // Submit detailed request - this will also send admin notification
+      const updatedRequest = await eventRequestsAPI.submitDetailedRequest(request.id, detailedData);
+      
+      // Verify the update was successful
+      if (!updatedRequest) {
+        throw new Error('Die Details konnten nicht gespeichert werden. Keine Antwort vom Server.');
+      }
+      
+      if (updatedRequest.request_stage !== 'details_submitted') {
+        throw new Error(`Die Details konnten nicht gespeichert werden. Status: ${updatedRequest.request_stage}`);
       }
 
       setUploadProgress(100);
       setSuccess(true);
 
+      // Wait a bit longer to ensure database is updated before refreshing
       setTimeout(() => {
         if (onSuccess) onSuccess();
         if (onClose) onClose();
-      }, 2000);
+      }, 1500);
 
     } catch (err) {
-      console.error('Error submitting detailed request:', err);
       setError(err.message || 'Fehler beim Senden der Details');
+      secureLog('error', '[DetailedEventForm] Submit error', { error: sanitizeError(err) });
     } finally {
       setLoading(false);
     }
@@ -213,8 +237,8 @@ const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
 
   if (success) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-2xl p-8 max-w-md w-full text-center border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#4a4a4a]' : ''}`}>
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4" style={{ touchAction: 'pan-y', overscrollBehavior: 'contain' }}>
+        <div className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-xl sm:rounded-2xl p-6 sm:p-8 max-w-md w-full text-center border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#4a4a4a]' : ''}`}>
           <div className="text-green-500 text-6xl mb-4">
             <CheckCircle className="w-24 h-24 mx-auto" />
           </div>
@@ -222,7 +246,7 @@ const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
             Details eingereicht!
           </h3>
           <p className={`text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>
-            Ihre Event-Details wurden erfolgreich eingereicht. Ein Administrator wird Ihre Angaben überprüfen und das Event endgültig freigeben.
+            Ihre Veranstaltungs-Details wurden erfolgreich eingereicht. Ein Administrator wird Ihre Angaben überprüfen und die Veranstaltung endgültig freigeben.
           </p>
         </div>
       </div>
@@ -230,29 +254,40 @@ const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#4a4a4a]' : ''}`}>
-        <div className={`flex items-center justify-between p-8 border-b border-[#A58C81] ${isDarkMode ? 'dark:border-[#EBE9E9]' : ''}`}>
-          <div>
-            <h2 className={`text-2xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
-              Event-Details vervollständigen
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-3 md:p-4" style={{ touchAction: 'pan-y', overscrollBehavior: 'contain' }}>
+      <div 
+        className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-xl sm:rounded-2xl shadow-xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#4a4a4a]' : ''}`}
+        style={{ 
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y',
+          overscrollBehavior: 'contain'
+        }}
+      >
+        {/* MOBILE RESPONSIVE: Header with responsive padding and proper close button */}
+        <div className={`flex items-center justify-between p-4 sm:p-6 md:p-8 border-b border-[#A58C81] ${isDarkMode ? 'dark:border-[#EBE9E9]' : ''}`}>
+          <div className="flex-1 min-w-0 pr-2">
+            <h2 className={`text-lg sm:text-xl md:text-2xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} truncate`}>
+              Veranstaltungs-Details vervollständigen
             </h2>
-            <p className={`text-sm mt-1 text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>
+            <p className={`text-xs sm:text-sm mt-1 text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>
               Event: <span className="font-semibold">{request?.event_name || request?.title}</span>
             </p>
-            <p className={`text-sm mt-1 text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>
+            <p className={`text-xs sm:text-sm mt-1 text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>
               Schritt 2 von 3: Geben Sie die genauen Zeiten an
             </p>
           </div>
           <button
             onClick={onClose}
-            className={`p-2 hover:opacity-70 transition-opacity rounded-lg text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}
+            className={`min-w-[44px] min-h-[44px] p-2 hover:opacity-70 active:scale-95 transition-all rounded-lg text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} touch-manipulation flex items-center justify-center flex-shrink-0`}
+            aria-label="Schließen"
+            style={{ touchAction: 'manipulation' }}
           >
             <X size={24} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-8">
+        {/* MOBILE RESPONSIVE: Form with responsive padding and spacing */}
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 md:p-8 space-y-6 sm:space-y-8">
           {error && (
             <div className={`rounded-lg p-4 bg-red-50 ${isDarkMode ? 'dark:bg-red-900/20' : ''} border border-red-200 ${isDarkMode ? 'dark:border-red-800' : ''}`}>
               <p className={`text-sm text-red-600 ${isDarkMode ? 'dark:text-red-400' : ''}`}>{error}</p>
@@ -281,10 +316,10 @@ const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
           {/* Event Date and Time - Clear Section */}
           <div className={`border-l-4 border-[#A58C81] pl-4 py-2`}>
             <h3 className={`text-xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} mb-1`}>
-              Event-Zeitraum
+              Veranstaltungs-Zeitraum
             </h3>
             <p className={`text-xs text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mb-4`}>
-              Geben Sie die genauen Start- und Endzeiten Ihres Events an
+              Geben Sie die genauen Start- und Endzeiten Ihrer Veranstaltung an
             </p>
             
             {/* Start Date/Time */}
@@ -292,14 +327,16 @@ const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
               <label className={`block text-sm font-semibold mb-2 text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
                 Von (Startdatum) *
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              {/* MOBILE RESPONSIVE: Stack on mobile, side-by-side on desktop */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <input
                   type="date"
                   name="event_start_date"
                   value={formData.event_start_date}
                   onChange={handleChange}
                   required
-                  className={`w-full px-3 py-3 border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+                  className={`w-full px-3 py-3 min-h-[44px] text-base border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+                  style={{ fontSize: '16px' }}
                 />
                 <input
                   type="time"
@@ -307,7 +344,8 @@ const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
                   value={formData.event_start_time}
                   onChange={handleChange}
                   required
-                  className={`w-full px-3 py-3 border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+                  className={`w-full px-3 py-3 min-h-[44px] text-base border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+                  style={{ fontSize: '16px' }}
                 />
               </div>
             </div>
@@ -317,14 +355,16 @@ const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
               <label className={`block text-sm font-semibold mb-2 text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
                 Bis (Enddatum) *
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              {/* MOBILE RESPONSIVE: Stack on mobile, side-by-side on desktop */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <input
                   type="date"
                   name="event_end_date"
                   value={formData.event_end_date}
                   onChange={handleChange}
                   required
-                  className={`w-full px-3 py-3 border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+                  className={`w-full px-3 py-3 min-h-[44px] text-base border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+                  style={{ fontSize: '16px' }}
                 />
                 <input
                   type="time"
@@ -332,7 +372,8 @@ const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
                   value={formData.event_end_time}
                   onChange={handleChange}
                   required
-                  className={`w-full px-3 py-3 border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+                  className={`w-full px-3 py-3 min-h-[44px] text-base border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+                  style={{ fontSize: '16px' }}
                 />
               </div>
             </div>
@@ -457,25 +498,29 @@ const DetailedEventForm = ({ request, isOpen, onClose, onSuccess }) => {
               value={formData.additional_notes}
               onChange={handleChange}
               rows="4"
-              className={`w-full px-3 py-3 border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} placeholder-gray-500 ${isDarkMode ? 'dark:placeholder-gray-400' : ''}`}
+              className={`w-full px-3 py-3 min-h-[44px] text-base border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} placeholder-gray-500 ${isDarkMode ? 'dark:placeholder-gray-400' : ''}`}
+              style={{ fontSize: '16px' }}
               placeholder="Zusätzliche Informationen, Wünsche oder Anmerkungen..."
             />
           </div>
 
           {/* Submit Buttons */}
-          <div className={`flex justify-end space-x-4 pt-6 border-t border-[#A58C81] ${isDarkMode ? 'dark:border-[#EBE9E9]' : ''}`}>
+          {/* MOBILE RESPONSIVE: Buttons stack on mobile, side-by-side on desktop */}
+          <div className={`flex flex-col sm:flex-row justify-end gap-3 sm:space-x-4 pt-6 border-t border-[#A58C81] ${isDarkMode ? 'dark:border-[#EBE9E9]' : ''}`}>
             <button
               type="button"
               onClick={onClose}
               disabled={loading}
-              className={`px-6 py-3 text-sm font-medium rounded-lg hover:opacity-80 transition-opacity border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} bg-transparent hover:bg-gray-50 ${isDarkMode ? 'dark:hover:bg-[#1a1a1a]' : ''}`}
+              className={`w-full sm:w-auto px-6 py-3 min-h-[44px] text-base font-medium rounded-lg hover:opacity-80 active:scale-95 transition-all border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} bg-transparent hover:bg-gray-50 ${isDarkMode ? 'dark:hover:bg-[#1a1a1a]' : ''} touch-manipulation`}
+              style={{ touchAction: 'manipulation' }}
             >
               Abbrechen
             </button>
             <button
               type="submit"
               disabled={loading}
-              className={`px-6 py-3 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-opacity bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} hover:bg-[#8a6a5a] ${isDarkMode ? 'dark:hover:bg-[#8a8a8a]' : ''}`}
+              className={`w-full sm:w-auto px-6 py-3 min-h-[44px] text-base font-medium text-white rounded-lg hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-all bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} hover:bg-[#8a6a5a] ${isDarkMode ? 'dark:hover:bg-[#8a8a8a]' : ''} touch-manipulation`}
+              style={{ touchAction: 'manipulation' }}
             >
               {loading ? (
                 <>

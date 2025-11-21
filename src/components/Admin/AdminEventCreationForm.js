@@ -1,6 +1,11 @@
+// FILE OVERVIEW
+// - Purpose: Admin form for creating new events directly in the calendar; includes conflict checking and validation.
+// - Used by: AdminPanelClean when admin clicks "Event erstellen"; allows direct event creation without request workflow.
+// - Notes: Production component. Admin-only; uses eventsAPI.create and eventValidation for conflict checking.
+
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Plus, Copy } from 'lucide-react';
-import { eventsAPI } from '../../services/httpApi';
+import { X, Plus, Copy } from 'lucide-react';
+import { eventsAPI } from '../../services/databaseApi';
 import { useDarkMode } from '../../contexts/DarkModeContext';
 import { checkEventConflicts, formatConflictMessage, validateEventTimes } from '../../utils/eventValidation';
 
@@ -36,7 +41,6 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
       try {
         setTemplates(JSON.parse(savedTemplates));
       } catch (e) {
-        console.error('Error loading templates:', e);
       }
     }
   }, [isOpen]);
@@ -145,7 +149,7 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
     try {
       // Validate required fields
       if (!formData.title.trim()) {
-        throw new Error('Bitte geben Sie einen Event-Namen ein');
+        throw new Error('Bitte geben Sie einen Namen für die Veranstaltung ein');
       }
 
       if (!formData.event_start_date || !formData.event_start_time) {
@@ -210,7 +214,7 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
           await eventsAPI.create(eventData);
         }
 
-        alert(`${recurringDates.length} wiederkehrende Events erfolgreich erstellt!`);
+        alert(`${recurringDates.length} wiederkehrende Veranstaltungen erfolgreich erstellt!`);
       } else {
         // Single event
         const eventData = {
@@ -232,8 +236,7 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
       if (onClose) onClose();
 
     } catch (err) {
-      console.error('Error creating event:', err);
-      setError(err.message || 'Fehler beim Erstellen des Events');
+      setError(err.message || 'Fehler beim Erstellen der Veranstaltung');
     } finally {
       setLoading(false);
     }
@@ -241,28 +244,42 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
 
   if (!isOpen) return null;
 
+  // MOBILE RESPONSIVE: Modal with proper mobile sizing and touch-friendly interactions
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#4a4a4a]' : ''}`}>
-        {/* Header */}
-        <div className={`flex items-center justify-between p-8 border-b border-[#A58C81] ${isDarkMode ? 'dark:border-[#EBE9E9]' : ''}`}>
-          <div>
-            <h2 className={`text-2xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
-              Neues Event erstellen
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-3 md:p-4"
+      style={{ touchAction: 'pan-y', overscrollBehavior: 'contain' }}
+    >
+      <div 
+        className={`bg-white ${isDarkMode ? 'dark:bg-[#2a2a2a]' : ''} rounded-xl sm:rounded-2xl shadow-xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#4a4a4a]' : ''}`}
+        style={{ 
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y',
+          overscrollBehavior: 'contain'
+        }}
+      >
+        {/* MOBILE RESPONSIVE: Header with responsive padding */}
+        <div className={`flex items-center justify-between p-4 sm:p-6 md:p-8 border-b border-[#A58C81] ${isDarkMode ? 'dark:border-[#EBE9E9]' : ''}`}>
+          <div className="flex-1 min-w-0 pr-2">
+            <h2 className={`text-lg sm:text-xl md:text-2xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} truncate`}>
+              Neue Veranstaltung erstellen
             </h2>
-            <p className={`text-sm mt-1 text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>
-              Als Admin direkt Event erstellen (keine Genehmigung erforderlich)
+            <p className={`text-xs sm:text-sm mt-1 text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>
+              Als Admin direkt Veranstaltung erstellen (keine Genehmigung erforderlich)
             </p>
           </div>
           <button
             onClick={onClose}
-            className={`p-2 hover:opacity-70 transition-opacity rounded-lg text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}
+            className={`min-w-[44px] min-h-[44px] p-2 hover:opacity-70 active:scale-95 transition-all rounded-lg text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} touch-manipulation flex items-center justify-center flex-shrink-0`}
+            aria-label="Schließen"
+            style={{ touchAction: 'manipulation' }}
           >
             <X size={24} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-8">
+        {/* MOBILE RESPONSIVE: Form with responsive padding */}
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 md:p-8 space-y-6 sm:space-y-8">
           {error && (
             <div className={`rounded-lg p-4 bg-red-50 ${isDarkMode ? 'dark:bg-red-900/20' : ''} border border-red-200 ${isDarkMode ? 'dark:border-red-800' : ''}`}>
               <p className={`text-sm text-red-600 ${isDarkMode ? 'dark:text-red-400' : ''}`}>{error}</p>
@@ -278,7 +295,8 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
               <select
                 value={selectedTemplate}
                 onChange={handleLoadTemplate}
-                className={`w-full px-3 py-2 border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6054d9] bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+                className={`w-full px-3 py-3 min-h-[44px] text-base border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6054d9] bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+                style={{ fontSize: '16px' }}
               >
                 <option value="">-- Vorlage auswählen --</option>
                 {templates.map((template, index) => (
@@ -288,7 +306,7 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
                 ))}
               </select>
               <p className={`text-xs mt-1 text-purple-700 ${isDarkMode ? 'dark:text-purple-300' : ''}`}>
-                Lädt Event-Details aus gespeicherten Vorlagen
+                Lädt Veranstaltungs-Details aus gespeicherten Vorlagen
               </p>
             </div>
           )}
@@ -296,16 +314,16 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
           {/* Basic Information Section */}
           <div className={`border-l-4 border-[#A58C81] pl-4 py-2`}>
             <h3 className={`text-xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} mb-1`}>
-              Event-Informationen
+              Veranstaltungs-Informationen
             </h3>
             <p className={`text-xs text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mb-4`}>
-              Grundlegende Informationen zum Event
+              Grundlegende Informationen zur Veranstaltung
             </p>
 
             <div className="space-y-4">
               <div>
                 <label className={`block text-sm font-semibold mb-2 text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
-                  Event-Name *
+                  Veranstaltungs-Name *
                 </label>
                 <input
                   type="text"
@@ -313,7 +331,8 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
                   value={formData.title}
                   onChange={handleChange}
                   required
-                  className={`w-full px-3 py-3 border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} placeholder-gray-500 ${isDarkMode ? 'dark:placeholder-gray-400' : ''}`}
+                  className={`w-full px-3 py-3 min-h-[44px] text-base border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} placeholder-gray-500 ${isDarkMode ? 'dark:placeholder-gray-400' : ''}`}
+                  style={{ fontSize: '16px' }}
                   placeholder="z.B. Sommerveranstaltung, Vereinstreffen"
                 />
               </div>
@@ -327,8 +346,9 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
                   value={formData.description}
                   onChange={handleChange}
                   rows="3"
-                  className={`w-full px-3 py-3 border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} placeholder-gray-500 ${isDarkMode ? 'dark:placeholder-gray-400' : ''}`}
-                  placeholder="Optionale Beschreibung des Events..."
+                  className={`w-full px-3 py-3 min-h-[44px] text-base border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} placeholder-gray-500 ${isDarkMode ? 'dark:placeholder-gray-400' : ''}`}
+                  style={{ fontSize: '16px' }}
+                  placeholder="Optionale Beschreibung der Veranstaltung..."
                 />
               </div>
             </div>
@@ -340,7 +360,7 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
               Zeitraum
             </h3>
             <p className={`text-xs text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mb-4`}>
-              Wann findet das Event statt?
+              Wann findet die Veranstaltung statt?
             </p>
 
             <div className="space-y-4">
@@ -399,10 +419,10 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
           {/* Recurring Events Section */}
           <div className={`border-l-4 border-[#6054d9] pl-4 py-2`}>
             <h3 className={`text-xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} mb-1`}>
-              Wiederkehrende Events
+              Wiederkehrende Veranstaltungen
             </h3>
             <p className={`text-xs text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mb-4`}>
-              Erstellen Sie eine Serie von Events automatisch
+              Erstellen Sie eine Serie von Veranstaltungen automatisch
             </p>
 
             <div className="space-y-4">
@@ -416,7 +436,7 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
                   className={`h-4 w-4 rounded border-gray-300 ${isDarkMode ? 'dark:border-gray-600' : ''} text-[#6054d9] focus:ring-[#6054d9]`}
                 />
                 <label htmlFor="is_recurring" className={`ml-3 block text-sm font-semibold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
-                  Serie von Events erstellen (z.B. jeden Montag)
+                  Serie von Veranstaltungen erstellen (z.B. jeden Montag)
                 </label>
               </div>
 
@@ -431,7 +451,8 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
                         name="recurrence_pattern"
                         value={formData.recurrence_pattern}
                         onChange={handleChange}
-                        className={`w-full px-3 py-2 border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6054d9] bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+                        className={`w-full px-3 py-3 min-h-[44px] text-base border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6054d9] bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+                style={{ fontSize: '16px' }}
                       >
                         <option value="weekly">Wöchentlich</option>
                         <option value="monthly">Monatlich</option>
@@ -450,7 +471,8 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
                           onChange={handleChange}
                           min="1"
                           max="12"
-                          className={`w-20 px-3 py-2 border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6054d9] bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+                          className={`w-20 px-3 py-3 min-h-[44px] text-base border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6054d9] bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+                        style={{ fontSize: '16px' }}
                         />
                         <span className={`text-sm text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
                           {formData.recurrence_pattern === 'weekly' ? 'Woche(n)' : 'Monat(e)'}
@@ -470,10 +492,11 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
                       onChange={handleChange}
                       min="1"
                       max="52"
-                      className={`w-32 px-3 py-2 border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6054d9] bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+                      className={`w-32 px-3 py-3 min-h-[44px] text-base border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6054d9] bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''}`}
+                      style={{ fontSize: '16px' }}
                     />
                     <p className={`text-xs mt-1 text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''}`}>
-                      z.B. 4 = 4 Events werden erstellt
+                      z.B. 4 = 4 Veranstaltungen werden erstellt
                     </p>
                   </div>
 
@@ -481,7 +504,7 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
                   {previewDates.length > 0 && (
                     <div>
                       <h4 className={`text-sm font-semibold mb-2 text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
-                        Vorschau ({previewDates.length} Events):
+                        Vorschau ({previewDates.length} Veranstaltungen):
                       </h4>
                       <div className="max-h-40 overflow-y-auto space-y-1">
                         {previewDates.map((date, index) => (
@@ -512,7 +535,7 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
           {/* Event Settings Section */}
           <div className={`border-l-4 border-[#A58C81] pl-4 py-2`}>
             <h3 className={`text-xl font-bold text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''} mb-1`}>
-              Event-Einstellungen
+              Veranstaltungs-Einstellungen
             </h3>
             <p className={`text-xs text-[#A58C81] ${isDarkMode ? 'dark:text-[#EBE9E9]' : ''} mb-4`}>
               Zusätzliche Einstellungen
@@ -521,7 +544,7 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
             <div className="space-y-4">
               <div>
                 <label className={`block text-sm font-semibold mb-2 text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
-                  Event-Typ
+                  Veranstaltungs-Typ
                 </label>
                 <div className="space-y-3">
                   <div className="flex items-center">
@@ -535,7 +558,7 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
                       className={`h-4 w-4 focus:ring-2 focus:ring-opacity-50 border-gray-300 ${isDarkMode ? 'dark:border-gray-600' : ''} text-[#A58C81] ${isDarkMode ? 'dark:text-[#8a8a8a]' : ''} focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''}`}
                     />
                     <label htmlFor="private_event_admin" className={`ml-3 block text-sm font-medium text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
-                      Privates Event
+                      Private Veranstaltung
                     </label>
                   </div>
                   <div className="flex items-center">
@@ -549,7 +572,7 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
                       className={`h-4 w-4 focus:ring-2 focus:ring-opacity-50 border-gray-300 ${isDarkMode ? 'dark:border-gray-600' : ''} text-[#A58C81] ${isDarkMode ? 'dark:text-[#8a8a8a]' : ''} focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''}`}
                     />
                     <label htmlFor="public_event_admin" className={`ml-3 block text-sm font-medium text-[#252422] ${isDarkMode ? 'dark:text-[#F4F1E8]' : ''}`}>
-                      Öffentliches Event
+                      Öffentliche Veranstaltung
                     </label>
                   </div>
                 </div>
@@ -578,7 +601,8 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
                   name="location"
                   value={formData.location}
                   onChange={handleChange}
-                  className={`w-full px-3 py-3 border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} placeholder-gray-500 ${isDarkMode ? 'dark:placeholder-gray-400' : ''}`}
+                  className={`w-full px-3 py-3 min-h-[44px] text-base border border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A58C81] ${isDarkMode ? 'dark:focus:ring-[#8a8a8a]' : ''} focus:ring-opacity-50 transition-colors bg-white ${isDarkMode ? 'dark:bg-[#1a1a1a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} placeholder-gray-500 ${isDarkMode ? 'dark:placeholder-gray-400' : ''}`}
+                  style={{ fontSize: '16px' }}
                   placeholder="Pferdestall Wedes-Wedel"
                 />
               </div>
@@ -586,30 +610,34 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
           </div>
 
           {/* Submit Buttons */}
-          <div className={`flex justify-between pt-6 border-t border-[#A58C81] ${isDarkMode ? 'dark:border-[#EBE9E9]' : ''}`}>
+          {/* MOBILE RESPONSIVE: Buttons stack on mobile, side-by-side on desktop */}
+          <div className={`flex flex-col sm:flex-row justify-between gap-3 pt-6 border-t border-[#A58C81] ${isDarkMode ? 'dark:border-[#EBE9E9]' : ''}`}>
             <button
               type="button"
               onClick={handleSaveAsTemplate}
               disabled={!formData.title || loading}
-              className={`px-4 py-2 text-sm font-medium rounded-lg border-2 border-[#6054d9] text-[#6054d9] hover:bg-[#6054d9] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center`}
+              className={`w-full sm:w-auto px-4 py-3 min-h-[44px] text-base font-medium rounded-lg border-2 border-[#6054d9] text-[#6054d9] hover:bg-[#6054d9] hover:text-white active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center touch-manipulation`}
+              style={{ touchAction: 'manipulation' }}
             >
-              <Copy className="h-4 w-4 mr-2" />
+              <Copy className="h-4 w-4 mr-2 flex-shrink-0" />
               Als Vorlage speichern
             </button>
 
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
                 type="button"
                 onClick={onClose}
                 disabled={loading}
-                className={`px-6 py-3 text-sm font-medium rounded-lg hover:opacity-80 transition-opacity border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} bg-transparent hover:bg-gray-50 ${isDarkMode ? 'dark:hover:bg-[#1a1a1a]' : ''}`}
+                className={`w-full sm:w-auto px-6 py-3 min-h-[44px] text-base font-medium rounded-lg hover:opacity-80 active:scale-95 transition-all border-2 border-[#A58C81] ${isDarkMode ? 'dark:border-[#6a6a6a]' : ''} text-[#252422] ${isDarkMode ? 'dark:text-[#e0e0e0]' : ''} bg-transparent hover:bg-gray-50 ${isDarkMode ? 'dark:hover:bg-[#1a1a1a]' : ''} touch-manipulation`}
+                style={{ touchAction: 'manipulation' }}
               >
                 Abbrechen
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className={`px-6 py-3 text-sm font-medium text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-opacity bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} hover:bg-[#8a6a5a] ${isDarkMode ? 'dark:hover:bg-[#8a8a8a]' : ''}`}
+                className={`w-full sm:w-auto px-6 py-3 min-h-[44px] text-base font-medium text-white rounded-lg hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-all bg-[#A58C81] ${isDarkMode ? 'dark:bg-[#6a6a6a]' : ''} hover:bg-[#8a6a5a] ${isDarkMode ? 'dark:hover:bg-[#8a8a8a]' : ''} touch-manipulation`}
+                style={{ touchAction: 'manipulation' }}
               >
                 {loading ? (
                   <>
@@ -619,7 +647,7 @@ const AdminEventCreationForm = ({ isOpen, onClose, onSuccess }) => {
                 ) : (
                   <>
                     <Plus className="h-4 w-4 mr-2" />
-                    {formData.is_recurring ? `${previewDates.length} Events erstellen` : 'Event erstellen'}
+                    {formData.is_recurring ? `${previewDates.length} Veranstaltungen erstellen` : 'Veranstaltung erstellen'}
                   </>
                 )}
               </button>
