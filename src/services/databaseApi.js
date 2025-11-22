@@ -254,7 +254,7 @@ export const eventsAPI = {
         
         try {
           const response = await fetch(
-            `${SUPABASE_URL}/rest/v1/events?select=id,title,description,start_date,end_date,created_by,is_private,status,requested_by,event_type,requester_name,schluesselannahme_time,schluesselabgabe_time,additional_notes,uploaded_mietvertrag_url&order=start_date.asc`,
+            `${SUPABASE_URL}/rest/v1/events?select=id,title,description,start_date,end_date,created_by,is_private,status,requested_by,event_type,requester_name,schluesselannahme_time,schluesselabgabe_time,additional_notes,uploaded_mietvertrag_url,imported_uid,imported_from,imported_at,category,attendee_info&order=start_date.asc`,
             {
               method: 'GET',
               headers: {
@@ -288,7 +288,7 @@ export const eventsAPI = {
       async () => {
         const result = await supabase
           .from('events')
-          .select('id,title,description,start_date,end_date,created_by,is_private,status,requested_by,event_type,requester_name,schluesselannahme_time,schluesselabgabe_time,additional_notes,uploaded_mietvertrag_url')
+          .select('id,title,description,start_date,end_date,created_by,is_private,status,requested_by,event_type,requester_name,schluesselannahme_time,schluesselabgabe_time,additional_notes,uploaded_mietvertrag_url,imported_uid,imported_from,imported_at,category,attendee_info')
           .order('start_date', { ascending: true })
         
         if (result.error) {
