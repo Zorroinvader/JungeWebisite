@@ -526,15 +526,27 @@ const SettingsTab = () => {
       
       // Fetch and parse ICS feed
       const supabaseKey = getSupabaseAnonKey()
+      console.log('📥 Starting ICS import from:', ICS_FEED_URL)
       const parsedEvents = await fetchAndParseICS(ICS_FEED_URL, supabaseKey)
+      console.log(`✅ Parsed ${parsedEvents.length} events from ICS feed`)
       
+      if (parsedEvents.length === 0) {
+        alert('Keine Events im ICS Feed gefunden.')
+        return
+      }
       
       // Show sample of first few events
-      parsedEvents.slice(0, 3).forEach((evt, idx) => {
-      })
+      console.log('Sample events:', parsedEvents.slice(0, 3).map(e => ({
+        title: e.SUMMARY,
+        start: e.startDate,
+        uid: e.UID,
+        category: e.CATEGORIES
+      })))
       
       // Get existing events once
+      console.log('📋 Loading existing events for duplicate check...')
       const existingEvents = await eventsAPI.getAll()
+      console.log(`📋 Found ${existingEvents.length} existing events`)
       
       // Convert and import events
       
@@ -551,7 +563,7 @@ const SettingsTab = () => {
           const dbEvent = convertToDBEvent(icsEvent)
           
           // Check if event already exists (by UID)
-          const exists = existingEvents.some(e => e.imported_uid === dbEvent.imported_uid)
+          const exists = existingEvents.some(e => e.imported_uid && e.imported_uid === dbEvent.imported_uid)
           
           if (exists) {
             skipCount++
@@ -559,13 +571,37 @@ const SettingsTab = () => {
           }
           
           // Create event in database
+          try {
+            const result = await eventsAPI.create(dbEvent)
+            
+            // Handle different response formats from eventsAPI
+            // Supabase client returns {data, error}, HTTP API returns data directly
+            if (result && result.error) {
+              throw new Error(result.error.message || result.error || 'Failed to create event')
+            }
+            
+            // If result has data array, check if it's empty (which would indicate failure)
+            if (result && result.data && Array.isArray(result.data) && result.data.length === 0) {
+              // Empty array might be OK if no error, but log it
+              console.warn('Event creation returned empty data array for:', dbEvent.title)
+            }
+            
+            successCount++
+          } catch (createError) {
+            // Re-throw to be caught by outer catch
+            throw createError
+          }
           
-          await eventsAPI.create(dbEvent)
-          successCount++
+          // Log progress every 10 events
+          if ((i + 1) % 10 === 0) {
+            console.log(`Import progress: ${i + 1}/${parsedEvents.length} events processed`)
+          }
           
         } catch (error) {
           errorCount++
-          errors.push({ event: icsEvent.SUMMARY, error: error.message })
+          const errorMessage = error.message || String(error)
+          errors.push({ event: icsEvent.SUMMARY || 'Unknown', error: errorMessage })
+          console.error(`Failed to import event "${icsEvent.SUMMARY}":`, errorMessage)
         }
       }
       

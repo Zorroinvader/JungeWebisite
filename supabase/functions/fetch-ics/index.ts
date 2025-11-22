@@ -11,18 +11,33 @@ const getAllowedOrigins = () => {
   if (envOrigins) {
     return envOrigins.split(',').map(o => o.trim())
   }
-  return [
-    Deno.env.get('ALLOWED_ORIGIN') || 'https://your-production-domain.com',
-    'http://localhost:3000', // Development
+  
+  // Default allowed origins - include both production and development
+  const defaultOrigins = [
+    'https://www.jg-wedeswedel.de',
+    'https://jg-wedeswedel.de',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001'
   ]
+  
+  const envOrigin = Deno.env.get('ALLOWED_ORIGIN')
+  if (envOrigin) {
+    return [envOrigin, ...defaultOrigins]
+  }
+  
+  return defaultOrigins
 }
 
 const getCorsHeaders = (req: Request) => {
   const allowedOrigins = getAllowedOrigins()
   const origin = req.headers.get('origin')
+  
+  // Check if the request origin is in the allowed list
   const corsOrigin = origin && allowedOrigins.includes(origin) 
     ? origin 
-    : allowedOrigins[0]
+    : allowedOrigins[0] // Default to first allowed origin if not in list
   
   return {
     'Access-Control-Allow-Origin': corsOrigin,
@@ -37,14 +52,25 @@ serve(async (req) => {
   
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { 
+      status: 204,
+      headers: corsHeaders 
+    })
   }
 
   try {
+    console.log('📥 Fetching ICS feed from:', ICS_FEED_URL)
+    console.log('🌐 Request origin:', req.headers.get('origin'))
+    
     // Fetch the ICS feed
-    const response = await fetch(ICS_FEED_URL)
+    const response = await fetch(ICS_FEED_URL, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; Supabase-Edge-Function/1.0)'
+      }
+    })
     
     if (!response.ok) {
+      console.error('❌ Failed to fetch ICS:', response.status, response.statusText)
       return new Response(
         JSON.stringify({ 
           error: `Failed to fetch ICS: ${response.statusText}`,
@@ -54,7 +80,7 @@ serve(async (req) => {
           status: response.status,
           headers: {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
+            ...corsHeaders,
           },
         }
       )
@@ -62,18 +88,20 @@ serve(async (req) => {
 
     // Get the ICS content
     const icsContent = await response.text()
+    console.log('✅ Successfully fetched ICS, length:', icsContent.length, 'characters')
     
     // Return the ICS content with CORS headers
     return new Response(icsContent, {
       status: 200,
       headers: {
-        'Content-Type': 'text/calendar',
+        'Content-Type': 'text/calendar; charset=utf-8',
         ...corsHeaders,
         'Cache-Control': 'public, max-age=300', // Cache for 5 minutes
       },
     })
 
   } catch (error) {
+    console.error('❌ Error fetching ICS:', error)
     const isProduction = Deno.env.get('ENVIRONMENT') === 'production'
     
     return new Response(
