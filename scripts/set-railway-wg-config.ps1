@@ -18,7 +18,7 @@ if (-not $railwayLinked) {
 }
 
 # Read the config file
-$configPath = "src/services/wg_config.conf"
+$configPath = "config/wg_config.conf"
 if (-not (Test-Path $configPath)) {
     Write-Host "Error: $configPath not found!" -ForegroundColor Red
     exit 1

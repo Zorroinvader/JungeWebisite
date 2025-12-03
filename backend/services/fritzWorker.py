@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from fritzconnection import FritzConnection
 from datetime import datetime, timedelta
+from pathlib import Path
 import subprocess
 import os
 import tempfile
@@ -260,7 +261,10 @@ def _connect_wireguard():
     wg_config_from_env = os.environ.get('WG_CONFIG', '').strip()
     
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    existing_config = os.path.join(script_dir, 'wg_config.conf')
+    # Look for config in config/ directory (project root relative to backend/)
+    project_root = Path(__file__).parent.parent.parent
+    config_path = project_root / 'config' / 'wg_config.conf'
+    existing_config = str(config_path) if config_path.exists() else os.path.join(script_dir, 'wg_config.conf')
     
     try:
         # Priority 1: Use environment variable if set (for VPS deployments)

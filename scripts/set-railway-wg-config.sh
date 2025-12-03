@@ -17,7 +17,7 @@ if [ ! -f .railway ]; then
 fi
 
 # Read the config file
-CONFIG_PATH="src/services/wg_config.conf"
+CONFIG_PATH="config/wg_config.conf"
 if [ ! -f "$CONFIG_PATH" ]; then
     echo "Error: $CONFIG_PATH not found!"
     exit 1

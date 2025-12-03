@@ -11,5 +11,5 @@ export PYTHONPATH=/fritz-service
 PORT=${PORT:-8000}
 
 # Start uvicorn with the port
-exec uvicorn src.services.fritzWorkerService:app --host 0.0.0.0 --port "$PORT" --log-level info --access-log
+exec uvicorn backend.services.fritzWorkerService:app --host 0.0.0.0 --port "$PORT" --log-level info --access-log
 

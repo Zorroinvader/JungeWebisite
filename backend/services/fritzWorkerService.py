@@ -5,10 +5,10 @@ This service is designed to run on a VPS (Virtual Private Server) with WireGuard
 
 Usage:
     # Local development
-    python src/services/fritzWorkerService.py
+    python backend/services/fritzWorkerService.py
 
     # Or with uvicorn (recommended for production)
-    uvicorn src.services.fritzWorkerService:app --host 0.0.0.0 --port 8000
+    uvicorn backend.services.fritzWorkerService:app --host 0.0.0.0 --port 8000
 """
 
 from fastapi import FastAPI, HTTPException, Header
@@ -18,10 +18,11 @@ import sys
 import os
 from pathlib import Path
 
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add project root to path for imports
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
 
-from services.fritzWorker import check_for_new_devices
+from backend.services.fritzWorker import check_for_new_devices
 
 app = FastAPI(title="FritzBox Device Checker Service with VPN")
 
