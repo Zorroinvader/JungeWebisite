@@ -48,7 +48,7 @@ export async function getActiveSpecialEvents({ useCache = true } = {}) {
     .select('id, title, slug, description, starts_at, is_active')
     .eq('is_active', true)
     .order('starts_at', { ascending: false })
-    .limit(1)
+    .limit(10)
 
   const timeoutMs = 3000
   const timeoutPromise = new Promise((_, reject) => {
@@ -68,7 +68,7 @@ export async function getActiveSpecialEvents({ useCache = true } = {}) {
         .from('special_events')
         .select('id, title, slug, description, starts_at, is_active')
         .eq('is_active', true)
-        .limit(1)
+        .limit(10)
       if (!err2 && data2 && data2.length > 0) list = data2
     }
     if (!nocache) writeCache(list)
@@ -82,20 +82,20 @@ export async function getActiveSpecialEvents({ useCache = true } = {}) {
       if (url && key) {
         const controller = new AbortController()
         const to = setTimeout(() => controller.abort(), timeoutMs)
-        let resp = await fetch(`${url}/rest/v1/special_events?select=id,title,slug,description,starts_at,is_active&is_active=eq.true&order=starts_at.desc&limit=1`, {
+        let resp = await fetch(`${url}/rest/v1/special_events?select=id,title,slug,description,starts_at,is_active&is_active=eq.true&order=starts_at.desc&limit=10`, {
           headers: { 'apikey': key, 'Authorization': `Bearer ${key}` },
           signal: controller.signal
         })
         clearTimeout(to)
         if (!resp.ok) {
           // Retry without order
-          resp = await fetch(`${url}/rest/v1/special_events?select=id,title,slug,description,starts_at,is_active&is_active=eq.true&limit=1`, {
+          resp = await fetch(`${url}/rest/v1/special_events?select=id,title,slug,description,starts_at,is_active&is_active=eq.true&limit=10`, {
             headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
           })
         }
         if (!resp.ok) {
           // Retry without filter; RLS will still enforce is_active=true
-          resp = await fetch(`${url}/rest/v1/special_events?select=id,title,slug,description,starts_at,is_active&limit=1`, {
+          resp = await fetch(`${url}/rest/v1/special_events?select=id,title,slug,description,starts_at,is_active&limit=10`, {
             headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
           })
         }

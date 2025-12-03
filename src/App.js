@@ -23,6 +23,7 @@ import AdminPanelClean from './components/Admin/AdminPanelClean'
 import SpecialEventsPage from './pages/SpecialEventsPage'
 import SpecialEventDetailPage from './pages/SpecialEventDetailPage'
 import CostumeContestResultsPage from './pages/CostumeContestResultsPage'
+import NikolausfeierPage from './pages/NikolausfeierPage'
 import './index.css'
 import { prefetchActiveSpecialEvents } from './services/specialEventsApi'
 
@@ -105,6 +106,7 @@ const AppContent = () => {
         <Route path="/special-events" element={<Layout><SpecialEventsPage /></Layout>} />
         <Route path="/special-events/:slug" element={<Layout><SpecialEventDetailPage /></Layout>} />
         <Route path="/kostuemwettbewerb-ergebnisse" element={<Layout><CostumeContestResultsPage /></Layout>} />
+        <Route path="/nikolausfeier" element={<Layout><NikolausfeierPage /></Layout>} />
         
         {/* Test Route */}
         <Route path="/test" element={<div>Test-Route funktioniert!</div>} />

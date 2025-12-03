@@ -5,7 +5,7 @@
 
 import React, { useEffect, useMemo, useState, useRef } from 'react'
 import { Trash2, RefreshCw } from 'lucide-react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
   getSpecialEventBySlug,
@@ -23,6 +23,7 @@ import {
 const SpecialEventDetailPage = () => {
   const { isAdmin } = useAuth()
   const { slug } = useParams()
+  const navigate = useNavigate()
   const [event, setEvent] = useState(null)
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
@@ -47,6 +48,12 @@ const SpecialEventDetailPage = () => {
   const voterToken = useMemo(() => localStorage.getItem('se_voter_anon_token') || '', [])
 
   useEffect(() => {
+    // Redirect Nikolausfeier to dedicated page
+    if (slug === 'nikolausfeier') {
+      navigate('/nikolausfeier', { replace: true })
+      return
+    }
+
     let isMounted = true
     async function load() {
       try {
@@ -147,7 +154,7 @@ const SpecialEventDetailPage = () => {
     const stop = setTimeout(() => { if (isMounted) setLoading(false) }, 2500)
     load().finally(() => { if (isMounted) setLoading(false); clearTimeout(stop) })
     return () => { isMounted = false }
-  }, [slug])
+  }, [slug, navigate])
 
   // Handle hash navigation to results section
   useEffect(() => {

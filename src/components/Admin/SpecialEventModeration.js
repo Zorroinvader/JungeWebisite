@@ -6,10 +6,19 @@
 import React, { useEffect, useState } from 'react'
 import { Trophy, Vote, Users, RefreshCw } from 'lucide-react'
 import { getActiveSpecialEvents, listPendingEntries, approveEntry, rejectEntry, getPublicImageUrl, listApprovedEntries, deleteUserUpload, getVoteStatsForEvent } from '../../services/specialEventsApi'
+import { 
+  listPendingNikolausfeierEntries, 
+  listApprovedNikolausfeierEntries,
+  approveNikolausfeierEntry, 
+  rejectNikolausfeierEntry,
+  deleteNikolausfeierEntry,
+  getPublicVideoUrl
+} from '../../services/nikolausfeierApi'
 
 const SpecialEventModeration = () => {
   const [events, setEvents] = useState([])
   const [selectedEventId, setSelectedEventId] = useState('')
+  const [selectedEventSlug, setSelectedEventSlug] = useState('')
   const [pending, setPending] = useState([])
   const [approved, setApproved] = useState([])
   const [voteStats, setVoteStats] = useState([])
@@ -17,36 +26,65 @@ const SpecialEventModeration = () => {
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('pending') // 'pending', 'approved', or 'results'
   const [actionState, setActionState] = useState({}) // { [entryId]: 'approving'|'rejecting' }
+  const isNikolausfeier = selectedEventSlug === 'nikolausfeier'
 
   useEffect(() => {
     getActiveSpecialEvents().then(setEvents).catch(err => setError(err.message || String(err)))
   }, [])
 
   useEffect(() => {
+    const event = events.find(e => e.id === selectedEventId)
+    setSelectedEventSlug(event?.slug || '')
+  }, [selectedEventId, events])
+
+  useEffect(() => {
     if (!selectedEventId) return
     setLoading(true)
-    Promise.all([
-      listPendingEntries(selectedEventId),
-      listApprovedEntries(selectedEventId),
-      getVoteStatsForEvent(selectedEventId)
-    ])
-      .then(([pendingData, approvedData, voteData]) => {
-        setPending(pendingData)
-        setApproved(approvedData)
-        setVoteStats(voteData)
-      })
-      .catch(err => {
-        setError(`Fehler beim Laden der Daten. Details: ${err?.message || String(err)}`)
-      })
-      .finally(() => setLoading(false))
-  }, [selectedEventId])
+    
+    if (isNikolausfeier) {
+      // Load Nikolausfeier entries
+      Promise.all([
+        listPendingNikolausfeierEntries(),
+        listApprovedNikolausfeierEntries()
+      ])
+        .then(([pendingData, approvedData]) => {
+          setPending(pendingData)
+          setApproved(approvedData)
+          setVoteStats([]) // No voting for Nikolausfeier
+        })
+        .catch(err => {
+          setError(`Fehler beim Laden der Daten. Details: ${err?.message || String(err)}`)
+        })
+        .finally(() => setLoading(false))
+    } else {
+      // Load special event entries (images)
+      Promise.all([
+        listPendingEntries(selectedEventId),
+        listApprovedEntries(selectedEventId),
+        getVoteStatsForEvent(selectedEventId)
+      ])
+        .then(([pendingData, approvedData, voteData]) => {
+          setPending(pendingData)
+          setApproved(approvedData)
+          setVoteStats(voteData)
+        })
+        .catch(err => {
+          setError(`Fehler beim Laden der Daten. Details: ${err?.message || String(err)}`)
+        })
+        .finally(() => setLoading(false))
+    }
+  }, [selectedEventId, isNikolausfeier])
 
   async function handleApprove(id) {
     try {
       setActionState(s => ({ ...s, [id]: 'approving' }))
-      const updated = await approveEntry(id)
+      if (isNikolausfeier) {
+        await approveNikolausfeierEntry(id)
+      } else {
+        const updated = await approveEntry(id)
+        try { sessionStorage.removeItem('special_event_entries_' + (updated?.event_id || selectedEventId)) } catch {}
+      }
       setPending(p => p.filter(x => x.id !== id))
-      try { sessionStorage.removeItem('special_event_entries_' + (updated?.event_id || selectedEventId)) } catch {}
     } catch (err) {
       setError(`Freigeben fehlgeschlagen: ${err?.message || String(err)}`)
     } finally {
@@ -57,9 +95,13 @@ const SpecialEventModeration = () => {
   async function handleReject(id) {
     try {
       setActionState(s => ({ ...s, [id]: 'rejecting' }))
-      const updated = await rejectEntry(id)
+      if (isNikolausfeier) {
+        await rejectNikolausfeierEntry(id)
+      } else {
+        const updated = await rejectEntry(id)
+        try { sessionStorage.removeItem('special_event_entries_' + (updated?.event_id || selectedEventId)) } catch {}
+      }
       setPending(p => p.filter(x => x.id !== id))
-      try { sessionStorage.removeItem('special_event_entries_' + (updated?.event_id || selectedEventId)) } catch {}
     } catch (err) {
       setError(`Ablehnen fehlgeschlagen: ${err?.message || String(err)}`)
     } finally {
@@ -68,9 +110,16 @@ const SpecialEventModeration = () => {
   }
 
   async function handleDeleteApproved(id, imagePath) {
-    if (!window.confirm('Dieses Foto aus der Galerie entfernen? Das Foto und alle Votes werden gelöscht.')) return
+    const confirmMsg = isNikolausfeier 
+      ? 'Dieses Video aus der Galerie entfernen? Das Video wird gelöscht.'
+      : 'Dieses Foto aus der Galerie entfernen? Das Foto und alle Votes werden gelöscht.'
+    if (!window.confirm(confirmMsg)) return
     try {
-      await deleteUserUpload(id, imagePath)
+      if (isNikolausfeier) {
+        await deleteNikolausfeierEntry(id)
+      } else {
+        await deleteUserUpload(id, imagePath)
+      }
       setApproved(p => p.filter(x => x.id !== id))
     } catch (err) {
       setError(err.message || String(err))
@@ -81,19 +130,39 @@ const SpecialEventModeration = () => {
     if (!selectedEventId) return
     setLoading(true)
     try {
-      const [pendingData, approvedData, voteData] = await Promise.all([
-        listPendingEntries(selectedEventId),
-        listApprovedEntries(selectedEventId),
-        getVoteStatsForEvent(selectedEventId)
-      ])
-      setPending(pendingData)
-      setApproved(approvedData)
-      setVoteStats(voteData)
+      if (isNikolausfeier) {
+        const [pendingData, approvedData] = await Promise.all([
+          listPendingNikolausfeierEntries(),
+          listApprovedNikolausfeierEntries()
+        ])
+        setPending(pendingData)
+        setApproved(approvedData)
+        setVoteStats([])
+      } else {
+        const [pendingData, approvedData, voteData] = await Promise.all([
+          listPendingEntries(selectedEventId),
+          listApprovedEntries(selectedEventId),
+          getVoteStatsForEvent(selectedEventId)
+        ])
+        setPending(pendingData)
+        setApproved(approvedData)
+        setVoteStats(voteData)
+      }
     } catch (err) {
       setError(err.message || String(err))
     } finally {
       setLoading(false)
     }
+  }
+
+  const formatTime = (seconds) => {
+    if (!seconds) return ''
+    if (seconds < 60) {
+      return `${seconds} Sekunden`
+    }
+    const minutes = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return secs > 0 ? `${minutes} Min ${secs} Sek` : `${minutes} Minuten`
   }
 
   return (
@@ -173,18 +242,20 @@ const SpecialEventModeration = () => {
                   Freigegeben
                   <span className="ml-1 px-2 py-0.5 rounded-full bg-white/30 dark:bg-black/30 text-xs">({approved.length})</span>
                 </button>
-                <button
-                  onClick={() => setActiveTab('results')}
-                  className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-semibold transition-all ${
-                    activeTab === 'results'
-                      ? 'bg-[#A58C81] text-white shadow-md'
-                      : 'bg-[#F4F1E8] dark:bg-[#1a1a1a] text-[#252422] dark:text-[#F4F1E8] hover:bg-[#A58C81]/20 dark:hover:bg-[#A58C81]/10'
-                  }`}
-                >
-                  <Trophy className="h-4 w-4" />
-                  Ergebnisse
-                  <span className="ml-1 px-2 py-0.5 rounded-full bg-white/30 dark:bg-black/30 text-xs">({voteStats.length})</span>
-                </button>
+                {!isNikolausfeier && (
+                  <button
+                    onClick={() => setActiveTab('results')}
+                    className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-semibold transition-all ${
+                      activeTab === 'results'
+                        ? 'bg-[#A58C81] text-white shadow-md'
+                        : 'bg-[#F4F1E8] dark:bg-[#1a1a1a] text-[#252422] dark:text-[#F4F1E8] hover:bg-[#A58C81]/20 dark:hover:bg-[#A58C81]/10'
+                    }`}
+                  >
+                    <Trophy className="h-4 w-4" />
+                    Ergebnisse
+                    <span className="ml-1 px-2 py-0.5 rounded-full bg-white/30 dark:bg-black/30 text-xs">({voteStats.length})</span>
+                  </button>
+                )}
               </div>
               
               {/* Refresh Button */}
@@ -201,16 +272,77 @@ const SpecialEventModeration = () => {
             {/* Content Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             {activeTab === 'pending' && pending.map(en => (
-              <div key={en.id} className="border-2 border-[#A58C81]/30 dark:border-[#EBE9E9]/30 rounded-xl overflow-hidden bg-white dark:bg-[#1a1a1a] shadow-md hover:shadow-lg transition-shadow">
-                <div className="w-full h-48 bg-gray-50 dark:bg-[#0f0f0f] flex items-center justify-center">
-                  <img src={getPublicImageUrl(en.image_path)} alt={en.title || 'Beitrag'} className="max-w-full max-h-full object-contain" />
-                </div>
-                <div className="p-4">
-                  {en.title && <div className="font-semibold text-[#252422] dark:text-[#F4F1E8] mb-2">{en.title}</div>}
-                  {en.description && <div className="text-sm text-[#A58C81] dark:text-[#EBE9E9] mb-3">{en.description}</div>}
-                  {en.submitter_contact && (
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-4">Kontakt: {en.submitter_contact}</div>
-                  )}
+              <div key={en.id} className={`border-2 rounded-xl overflow-hidden bg-white dark:bg-[#1a1a1a] shadow-md hover:shadow-lg transition-shadow ${
+                en.replaces_entry_id ? 'border-amber-500 dark:border-amber-600' : 'border-[#A58C81]/30 dark:border-[#EBE9E9]/30'
+              }`}>
+                {/* Replacement Warning Banner */}
+                {isNikolausfeier && en.replaces_entry_id && (
+                  <div className="bg-amber-50 dark:bg-amber-900/30 border-b-2 border-amber-300 dark:border-amber-600 p-3">
+                    <div className="flex items-start gap-2">
+                      <div className="flex-shrink-0 mt-0.5">
+                        <svg className="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-1">
+                          ⚠️ Ersetzt einen alten Beitrag
+                        </p>
+                        {en.replaced_entry ? (
+                          <div className="text-xs text-amber-800 dark:text-amber-200 space-y-1">
+                            <p><strong>Alter Beitrag:</strong> {en.replaced_entry.video_name || 'Unbenannt'}</p>
+                            <p><strong>Teilnehmer:</strong> {en.replaced_entry.participant_name || 'Unbekannt'}</p>
+                            <p><strong>Erstellt:</strong> {new Date(en.replaced_entry.created_at).toLocaleDateString('de-DE')}</p>
+                            <p className="text-amber-700 dark:text-amber-300 font-medium mt-2">
+                              ⚠️ Der alte Beitrag wird beim Freigeben automatisch gelöscht!
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-amber-700 dark:text-amber-300">
+                            Der zu ersetzende Beitrag konnte nicht geladen werden (möglicherweise bereits gelöscht).
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {isNikolausfeier ? (
+                  <>
+                    <div className="w-full h-48 bg-gray-50 dark:bg-[#0f0f0f] flex items-center justify-center">
+                      <video
+                        src={getPublicVideoUrl(en.video_url)}
+                        controls
+                        className="max-w-full max-h-full"
+                        style={{ maxHeight: '192px' }}
+                      >
+                        Ihr Browser unterstützt das Video-Element nicht.
+                      </video>
+                    </div>
+                    <div className="p-4">
+                      <div className="font-semibold text-[#252422] dark:text-[#F4F1E8] mb-2">{en.video_name || en.event_name}</div>
+                      {en.participant_name && (
+                        <div className="text-sm text-[#A58C81] dark:text-[#EBE9E9] mb-2">von {en.participant_name}</div>
+                      )}
+                      {en.beer_drink_time && (
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-4">Bier-Trinkzeit: {formatTime(en.beer_drink_time)}</div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-full h-48 bg-gray-50 dark:bg-[#0f0f0f] flex items-center justify-center">
+                      <img src={getPublicImageUrl(en.image_path)} alt={en.title || 'Beitrag'} className="max-w-full max-h-full object-contain" />
+                    </div>
+                    <div className="p-4">
+                      {en.title && <div className="font-semibold text-[#252422] dark:text-[#F4F1E8] mb-2">{en.title}</div>}
+                      {en.description && <div className="text-sm text-[#A58C81] dark:text-[#EBE9E9] mb-3">{en.description}</div>}
+                      {en.submitter_contact && (
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-4">Kontakt: {en.submitter_contact}</div>
+                      )}
+                    </div>
+                  </>
+                )}
+                <div className="p-4 pt-0">
                   <div className="flex flex-col sm:flex-row gap-2">
                     <button 
                       onClick={() => handleApprove(en.id)} 
@@ -234,21 +366,48 @@ const SpecialEventModeration = () => {
             {activeTab === 'approved' && approved.map(en => (
               <div key={en.id} className="border-2 border-green-300 dark:border-green-700 rounded-xl overflow-hidden bg-white dark:bg-[#1a1a1a] shadow-md hover:shadow-lg transition-shadow">
                 <div className="relative">
-                  <div className="w-full h-48 bg-gray-50 dark:bg-[#0f0f0f] flex items-center justify-center">
-                    <img src={getPublicImageUrl(en.image_path)} alt={en.title || 'Beitrag'} className="max-w-full max-h-full object-contain" />
-                  </div>
+                  {isNikolausfeier ? (
+                    <div className="w-full h-48 bg-gray-50 dark:bg-[#0f0f0f] flex items-center justify-center">
+                      <video
+                        src={getPublicVideoUrl(en.video_url)}
+                        controls
+                        className="max-w-full max-h-full"
+                        style={{ maxHeight: '192px' }}
+                      >
+                        Ihr Browser unterstützt das Video-Element nicht.
+                      </video>
+                    </div>
+                  ) : (
+                    <div className="w-full h-48 bg-gray-50 dark:bg-[#0f0f0f] flex items-center justify-center">
+                      <img src={getPublicImageUrl(en.image_path)} alt={en.title || 'Beitrag'} className="max-w-full max-h-full object-contain" />
+                    </div>
+                  )}
                   <div className="absolute top-2 left-2 bg-green-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
                     ✓ Freigegeben
                   </div>
                 </div>
                 <div className="p-4">
-                  {en.title && <div className="font-semibold text-[#252422] dark:text-[#F4F1E8] mb-2">{en.title}</div>}
-                  {en.description && <div className="text-sm text-[#A58C81] dark:text-[#EBE9E9] mb-3">{en.description}</div>}
-                  {en.submitter_contact && (
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-4">Kontakt: {en.submitter_contact}</div>
+                  {isNikolausfeier ? (
+                    <>
+                      <div className="font-semibold text-[#252422] dark:text-[#F4F1E8] mb-2">{en.video_name || en.event_name}</div>
+                      {en.participant_name && (
+                        <div className="text-sm text-[#A58C81] dark:text-[#EBE9E9] mb-2">von {en.participant_name}</div>
+                      )}
+                      {en.beer_drink_time && (
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-4">Bier-Trinkzeit: {formatTime(en.beer_drink_time)}</div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {en.title && <div className="font-semibold text-[#252422] dark:text-[#F4F1E8] mb-2">{en.title}</div>}
+                      {en.description && <div className="text-sm text-[#A58C81] dark:text-[#EBE9E9] mb-3">{en.description}</div>}
+                      {en.submitter_contact && (
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-4">Kontakt: {en.submitter_contact}</div>
+                      )}
+                    </>
                   )}
                   <button 
-                    onClick={() => handleDeleteApproved(en.id, en.image_path)} 
+                    onClick={() => handleDeleteApproved(en.id, isNikolausfeier ? en.video_url : en.image_path)} 
                     className="w-full px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold transition-colors shadow-md"
                   >
                     Aus Galerie entfernen

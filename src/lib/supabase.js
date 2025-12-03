@@ -41,7 +41,8 @@ export const TABLES = {
   EVENTS: 'events',
   EVENT_REQUESTS: 'event_requests',
   PROFILES: 'profiles',
-  CLUB_STATUS: 'club_status'
+  CLUB_STATUS: 'club_status',
+  NIKOLAUSFEIER_EVENTS: 'nikolausfeier_events'
 }
 
 // User roles - hierarchical permission system
