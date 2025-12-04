@@ -340,18 +340,43 @@ export async function publishAllNikolausfeierVideos() {
 }
 
 export async function approveNikolausfeierEntry(entryId) {
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  // First, get the entry to check if it replaces another entry
+  // First, get the entry to check if it exists and if it replaces another entry
   const { data: entry, error: fetchError } = await supabase
     .from('nikolausfeier_events')
-    .select('replaces_entry_id')
+    .select('id, replaces_entry_id, status')
     .eq('id', entryId)
     .single()
   
-  if (fetchError) throw fetchError
+  if (fetchError) {
+    if (fetchError.code === 'PGRST116') {
+      throw new Error('Eintrag nicht gefunden')
+    }
+    throw fetchError
+  }
+  
+  if (!entry) {
+    throw new Error('Eintrag nicht gefunden')
+  }
+  
+  // Check if entry is already approved or rejected
+  if (entry.status === 'approved') {
+    throw new Error('Eintrag ist bereits freigegeben')
+  }
+  
+  if (entry.status === 'rejected') {
+    throw new Error('Eintrag wurde bereits abgelehnt')
+  }
+  
+  if (entry.status !== 'pending') {
+    throw new Error(`Eintrag hat einen unerwarteten Status: ${entry.status}`)
+  }
+  
+  // Get current user for approved_by field
+  const { data: { user } } = await supabase.auth.getUser()
   
   // Update entry to approved
+  // RLS policy will enforce admin-only access
+  // We already checked the status above, so we can update directly
   const { data: updated, error } = await supabase
     .from('nikolausfeier_events')
     .update({ 
@@ -362,7 +387,35 @@ export async function approveNikolausfeierEntry(entryId) {
     .eq('id', entryId)
     .select('*')
 
-  if (error) throw error
+  if (error) {
+    console.error('Error updating entry:', error)
+    // If RLS blocks the update, provide a clearer error message
+    if (error.code === '42501' || error.message?.includes('permission') || error.message?.includes('policy')) {
+      throw new Error('Nicht autorisiert: Nur Administratoren können Einträge freigeben')
+    }
+    throw error
+  }
+  
+  if (!updated || updated.length === 0) {
+    // Re-fetch the entry to see what the current status is
+    const { data: currentEntry } = await supabase
+      .from('nikolausfeier_events')
+      .select('status')
+      .eq('id', entryId)
+      .single()
+    
+    if (currentEntry) {
+      if (currentEntry.status === 'approved') {
+        throw new Error('Eintrag wurde bereits von einem anderen Administrator freigegeben')
+      } else if (currentEntry.status === 'rejected') {
+        throw new Error('Eintrag wurde bereits abgelehnt')
+      } else {
+        throw new Error(`Eintrag konnte nicht aktualisiert werden. Aktueller Status: ${currentEntry.status}`)
+      }
+    } else {
+      throw new Error('Eintrag konnte nicht aktualisiert werden. Eintrag wurde möglicherweise gelöscht.')
+    }
+  }
   
   // If this entry replaces another, delete the old entry
   if (entry?.replaces_entry_id) {
@@ -374,23 +427,50 @@ export async function approveNikolausfeierEntry(entryId) {
     }
   }
   
-  if (!updated || updated.length === 0) {
-    throw new Error('Eintrag nicht gefunden')
-  }
   return updated[0]
 }
 
 export async function rejectNikolausfeierEntry(entryId) {
+  // First, check if entry exists
+  const { data: entry, error: fetchError } = await supabase
+    .from('nikolausfeier_events')
+    .select('id, status')
+    .eq('id', entryId)
+    .single()
+  
+  if (fetchError) {
+    if (fetchError.code === 'PGRST116') {
+      throw new Error('Eintrag nicht gefunden')
+    }
+    throw fetchError
+  }
+  
+  if (!entry) {
+    throw new Error('Eintrag nicht gefunden')
+  }
+  
+  // Update entry to rejected
+  // RLS policy will enforce admin-only access
+  // We already checked the status above, so we can update directly
   const { data: updated, error } = await supabase
     .from('nikolausfeier_events')
     .update({ status: 'rejected' })
     .eq('id', entryId)
     .select('*')
 
-  if (error) throw error
-  if (!updated || updated.length === 0) {
-    throw new Error('Eintrag nicht gefunden')
+  if (error) {
+    console.error('Error rejecting entry:', error)
+    // If RLS blocks the update, provide a clearer error message
+    if (error.code === '42501' || error.message?.includes('permission') || error.message?.includes('policy')) {
+      throw new Error('Nicht autorisiert: Nur Administratoren können Einträge ablehnen')
+    }
+    throw error
   }
+  
+  if (!updated || updated.length === 0) {
+    throw new Error('Eintrag konnte nicht abgelehnt werden. Möglicherweise wurde er bereits bearbeitet.')
+  }
+  
   return updated[0]
 }
 

@@ -62,7 +62,17 @@ const NikolausfeierPage = () => {
       // Check for declined entries from this device
       try {
         const declined = await getDeclinedEntryFromDevice();
-        setDeclinedEntry(declined);
+        if (declined) {
+          console.log('Found declined entry from device:', declined);
+          setDeclinedEntry(declined);
+          // Show notification about declined entry
+          setNotification({ 
+            type: 'error', 
+            text: `Dein Beitrag "${declined.video_name}" wurde abgelehnt. Du kannst einen neuen Beitrag einreichen.` 
+          });
+        } else {
+          setDeclinedEntry(null);
+        }
       } catch (err) {
         console.warn('Could not check for declined entries:', err);
         setDeclinedEntry(null);
@@ -264,13 +274,36 @@ const NikolausfeierPage = () => {
                       <video
                         src={getPublicVideoUrl(entry.video_url)}
                         controls
-                        className="w-full rounded-lg"
+                        playsInline
+                        preload="metadata"
+                        className="w-full rounded-lg touch-manipulation"
                         style={{ 
                           maxHeight: '250px',
                           aspectRatio: '16/9',
-                          objectFit: 'contain'
+                          objectFit: 'contain',
+                          backgroundColor: '#000',
+                          cursor: 'pointer'
                         }}
-                        playsInline
+                        onClick={(e) => {
+                          // Explicitly handle tap on iOS
+                          const video = e.target;
+                          if (video.paused) {
+                            video.play().catch(err => {
+                              console.error('Video play error:', err);
+                            });
+                          } else {
+                            video.pause();
+                          }
+                        }}
+                        onError={(e) => {
+                          console.error('Video load error:', e);
+                          console.error('Video URL:', getPublicVideoUrl(entry.video_url));
+                          console.error('Video element:', e.target);
+                        }}
+                        onLoadedMetadata={(e) => {
+                          // Ensure video is ready on iOS
+                          console.log('Video metadata loaded for:', entry.video_name);
+                        }}
                       >
                         Ihr Browser unterstützt das Video-Element nicht.
                       </video>

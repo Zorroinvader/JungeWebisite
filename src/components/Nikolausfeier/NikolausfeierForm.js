@@ -707,8 +707,7 @@ const NikolausfeierForm = ({ onSuccess }) => {
                 type="file"
                 id="video"
                 name="video"
-                accept="video/mp4,video/mpeg,video/quicktime,video/x-msvideo,video/webm"
-                capture="environment"
+                accept="video/*"
                 onChange={handleFileChange}
                 required
                 className="hidden"
