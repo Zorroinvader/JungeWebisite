@@ -8,7 +8,7 @@ import { getSupabaseUrl, getSupabaseAnonKey } from '../utils/secureConfig'
 
 const BUCKET = 'event-videos'
 
-export async function createNikolausfeierEntry({ video_name, participant_name, videoFile, beer_drink_time, dsgvo_consent, drinking_rules_consent, replaces_entry_id }) {
+export async function createNikolausfeierEntry({ video_name, participant_name, videoFile, beer_drink_time, dsgvo_consent, drinking_rules_consent, time_verification_consent, replaces_entry_id }) {
   if (!video_name || !video_name.trim()) {
     throw new Error('Bitte geben Sie einen Namen für das Video/Clip ein')
   }
@@ -26,6 +26,9 @@ export async function createNikolausfeierEntry({ video_name, participant_name, v
   }
   if (!dsgvo_consent) {
     throw new Error('Bitte bestätigen Sie die DSGVO-Einwilligung')
+  }
+  if (!time_verification_consent) {
+    throw new Error('Bitte bestätigen Sie, dass die Zeit im Video sichtbar sein muss')
   }
 
   // Validate video file
@@ -67,6 +70,8 @@ export async function createNikolausfeierEntry({ video_name, participant_name, v
       video_url,
       beer_drink_time: parseInt(beer_drink_time, 10),
       dsgvo_consent: true,
+      drinking_rules_consent: drinking_rules_consent,
+      time_verification_consent: time_verification_consent,
       status: 'pending',
       created_at: new Date().toISOString()
   }
@@ -92,14 +97,72 @@ export async function createNikolausfeierEntry({ video_name, participant_name, v
 }
 
 export async function listNikolausfeierEntries() {
+  // Note: This function is called from the client, so localStorage is available
+  // Get device entries from localStorage to show user's own entries
+  let deviceEntryIds = []
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const stored = window.localStorage.getItem('nikolausfeier_device_entries')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed)) {
+          deviceEntryIds = parsed
+        }
+      }
+    } catch (e) {
+      console.warn('Error reading device entries from localStorage:', e)
+    }
+  }
+
+  // Get all approved entries
   const { data, error } = await supabase
     .from('nikolausfeier_events')
     .select('*')
     .eq('status', 'approved')
     .order('created_at', { ascending: false })
 
-  if (error) throw error
-  return data || []
+  if (error) {
+    console.error('Error fetching approved entries:', error)
+    throw error
+  }
+  
+  if (!data || data.length === 0) {
+    return []
+  }
+  
+  // Filter: show only user's own entries OR publicly published entries
+  const filtered = data.filter(entry => {
+    // Show if it's from this device
+    if (deviceEntryIds.length > 0 && deviceEntryIds.includes(entry.id)) {
+      return true
+    }
+    // Show if it's publicly published
+    if (entry.is_publicly_published === true) {
+      return true
+    }
+    // Otherwise hide it
+    return false
+  })
+  
+  // If we have device entry IDs but none matched, try to sync: check if any approved entries
+  // should be added to localStorage (in case localStorage was cleared or entry was approved elsewhere)
+  if (deviceEntryIds.length > 0 && filtered.length === 0) {
+    // Check if any of the device entry IDs exist in the approved entries
+    const matchingEntries = data.filter(entry => deviceEntryIds.includes(entry.id))
+    if (matchingEntries.length > 0) {
+      // These should have been shown, so return them
+      return matchingEntries
+    }
+  }
+  
+  // Sort by beer_drink_time (ascending - lowest time = winner) if all videos are public
+  // Check if all approved entries in DB are public, not just filtered ones
+  const allPublic = data.length > 0 && data.every(entry => entry.is_publicly_published === true)
+  if (allPublic && filtered.length > 0) {
+    filtered.sort((a, b) => a.beer_drink_time - b.beer_drink_time)
+  }
+  
+  return filtered
 }
 
 export async function getUserEntriesByParticipantName(participantName) {
@@ -180,6 +243,100 @@ export async function listApprovedNikolausfeierEntries() {
 
   if (error) throw error
   return data || []
+}
+
+export async function checkIfAllVideosArePublic() {
+  // Check if all approved entries are publicly published
+  const { data, error } = await supabase
+    .from('nikolausfeier_events')
+    .select('id, is_publicly_published')
+    .eq('status', 'approved')
+
+  if (error) throw error
+  
+  if (!data || data.length === 0) {
+    return false
+  }
+  
+  // Return true only if ALL approved entries are publicly published
+  return data.every(entry => entry.is_publicly_published === true)
+}
+
+export async function getDeclinedEntryFromDevice() {
+  // Get device entries from localStorage
+  let deviceEntryIds = []
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const stored = window.localStorage.getItem('nikolausfeier_device_entries')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed)) {
+          deviceEntryIds = parsed
+        }
+      }
+    } catch (e) {
+      console.warn('Error reading device entries from localStorage:', e)
+      return null
+    }
+  }
+  
+  if (deviceEntryIds.length === 0) {
+    return null
+  }
+  
+  // Get the most recent declined entry from this device
+  const { data, error } = await supabase
+    .from('nikolausfeier_events')
+    .select('*')
+    .in('id', deviceEntryIds)
+    .eq('status', 'rejected')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single()
+  
+  if (error) {
+    if (error.code === 'PGRST116') {
+      // No declined entries found
+      return null
+    }
+    throw error
+  }
+  
+  return data
+}
+
+export async function publishAllNikolausfeierVideos() {
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) {
+    throw new Error('Nicht autorisiert')
+  }
+
+  // Check if user is admin
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile || !['admin', 'superadmin'].includes(profile.role)) {
+    throw new Error('Nur Administratoren können Videos veröffentlichen')
+  }
+
+  // Update all approved entries to be publicly published
+  const { data: updated, error } = await supabase
+    .from('nikolausfeier_events')
+    .update({
+      is_publicly_published: true,
+      published_at: new Date().toISOString(),
+      published_by: user.id
+    })
+    .eq('status', 'approved')
+    .eq('is_publicly_published', false)
+    .select('*')
+
+  if (error) throw error
+  return updated || []
 }
 
 export async function approveNikolausfeierEntry(entryId) {

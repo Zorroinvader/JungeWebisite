@@ -19,7 +19,8 @@ const NikolausfeierForm = ({ onSuccess }) => {
     participant_name: '',
     beer_drink_time: '',
     dsgvo_consent: false,
-    drinking_rules_consent: false
+    drinking_rules_consent: false,
+    time_verification_consent: false
   });
   
   const [videoFile, setVideoFile] = useState(null);
@@ -52,11 +53,11 @@ const NikolausfeierForm = ({ onSuccess }) => {
           if (mobile && hasEntries) {
             setShowFormOnMobile(false);
             // If has entries, step 1 is the update option, otherwise start at step 1
-            setTotalSteps(hasEntries ? 7 : 6);
+            setTotalSteps(hasEntries ? 8 : 7);
             setCurrentStep(hasEntries ? 1 : 1);
           } else {
             setShowFormOnMobile(true);
-            setTotalSteps(hasEntries ? 7 : 6);
+            setTotalSteps(hasEntries ? 8 : 7);
             setCurrentStep(1);
           }
         };
@@ -208,7 +209,7 @@ const NikolausfeierForm = ({ onSuccess }) => {
   const canProceedToNextStep = () => {
     // Map currentStep to actual form step based on whether device has entries
     if (hasDeviceEntries) {
-      // Steps: 1=update, 2=video name, 3=participant, 4=video, 5=beer, 6=drinking rules, 7=dsgvo
+      // Steps: 1=update, 2=video name, 3=participant, 4=video, 5=beer, 6=drinking rules, 7=time verification, 8=dsgvo
       switch (currentStep) {
         case 1: // Update old entry step
           return wantToUpdateOldEntry === false || (wantToUpdateOldEntry && deleteOldEntryId);
@@ -222,13 +223,15 @@ const NikolausfeierForm = ({ onSuccess }) => {
           return formData.beer_drink_time && parseInt(formData.beer_drink_time, 10) >= 0;
         case 6: // Drinking rules consent
           return formData.drinking_rules_consent;
-        case 7: // DSGVO consent
+        case 7: // Time verification consent
+          return formData.time_verification_consent;
+        case 8: // DSGVO consent
           return formData.dsgvo_consent;
         default:
           return false;
       }
     } else {
-      // Steps: 1=video name, 2=participant, 3=video, 4=beer, 5=drinking rules, 6=dsgvo
+      // Steps: 1=video name, 2=participant, 3=video, 4=beer, 5=drinking rules, 6=time verification, 7=dsgvo
       switch (currentStep) {
         case 1: // Video name
           return formData.video_name.trim().length > 0 && formData.video_name.trim().length <= 200;
@@ -240,7 +243,9 @@ const NikolausfeierForm = ({ onSuccess }) => {
           return formData.beer_drink_time && parseInt(formData.beer_drink_time, 10) >= 0;
         case 5: // Drinking rules consent
           return formData.drinking_rules_consent;
-        case 6: // DSGVO consent
+        case 6: // Time verification consent
+          return formData.time_verification_consent;
+        case 7: // DSGVO consent
           return formData.dsgvo_consent;
         default:
           return false;
@@ -281,6 +286,10 @@ const NikolausfeierForm = ({ onSuccess }) => {
       setError('Bitte akzeptieren Sie die Trinkregeln');
       return false;
     }
+    if (!formData.time_verification_consent) {
+      setError('Bitte bestätigen Sie, dass die Zeit im Video sichtbar sein muss');
+      return false;
+    }
     if (!formData.dsgvo_consent) {
       setError('Bitte bestätigen Sie die DSGVO-Einwilligung');
       return false;
@@ -306,7 +315,7 @@ const NikolausfeierForm = ({ onSuccess }) => {
         beer_drink_time: parseInt(formData.beer_drink_time, 10),
         dsgvo_consent: formData.dsgvo_consent,
         drinking_rules_consent: formData.drinking_rules_consent,
-        competition_rules_consent: formData.competition_rules_consent,
+        time_verification_consent: formData.time_verification_consent,
         replaces_entry_id: deleteOldEntryId || null
       });
       
@@ -419,13 +428,12 @@ const NikolausfeierForm = ({ onSuccess }) => {
               <strong>ℹ️ Informationen zum Bier Wettbewerb:</strong>
             </p>
             <ul className="text-xs sm:text-sm text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
+            <li style={{ color: 'orange' }}><strong>Wichtig es darf kein Restbier mehr in der Flasche sein also am ende des videos am bestn die flasche umdrehen</strong></li>
               <li>Zeige uns wie schnell du ein Bier Trinken kannst.</li>
+             
               <li>Du kannst mehrere Beiträge für den Bier Wettbewerb einreichen.</li>
               <li>Du hast eine bessere Zeit als dein letzter Beitrag? Dann kannst du ihn aktualisieren.</li>
               <li>Du kannst Beiträge für dich oder deine Freunde erstellen.</li>
-              <li>Preis? Mindestens noch mehr Bier (Oder Cola und so ein kram)!</li>
-              <li>Erst bei der Preisvergaben werden die Zeiten veröffentlicht. Also gib dein Bestes!</li>
-              <li> Wir behalten uns vor, dir das Bier zu nehmen, wenn du deine grenzen überschreitest!</li>
             </ul>
           </div>
           <p className="text-xs sm:text-sm text-[#A58C81] dark:text-[#EBE9E9] mb-4 sm:mb-6">
@@ -460,28 +468,26 @@ const NikolausfeierForm = ({ onSuccess }) => {
       )}
 
       <form onSubmit={handleSubmit}>
-        {/* Progress Indicator - Mobile Only */}
-        {isMobile && (
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-[#A58C81] dark:text-[#EBE9E9]">
-                Schritt {currentStep} von {totalSteps}
-              </span>
-              <span className="text-xs text-[#A58C81] dark:text-[#EBE9E9]">
-                {Math.round((currentStep / totalSteps) * 100)}%
-              </span>
-            </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div
-                className="bg-[#A58C81] h-2 rounded-full transition-all duration-300"
-                style={{ width: `${(currentStep / totalSteps) * 100}%` }}
-              />
-            </div>
+        {/* Progress Indicator */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-[#252422] dark:text-[#F4F1E8]">
+              Schritt {currentStep} von {totalSteps}
+            </span>
+            <span className="text-sm font-medium text-[#A58C81] dark:text-[#EBE9E9]">
+              {Math.round((currentStep / totalSteps) * 100)}%
+            </span>
           </div>
-        )}
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+            <div
+              className="bg-[#A58C81] h-2 rounded-full transition-all duration-300"
+              style={{ width: `${(currentStep / totalSteps) * 100}%` }}
+            />
+          </div>
+        </div>
 
         {/* Step 1: Update Old Entry (only if hasDeviceEntries) */}
-        {((isMobile && currentStep === 1 && hasDeviceEntries) || (!isMobile && hasDeviceEntries)) && (
+        {currentStep === 1 && hasDeviceEntries && (
           <div className={`${isMobile ? '' : 'mb-6'} p-4 sm:p-4 bg-gray-50 dark:bg-gray-900/20 border-2 border-gray-200 dark:border-gray-700 rounded-lg`}>
             <h3 className="text-base sm:text-lg font-semibold text-[#252422] dark:text-[#F4F1E8] mb-4">
                1. Alten Bier Wettbewerb Beitrag aktualisieren?
@@ -539,12 +545,12 @@ const NikolausfeierForm = ({ onSuccess }) => {
               </div>
             )}
             
-            {isMobile && (
+            <div className="flex gap-3 mt-4">
               <button
                 type="button"
                 onClick={handleNextStep}
                 disabled={wantToUpdateOldEntry && !deleteOldEntryId}
-                className={`w-full min-h-[52px] mt-4 px-6 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation flex items-center justify-center gap-2 ${
+                className={`flex-1 min-h-[52px] sm:min-h-[48px] px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation flex items-center justify-center gap-2 ${
                   wantToUpdateOldEntry && !deleteOldEntryId
                     ? 'bg-gray-400 cursor-not-allowed opacity-60 text-white'
                     : 'bg-[#A58C81] hover:bg-[#8a7268] active:bg-[#7a6258] text-white shadow-md'
@@ -552,12 +558,12 @@ const NikolausfeierForm = ({ onSuccess }) => {
               >
                 Weiter <ChevronRight className="h-5 w-5" />
               </button>
-            )}
+            </div>
           </div>
         )}
 
         {/* Step 2: Video Name */}
-        {((isMobile && currentStep === (hasDeviceEntries ? 2 : 1)) || !isMobile) && (
+        {currentStep === (hasDeviceEntries ? 2 : 1) && (
           <div className={`${isMobile ? '' : 'mb-6'}`}>
             <h3 className="text-base sm:text-lg font-semibold text-[#252422] dark:text-[#F4F1E8] mb-4">
             2. Name des Videos/Clips
@@ -576,34 +582,34 @@ const NikolausfeierForm = ({ onSuccess }) => {
               className="w-full px-4 py-3.5 sm:py-2.5 text-base sm:text-sm border-2 border-[#A58C81]/40 dark:border-[#EBE9E9]/40 focus:border-[#A58C81] dark:focus:border-[#EBE9E9] rounded-lg bg-white dark:bg-[#1a1a1a] text-[#252422] dark:text-[#F4F1E8] touch-manipulation"
               placeholder="z.B. BierMeister MAX"
             />
-            {isMobile && (
-              <div className="flex gap-3 mt-4">
+            <div className="flex gap-3 mt-4">
+              {currentStep > (hasDeviceEntries ? 1 : 0) && (
                 <button
                   type="button"
                   onClick={handlePreviousStep}
-                  className="flex-1 min-h-[52px] px-4 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-[#252422] dark:text-[#F4F1E8] flex items-center justify-center gap-2"
+                  className="flex-1 min-h-[52px] sm:min-h-[48px] px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-[#252422] dark:text-[#F4F1E8] flex items-center justify-center gap-2"
                 >
                   <ChevronLeft className="h-5 w-5" /> Zurück
                 </button>
-                <button
-                  type="button"
-                  onClick={handleNextStep}
-                  disabled={!formData.video_name.trim()}
-                  className={`flex-1 min-h-[52px] px-4 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation flex items-center justify-center gap-2 ${
-                    !formData.video_name.trim()
-                      ? 'bg-gray-400 cursor-not-allowed opacity-60 text-white'
-                      : 'bg-[#A58C81] hover:bg-[#8a7268] active:bg-[#7a6258] text-white shadow-md'
-                  }`}
-                >
-                  Weiter <ChevronRight className="h-5 w-5" />
-                </button>
-              </div>
-            )}
+              )}
+              <button
+                type="button"
+                onClick={handleNextStep}
+                disabled={!formData.video_name.trim()}
+                className={`${currentStep > (hasDeviceEntries ? 1 : 0) ? 'flex-1' : 'w-full'} min-h-[52px] sm:min-h-[48px] px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation flex items-center justify-center gap-2 ${
+                  !formData.video_name.trim()
+                    ? 'bg-gray-400 cursor-not-allowed opacity-60 text-white'
+                    : 'bg-[#A58C81] hover:bg-[#8a7268] active:bg-[#7a6258] text-white shadow-md'
+                }`}
+              >
+                Weiter <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
           </div>
         )}
 
         {/* Step 3: Participant Name */}
-        {((isMobile && currentStep === (hasDeviceEntries ? 3 : 2)) || !isMobile) && (
+        {currentStep === (hasDeviceEntries ? 3 : 2) && (
           <div className={`${isMobile ? '' : 'mb-6'}`}>
             <h3 className="text-base sm:text-lg font-semibold text-[#252422] dark:text-[#F4F1E8] mb-4">
             3. Name für die Ankündigung
@@ -622,34 +628,32 @@ const NikolausfeierForm = ({ onSuccess }) => {
               className="w-full px-4 py-3.5 sm:py-2.5 text-base sm:text-sm border-2 border-[#A58C81]/40 dark:border-[#EBE9E9]/40 focus:border-[#A58C81] dark:focus:border-[#EBE9E9] rounded-lg bg-white dark:bg-[#1a1a1a] text-[#252422] dark:text-[#F4F1E8] touch-manipulation"
               placeholder="z.B. Max Mustermann"
             />
-            {isMobile && (
-              <div className="flex gap-3 mt-4">
-                <button
-                  type="button"
-                  onClick={handlePreviousStep}
-                  className="flex-1 min-h-[52px] px-4 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-[#252422] dark:text-[#F4F1E8] flex items-center justify-center gap-2"
-                >
-                  <ChevronLeft className="h-5 w-5" /> Zurück
-                </button>
-                <button
-                  type="button"
-                  onClick={handleNextStep}
-                  disabled={!formData.participant_name.trim()}
-                  className={`flex-1 min-h-[52px] px-4 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation flex items-center justify-center gap-2 ${
-                    !formData.participant_name.trim()
-                      ? 'bg-gray-400 cursor-not-allowed opacity-60 text-white'
-                      : 'bg-[#A58C81] hover:bg-[#8a7268] active:bg-[#7a6258] text-white shadow-md'
-                  }`}
-                >
-                  Weiter <ChevronRight className="h-5 w-5" />
-                </button>
-              </div>
-            )}
+            <div className="flex gap-3 mt-4">
+              <button
+                type="button"
+                onClick={handlePreviousStep}
+                className="flex-1 min-h-[52px] sm:min-h-[48px] px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-[#252422] dark:text-[#F4F1E8] flex items-center justify-center gap-2"
+              >
+                <ChevronLeft className="h-5 w-5" /> Zurück
+              </button>
+              <button
+                type="button"
+                onClick={handleNextStep}
+                disabled={!formData.participant_name.trim()}
+                className={`flex-1 min-h-[52px] sm:min-h-[48px] px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation flex items-center justify-center gap-2 ${
+                  !formData.participant_name.trim()
+                    ? 'bg-gray-400 cursor-not-allowed opacity-60 text-white'
+                    : 'bg-[#A58C81] hover:bg-[#8a7268] active:bg-[#7a6258] text-white shadow-md'
+                }`}
+              >
+                Weiter <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
           </div>
         )}
 
         {/* Step 4: Video Upload */}
-        {((isMobile && currentStep === (hasDeviceEntries ? 4 : 3)) || !isMobile) && (
+        {currentStep === (hasDeviceEntries ? 4 : 3) && (
           <div className={`${isMobile ? '' : 'mb-6'}`}>
             <h3 className="text-base sm:text-lg font-semibold text-[#252422] dark:text-[#F4F1E8] mb-4">
             4. Video hochladen (Es muss zeigen wie du dein Bier getrunken hast! Die Zeit muss nachzählbar sein!)
@@ -715,34 +719,32 @@ const NikolausfeierForm = ({ onSuccess }) => {
                 )}
               </label>
             </div>
-            {isMobile && (
-              <div className="flex gap-3 mt-4">
-                <button
-                  type="button"
-                  onClick={handlePreviousStep}
-                  className="flex-1 min-h-[52px] px-4 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-[#252422] dark:text-[#F4F1E8] flex items-center justify-center gap-2"
-                >
-                  <ChevronLeft className="h-5 w-5" /> Zurück
-                </button>
-                <button
-                  type="button"
-                  onClick={handleNextStep}
-                  disabled={!videoFile}
-                  className={`flex-1 min-h-[52px] px-4 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation flex items-center justify-center gap-2 ${
-                    !videoFile
-                      ? 'bg-gray-400 cursor-not-allowed opacity-60 text-white'
-                      : 'bg-[#A58C81] hover:bg-[#8a7268] active:bg-[#7a6258] text-white shadow-md'
-                  }`}
-                >
-                  Weiter <ChevronRight className="h-5 w-5" />
-                </button>
-              </div>
-            )}
+            <div className="flex gap-3 mt-4">
+              <button
+                type="button"
+                onClick={handlePreviousStep}
+                className="flex-1 min-h-[52px] sm:min-h-[48px] px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-[#252422] dark:text-[#F4F1E8] flex items-center justify-center gap-2"
+              >
+                <ChevronLeft className="h-5 w-5" /> Zurück
+              </button>
+              <button
+                type="button"
+                onClick={handleNextStep}
+                disabled={!videoFile}
+                className={`flex-1 min-h-[52px] sm:min-h-[48px] px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation flex items-center justify-center gap-2 ${
+                  !videoFile
+                    ? 'bg-gray-400 cursor-not-allowed opacity-60 text-white'
+                    : 'bg-[#A58C81] hover:bg-[#8a7268] active:bg-[#7a6258] text-white shadow-md'
+                }`}
+              >
+                Weiter <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
           </div>
         )}
 
         {/* Step 5: Beer Drink Time */}
-        {((isMobile && currentStep === (hasDeviceEntries ? 5 : 4)) || !isMobile) && (
+        {currentStep === (hasDeviceEntries ? 5 : 4) && (
           <div className={`${isMobile ? '' : 'mb-6'}`}>
             <h3 className="text-base sm:text-lg font-semibold text-[#252422] dark:text-[#F4F1E8] mb-4">
             5. Wie schnell hast du dein Bier getrunken? (Die Zeit im Video)
@@ -766,34 +768,32 @@ const NikolausfeierForm = ({ onSuccess }) => {
             <p className="mt-2 text-xs sm:text-sm text-[#A58C81] dark:text-[#EBE9E9]">
               Zeit in Sekunden, die du zum Trinken des Biers benötigt haben.
             </p>
-            {isMobile && (
-              <div className="flex gap-3 mt-4">
-                <button
-                  type="button"
-                  onClick={handlePreviousStep}
-                  className="flex-1 min-h-[52px] px-4 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-[#252422] dark:text-[#F4F1E8] flex items-center justify-center gap-2"
-                >
-                  <ChevronLeft className="h-5 w-5" /> Zurück
-                </button>
-                <button
-                  type="button"
-                  onClick={handleNextStep}
-                  disabled={!formData.beer_drink_time || parseInt(formData.beer_drink_time, 10) < 0}
-                  className={`flex-1 min-h-[52px] px-4 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation flex items-center justify-center gap-2 ${
-                    !formData.beer_drink_time || parseInt(formData.beer_drink_time, 10) < 0
-                      ? 'bg-gray-400 cursor-not-allowed opacity-60 text-white'
-                      : 'bg-[#A58C81] hover:bg-[#8a7268] active:bg-[#7a6258] text-white shadow-md'
-                  }`}
-                >
-                  Weiter <ChevronRight className="h-5 w-5" />
-                </button>
-              </div>
-            )}
+            <div className="flex gap-3 mt-4">
+              <button
+                type="button"
+                onClick={handlePreviousStep}
+                className="flex-1 min-h-[52px] sm:min-h-[48px] px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-[#252422] dark:text-[#F4F1E8] flex items-center justify-center gap-2"
+              >
+                <ChevronLeft className="h-5 w-5" /> Zurück
+              </button>
+              <button
+                type="button"
+                onClick={handleNextStep}
+                disabled={!formData.beer_drink_time || parseInt(formData.beer_drink_time, 10) < 0}
+                className={`flex-1 min-h-[52px] sm:min-h-[48px] px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation flex items-center justify-center gap-2 ${
+                  !formData.beer_drink_time || parseInt(formData.beer_drink_time, 10) < 0
+                    ? 'bg-gray-400 cursor-not-allowed opacity-60 text-white'
+                    : 'bg-[#A58C81] hover:bg-[#8a7268] active:bg-[#7a6258] text-white shadow-md'
+                }`}
+              >
+                Weiter <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
           </div>
         )}
 
         {/* Step 6: Drinking Rules Consent */}
-        {((isMobile && currentStep === (hasDeviceEntries ? 6 : 5)) || !isMobile) && (
+        {currentStep === (hasDeviceEntries ? 6 : 5) && (
           <div className={`${isMobile ? '' : 'mb-6'}`}>
             <h3 className="text-base sm:text-lg font-semibold text-[#252422] dark:text-[#F4F1E8] mb-4">
               {hasDeviceEntries ? '6' : '5'}. Trinkregeln akzeptieren
@@ -811,37 +811,79 @@ const NikolausfeierForm = ({ onSuccess }) => {
                 Ich akzeptiere die <a href="/wettbewerbsrichtlinien-bier-wettbewerb.pdf" target="_blank" rel="noopener noreferrer" className="text-[#A58C81] dark:text-[#EBE9E9] underline hover:text-[#8a7268] dark:hover:text-[#d4d2d2]">Trinkregeln</a> und verstehe, dass ich vom Wettbewerb ausgeschlossen werden kann, wenn ich meine Grenzen überschreite oder zu betrunken bin. <span className="text-red-500">*</span>
               </span>
             </label>
-            {isMobile && (
-              <div className="flex gap-3 mt-4">
-                <button
-                  type="button"
-                  onClick={handlePreviousStep}
-                  className="flex-1 min-h-[52px] px-4 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-[#252422] dark:text-[#F4F1E8] flex items-center justify-center gap-2"
-                >
-                  <ChevronLeft className="h-5 w-5" /> Zurück
-                </button>
-                <button
-                  type="button"
-                  onClick={handleNextStep}
-                  disabled={!formData.drinking_rules_consent}
-                  className={`flex-1 min-h-[52px] px-4 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation flex items-center justify-center gap-2 ${
-                    !formData.drinking_rules_consent
-                      ? 'bg-gray-400 cursor-not-allowed opacity-60 text-white'
-                      : 'bg-[#A58C81] hover:bg-[#8a7268] active:bg-[#7a6258] text-white shadow-md'
-                  }`}
-                >
-                  Weiter <ChevronRight className="h-5 w-5" />
-                </button>
-              </div>
-            )}
+            <div className="flex gap-3 mt-4">
+              <button
+                type="button"
+                onClick={handlePreviousStep}
+                className="flex-1 min-h-[52px] sm:min-h-[48px] px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-[#252422] dark:text-[#F4F1E8] flex items-center justify-center gap-2"
+              >
+                <ChevronLeft className="h-5 w-5" /> Zurück
+              </button>
+              <button
+                type="button"
+                onClick={handleNextStep}
+                disabled={!formData.drinking_rules_consent}
+                className={`flex-1 min-h-[52px] sm:min-h-[48px] px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation flex items-center justify-center gap-2 ${
+                  !formData.drinking_rules_consent
+                    ? 'bg-gray-400 cursor-not-allowed opacity-60 text-white'
+                    : 'bg-[#A58C81] hover:bg-[#8a7268] active:bg-[#7a6258] text-white shadow-md'
+                }`}
+              >
+                Weiter <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Step 7: DSGVO Consent */}
-        {((isMobile && currentStep === (hasDeviceEntries ? 7 : 6)) || !isMobile) && (
+        {/* Step 7: Time Verification Consent */}
+        {currentStep === (hasDeviceEntries ? 7 : 6) && (
           <div className={`${isMobile ? '' : 'mb-6'}`}>
             <h3 className="text-base sm:text-lg font-semibold text-[#252422] dark:text-[#F4F1E8] mb-4">
-              {hasDeviceEntries ? '7' : '6'}. Datenschutz-Einverständnis
+              {hasDeviceEntries ? '7' : '6'}. Zeitverifikation
+            </h3>
+            <label className="flex items-start gap-3 cursor-pointer touch-manipulation min-h-[52px] sm:min-h-[44px] py-2 p-4 bg-gray-50 dark:bg-gray-900/20 rounded-lg border-2 border-gray-200 dark:border-gray-700">
+              <input
+                type="checkbox"
+                name="time_verification_consent"
+                checked={formData.time_verification_consent}
+                onChange={handleChange}
+                required
+                className="mt-1.5 h-6 w-6 sm:h-5 sm:w-5 text-[#A58C81] border-[#A58C81] rounded focus:ring-[#A58C81] touch-manipulation"
+              />
+              <span className="text-sm sm:text-base text-[#252422] dark:text-[#F4F1E8] flex-1 pt-1">
+                Ich bestätige, dass die Bier-Trinkzeit im Video und im Formular nachvollziehbar korrekt ist. 
+                Ich verstehe, dass ich einen neuen Beitrag einreichen kann, wenn mein Beitrag abgelehnt wurde. <span className="text-red-500">*</span>
+              </span>
+            </label>
+            <div className="flex gap-3 mt-4">
+              <button
+                type="button"
+                onClick={handlePreviousStep}
+                className="flex-1 min-h-[52px] sm:min-h-[48px] px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-[#252422] dark:text-[#F4F1E8] flex items-center justify-center gap-2"
+              >
+                <ChevronLeft className="h-5 w-5" /> Zurück
+              </button>
+              <button
+                type="button"
+                onClick={handleNextStep}
+                disabled={!formData.time_verification_consent}
+                className={`flex-1 min-h-[52px] sm:min-h-[48px] px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation flex items-center justify-center gap-2 ${
+                  !formData.time_verification_consent
+                    ? 'bg-gray-400 cursor-not-allowed opacity-60 text-white'
+                    : 'bg-[#A58C81] hover:bg-[#8a7268] active:bg-[#7a6258] text-white shadow-md'
+                }`}
+              >
+                Weiter <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 8: DSGVO Consent */}
+        {currentStep === (hasDeviceEntries ? 8 : 7) && (
+          <div className={`${isMobile ? '' : 'mb-6'}`}>
+            <h3 className="text-base sm:text-lg font-semibold text-[#252422] dark:text-[#F4F1E8] mb-4">
+              {hasDeviceEntries ? '8' : '7'}. Datenschutz-Einverständnis
             </h3>
             <label className="flex items-start gap-3 cursor-pointer touch-manipulation min-h-[52px] sm:min-h-[44px] py-2 p-4 bg-gray-50 dark:bg-gray-900/20 rounded-lg border-2 border-gray-200 dark:border-gray-700">
               <input
@@ -867,9 +909,9 @@ const NikolausfeierForm = ({ onSuccess }) => {
                 </button>
                 <button
                   type="submit"
-                  disabled={loading || !formData.dsgvo_consent || !formData.drinking_rules_consent || !canProceedToNextStep()}
+                  disabled={loading || !formData.dsgvo_consent || !formData.drinking_rules_consent || !formData.time_verification_consent || !canProceedToNextStep()}
                   className={`flex-1 min-h-[52px] px-4 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation flex items-center justify-center gap-2 ${
-                    loading || !formData.dsgvo_consent || !formData.drinking_rules_consent || !canProceedToNextStep()
+                    loading || !formData.dsgvo_consent || !formData.drinking_rules_consent || !formData.time_verification_consent || !canProceedToNextStep()
                       ? 'bg-gray-400 cursor-not-allowed opacity-60 text-white'
                       : 'bg-[#A58C81] hover:bg-[#8a7268] active:bg-[#7a6258] text-white shadow-md'
                   }`}
@@ -881,22 +923,6 @@ const NikolausfeierForm = ({ onSuccess }) => {
           </div>
         )}
 
-        {/* Submit Button - Desktop Only */}
-        {!isMobile && (
-          <div className="pt-3 sm:pt-2">
-            <button
-              type="submit"
-              disabled={loading || !videoFile || !formData.dsgvo_consent || !formData.drinking_rules_consent}
-              className={`w-full min-h-[52px] sm:min-h-[48px] px-6 py-3.5 sm:py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation ${
-                loading || !videoFile || !formData.dsgvo_consent || !formData.drinking_rules_consent
-                  ? 'bg-gray-400 cursor-not-allowed opacity-60'
-                  : 'bg-[#A58C81] hover:bg-[#8a7268] active:bg-[#7a6258] text-white shadow-md'
-              }`}
-            >
-              {loading ? 'Wird hochgeladen...' : 'Einreichen'}
-            </button>
-          </div>
-        )}
 
         {loading && uploadProgress > 0 && (
           <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-4">

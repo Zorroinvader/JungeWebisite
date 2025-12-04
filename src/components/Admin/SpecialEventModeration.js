@@ -12,7 +12,8 @@ import {
   approveNikolausfeierEntry, 
   rejectNikolausfeierEntry,
   deleteNikolausfeierEntry,
-  getPublicVideoUrl
+  getPublicVideoUrl,
+  publishAllNikolausfeierVideos
 } from '../../services/nikolausfeierApi'
 
 const SpecialEventModeration = () => {
@@ -26,6 +27,7 @@ const SpecialEventModeration = () => {
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('pending') // 'pending', 'approved', or 'results'
   const [actionState, setActionState] = useState({}) // { [entryId]: 'approving'|'rejecting' }
+  const [publishingAll, setPublishingAll] = useState(false)
   const isNikolausfeier = selectedEventSlug === 'nikolausfeier'
 
   useEffect(() => {
@@ -258,15 +260,43 @@ const SpecialEventModeration = () => {
                 )}
               </div>
               
-              {/* Refresh Button */}
-              <button
-                onClick={refreshData}
-                disabled={loading}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#6054d9] hover:bg-[#4f44c7] text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
-              >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                <span className="hidden sm:inline">Aktualisieren</span>
-              </button>
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-2">
+                {isNikolausfeier && activeTab === 'approved' && (
+                  <button
+                    onClick={async () => {
+                      if (!window.confirm('Möchten Sie wirklich ALLE freigegebenen Videos öffentlich veröffentlichen? Dies kann nicht rückgängig gemacht werden.')) {
+                        return
+                      }
+                      try {
+                        setPublishingAll(true)
+                        await publishAllNikolausfeierVideos()
+                        setError(null)
+                        await refreshData()
+                        alert('Alle Videos wurden erfolgreich veröffentlicht!')
+                      } catch (err) {
+                        setError(`Fehler beim Veröffentlichen: ${err?.message || String(err)}`)
+                      } finally {
+                        setPublishingAll(false)
+                      }
+                    }}
+                    disabled={publishingAll || loading}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#f57105] hover:bg-[#e06600] text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
+                  >
+                    <Trophy className={`h-4 w-4 ${publishingAll ? 'animate-spin' : ''}`} />
+                    <span className="hidden sm:inline">Alle Videos veröffentlichen</span>
+                    <span className="sm:hidden">Veröffentlichen</span>
+                  </button>
+                )}
+                <button
+                  onClick={refreshData}
+                  disabled={loading}
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#6054d9] hover:bg-[#4f44c7] text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
+                >
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline">Aktualisieren</span>
+                </button>
+              </div>
             </div>
 
             {/* Content Grid */}

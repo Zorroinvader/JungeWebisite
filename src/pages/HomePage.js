@@ -7,13 +7,14 @@ import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useDarkMode } from '../contexts/DarkModeContext'
-import { Calendar, Users, FileText } from 'lucide-react'
+import { Calendar, Users, FileText, X, Trophy, ArrowRight } from 'lucide-react'
 import SimpleMonthCalendar from '../components/Calendar/SimpleMonthCalendar'
 import TypewriterText from '../components/UI/TypewriterText'
 import NextEventInfo from '../components/UI/NextEventInfo'
 import ClubStatusIndicator from '../components/UI/ClubStatusIndicator'
 import PublicEventRequestForm from '../components/Calendar/PublicEventRequestForm'
 import GuestOrRegisterModal from '../components/Calendar/GuestOrRegisterModal'
+import { getActiveSpecialEvents } from '../services/specialEventsApi'
 
 const HomePage = () => {
   const { user } = useAuth()
@@ -23,6 +24,8 @@ const HomePage = () => {
   const [showGuestOrRegister, setShowGuestOrRegister] = useState(false)
   const [selectedDate, setSelectedDate] = useState(null)
   const [currentDate, setCurrentDate] = useState(new Date())
+  const [showBierWettbewerbPopup, setShowBierWettbewerbPopup] = useState(false)
+  const [isNikolausfeierActive, setIsNikolausfeierActive] = useState(false)
 
   const handleFirstTextComplete = () => {
     setShowSubtitle(true)
@@ -72,9 +75,68 @@ const HomePage = () => {
     }
   }, [user])
 
+  // Check if Nikolausfeier/Bier Wettbewerb is active and show popup
+  useEffect(() => {
+    const checkNikolausfeier = async () => {
+      try {
+        const events = await getActiveSpecialEvents()
+        const nikolausfeierEvent = events.find(e => e.slug === 'nikolausfeier')
+        if (nikolausfeierEvent) {
+          setIsNikolausfeierActive(true)
+          // Check if user has already dismissed the popup
+          const dismissed = localStorage.getItem('bier-wettbewerb-popup-dismissed')
+          if (!dismissed) {
+            // Show popup after a short delay
+            setTimeout(() => {
+              setShowBierWettbewerbPopup(true)
+            }, 1000)
+          }
+        }
+      } catch (error) {
+        console.error('Error checking Nikolausfeier event:', error)
+      }
+    }
+    checkNikolausfeier()
+  }, [])
+
+  const handleBierWettbewerbRedirect = () => {
+    setShowBierWettbewerbPopup(false)
+    navigate('/nikolausfeier')
+  }
+
+  const handleDismissPopup = () => {
+    setShowBierWettbewerbPopup(false)
+    localStorage.setItem('bier-wettbewerb-popup-dismissed', 'true')
+  }
+
 
   return (
     <div className="min-h-screen">
+      {/* Banner at the top */}
+      {isNikolausfeierActive && (
+        <div className="w-full bg-[#F4F1E8] dark:bg-[#252422] border-b-2 border-[#A58C81] dark:border-[#EBE9E9] py-3 px-4">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 flex-1">
+              <Trophy className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0 text-[#A58C81] dark:text-[#EBE9E9]" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm sm:text-base font-semibold text-[#252422] dark:text-[#F4F1E8]">
+                  Bier Wettbewerb - Jetzt teilnehmen!
+                </p>
+                <p className="text-xs sm:text-sm text-[#A58C81] dark:text-[#EBE9E9]">
+                  Zeige uns wie schnell du ein Bier trinken kannst!
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/nikolausfeier"
+              className="flex items-center gap-2 bg-[#6054d9] hover:bg-[#4f44c7] dark:bg-[#6054d9] dark:hover:bg-[#4f44c7] text-white px-4 py-2 rounded-lg font-semibold text-sm sm:text-base transition-colors whitespace-nowrap flex-shrink-0 shadow-md"
+            >
+              Jetzt teilnehmen
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Hero Section - Consistent Design */}
       <div className="w-full bg-[#F4F1E8] dark:bg-[#252422]">
@@ -221,6 +283,85 @@ const HomePage = () => {
           selectedDate={selectedDate}
           userData={user}
         />
+      )}
+
+      {/* Bier Wettbewerb Popup */}
+      {showBierWettbewerbPopup && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-3 md:p-4"
+          style={{ touchAction: 'pan-y', overscrollBehavior: 'contain' }}
+          onClick={handleDismissPopup}
+        >
+          <div 
+            className="relative bg-white dark:bg-[#2a2a2a] rounded-xl sm:rounded-2xl shadow-xl max-w-md w-full border-2 border-[#A58C81] dark:border-[#4a4a4a] max-h-[95vh] sm:max-h-[90vh] overflow-y-auto"
+            style={{ 
+              WebkitOverflowScrolling: 'touch',
+              touchAction: 'pan-y',
+              overscrollBehavior: 'contain'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-4 sm:p-6 border-b border-[#A58C81] dark:border-[#EBE9E9]">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="p-2 bg-[#A58C81] dark:bg-[#6a6a6a] rounded-lg flex-shrink-0">
+                    <Trophy className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-xl sm:text-2xl font-bold text-[#252422] dark:text-[#F4F1E8]">
+                      Bier Wettbewerb
+                    </h3>
+                    <p className="text-sm text-[#A58C81] dark:text-[#EBE9E9] mt-1">
+                      Nikolausfeier 2024
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleDismissPopup}
+                  className="min-w-[44px] min-h-[44px] p-2 hover:opacity-70 active:scale-95 transition-all rounded-lg text-[#A58C81] dark:text-[#EBE9E9] touch-manipulation flex items-center justify-center flex-shrink-0"
+                  aria-label="Schließen"
+                  style={{ touchAction: 'manipulation' }}
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 sm:p-6">
+              <p className="text-[#252422] dark:text-[#F4F1E8] mb-4 text-base sm:text-lg">
+                Zeige uns wie schnell du ein Bier trinken kannst!
+              </p>
+              <ul className="text-sm text-[#A58C81] dark:text-[#EBE9E9] space-y-2 list-disc list-inside mb-6">
+                <li>Lade ein Video hoch und zeige deine Zeit</li>
+                <li>Teilnahme für alle möglich</li>
+                <li>Preise zu gewinnen!</li>
+              </ul>
+            </div>
+
+            {/* Actions */}
+            <div className="p-4 sm:p-6 border-t border-[#A58C81] dark:border-[#EBE9E9]">
+              <div className="flex gap-3">
+                <button
+                  onClick={handleDismissPopup}
+                  className="flex-1 px-4 sm:px-6 py-3 min-h-[44px] text-base border-2 border-[#A58C81] dark:border-[#6a6a6a] text-[#252422] dark:text-[#e0e0e0] rounded-lg hover:bg-gray-50 dark:hover:bg-[#1a1a1a] active:scale-95 transition-all font-semibold touch-manipulation"
+                  style={{ touchAction: 'manipulation' }}
+                >
+                  Später
+                </button>
+                <button
+                  onClick={handleBierWettbewerbRedirect}
+                  className="flex-1 px-4 sm:px-6 py-3 min-h-[44px] text-base bg-[#6054d9] hover:bg-[#4f44c7] dark:bg-[#6054d9] dark:hover:bg-[#4f44c7] text-white rounded-lg active:scale-95 transition-all font-semibold touch-manipulation flex items-center justify-center gap-2 shadow-md"
+                  style={{ touchAction: 'manipulation' }}
+                >
+                  Jetzt teilnehmen
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
