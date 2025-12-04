@@ -37,6 +37,7 @@ const NikolausfeierForm = ({ onSuccess }) => {
   const [isMobile, setIsMobile] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [totalSteps, setTotalSteps] = useState(7);
+  const [isFormInitialized, setIsFormInitialized] = useState(false);
 
   // Check if device has entries and detect mobile
   useEffect(() => {
@@ -54,17 +55,39 @@ const NikolausfeierForm = ({ onSuccess }) => {
             setShowFormOnMobile(false);
             // If has entries, step 1 is the update option, otherwise start at step 1
             setTotalSteps(hasEntries ? 8 : 7);
-            setCurrentStep(hasEntries ? 1 : 1);
+            // Only set step to 1 on initial load, not on resize
+            if (!isFormInitialized) {
+              setCurrentStep(hasEntries ? 1 : 1);
+              setIsFormInitialized(true);
+            }
           } else {
             setShowFormOnMobile(true);
             setTotalSteps(hasEntries ? 8 : 7);
-            setCurrentStep(1);
+            // Only reset step on initial load, not on resize
+            if (!isFormInitialized) {
+              setCurrentStep(1);
+              setIsFormInitialized(true);
+            }
           }
         };
         
         checkMobile();
-        window.addEventListener('resize', checkMobile);
-        return () => window.removeEventListener('resize', checkMobile);
+        // Debounce resize to prevent too many updates and step resets
+        let resizeTimeout;
+        const handleResize = () => {
+          clearTimeout(resizeTimeout);
+          resizeTimeout = setTimeout(() => {
+            const mobile = window.innerWidth < 768;
+            setIsMobile(mobile);
+            // Don't reset step on resize - only update mobile state
+            // This prevents the form from jumping back to step 1 when keyboard appears/disappears
+          }, 200);
+        };
+        window.addEventListener('resize', handleResize);
+        return () => {
+          window.removeEventListener('resize', handleResize);
+          clearTimeout(resizeTimeout);
+        };
       } catch (e) {
         // Ignore storage errors
       }
@@ -162,16 +185,7 @@ const NikolausfeierForm = ({ onSuccess }) => {
       setVideoFile(file);
       if (error) setError('');
       
-      // On mobile, auto-advance to next step after video selection
-      if (isMobile) {
-        const videoStep = hasDeviceEntries ? 4 : 3;
-        if (currentStep === videoStep) {
-          setTimeout(() => {
-            setCurrentStep(videoStep + 1);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }, 500);
-        }
-      }
+      // Don't auto-advance - user must click "Next" button manually
     }
   };
 
@@ -187,11 +201,25 @@ const NikolausfeierForm = ({ onSuccess }) => {
   };
 
   const handleNextStep = () => {
+    // Prevent navigation if validation fails
+    if (!canProceedToNextStep()) {
+      return;
+    }
+    
+    // Only proceed if we're not at the last step
     if (currentStep < totalSteps) {
-      setCurrentStep(currentStep + 1);
-      // Scroll to top of form on mobile
+      // Use functional update to ensure we're using the latest state
+      setCurrentStep(prevStep => {
+        const nextStep = prevStep + 1;
+        // Ensure we don't go beyond totalSteps
+        return nextStep <= totalSteps ? nextStep : prevStep;
+      });
+      
+      // Scroll to top of form on mobile after state update
       if (isMobile) {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setTimeout(() => {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 150);
       }
     }
   };
@@ -423,7 +451,8 @@ const NikolausfeierForm = ({ onSuccess }) => {
           <h2 className="text-xl sm:text-2xl font-bold text-[#252422] dark:text-[#F4F1E8] mb-2 sm:mb-4">
             Bier Wettbewerb - Beitrag einreichen
           </h2>
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+          {/* Information box - hidden on mobile, shown on desktop */}
+          <div className="hidden sm:block bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
             <p className="text-xs sm:text-sm text-blue-900 dark:text-blue-100 mb-2">
               <strong>ℹ️ Informationen zum Bier Wettbewerb:</strong>
             </p>
@@ -436,7 +465,7 @@ const NikolausfeierForm = ({ onSuccess }) => {
               <li>Du kannst Beiträge für dich oder deine Freunde erstellen.</li>
             </ul>
           </div>
-          <p className="text-xs sm:text-sm text-[#A58C81] dark:text-[#EBE9E9] mb-4 sm:mb-6">
+          <p className="hidden sm:block text-xs sm:text-sm text-[#A58C81] dark:text-[#EBE9E9] mb-4 sm:mb-6">
            Fragen? Komme zur Bar, wie helfen dir gerne weiter.
           </p>
           
@@ -548,7 +577,11 @@ const NikolausfeierForm = ({ onSuccess }) => {
             <div className="flex gap-3 mt-4">
               <button
                 type="button"
-                onClick={handleNextStep}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleNextStep();
+                }}
                 disabled={wantToUpdateOldEntry && !deleteOldEntryId}
                 className={`flex-1 min-h-[52px] sm:min-h-[48px] px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation flex items-center justify-center gap-2 ${
                   wantToUpdateOldEntry && !deleteOldEntryId
@@ -594,7 +627,11 @@ const NikolausfeierForm = ({ onSuccess }) => {
               )}
               <button
                 type="button"
-                onClick={handleNextStep}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleNextStep(e);
+                }}
                 disabled={!formData.video_name.trim()}
                 className={`${currentStep > (hasDeviceEntries ? 1 : 0) ? 'flex-1' : 'w-full'} min-h-[52px] sm:min-h-[48px] px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation flex items-center justify-center gap-2 ${
                   !formData.video_name.trim()
@@ -638,7 +675,11 @@ const NikolausfeierForm = ({ onSuccess }) => {
               </button>
               <button
                 type="button"
-                onClick={handleNextStep}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleNextStep(e);
+                }}
                 disabled={!formData.participant_name.trim()}
                 className={`flex-1 min-h-[52px] sm:min-h-[48px] px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation flex items-center justify-center gap-2 ${
                   !formData.participant_name.trim()
@@ -729,7 +770,11 @@ const NikolausfeierForm = ({ onSuccess }) => {
               </button>
               <button
                 type="button"
-                onClick={handleNextStep}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleNextStep(e);
+                }}
                 disabled={!videoFile}
                 className={`flex-1 min-h-[52px] sm:min-h-[48px] px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation flex items-center justify-center gap-2 ${
                   !videoFile
@@ -778,7 +823,11 @@ const NikolausfeierForm = ({ onSuccess }) => {
               </button>
               <button
                 type="button"
-                onClick={handleNextStep}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleNextStep(e);
+                }}
                 disabled={!formData.beer_drink_time || parseInt(formData.beer_drink_time, 10) < 0}
                 className={`flex-1 min-h-[52px] sm:min-h-[48px] px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation flex items-center justify-center gap-2 ${
                   !formData.beer_drink_time || parseInt(formData.beer_drink_time, 10) < 0
@@ -821,7 +870,11 @@ const NikolausfeierForm = ({ onSuccess }) => {
               </button>
               <button
                 type="button"
-                onClick={handleNextStep}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleNextStep(e);
+                }}
                 disabled={!formData.drinking_rules_consent}
                 className={`flex-1 min-h-[52px] sm:min-h-[48px] px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation flex items-center justify-center gap-2 ${
                   !formData.drinking_rules_consent
@@ -865,7 +918,11 @@ const NikolausfeierForm = ({ onSuccess }) => {
               </button>
               <button
                 type="button"
-                onClick={handleNextStep}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleNextStep(e);
+                }}
                 disabled={!formData.time_verification_consent}
                 className={`flex-1 min-h-[52px] sm:min-h-[48px] px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors text-base touch-manipulation flex items-center justify-center gap-2 ${
                   !formData.time_verification_consent
@@ -933,6 +990,24 @@ const NikolausfeierForm = ({ onSuccess }) => {
           </div>
         )}
       </form>
+
+      {/* Information box - shown on mobile after form, hidden on desktop */}
+      <div className="sm:hidden bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-3 sm:p-4 mt-4 sm:mb-6">
+        <p className="text-xs sm:text-sm text-blue-900 dark:text-blue-100 mb-2">
+          <strong>ℹ️ Informationen zum Bier Wettbewerb:</strong>
+        </p>
+        <ul className="text-xs sm:text-sm text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
+        <li style={{ color: 'orange' }}><strong>Wichtig es darf kein Restbier mehr in der Flasche sein also am ende des videos am bestn die flasche umdrehen</strong></li>
+          <li>Zeige uns wie schnell du ein Bier Trinken kannst.</li>
+         
+          <li>Du kannst mehrere Beiträge für den Bier Wettbewerb einreichen.</li>
+          <li>Du hast eine bessere Zeit als dein letzter Beitrag? Dann kannst du ihn aktualisieren.</li>
+          <li>Du kannst Beiträge für dich oder deine Freunde erstellen.</li>
+        </ul>
+      </div>
+      <p className="sm:hidden text-xs sm:text-sm text-[#A58C81] dark:text-[#EBE9E9] mt-2 mb-4">
+       Fragen? Komme zur Bar, wie helfen dir gerne weiter.
+      </p>
         </>
       )}
 
